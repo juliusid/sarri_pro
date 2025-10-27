@@ -10,7 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
 
-enum DriverSignupStep { email, otp, details, documents }
+enum DriverSignupStep { email, otp, details }
 
 class DriverSignupController extends GetxController {
   static DriverSignupController get instance => Get.find();

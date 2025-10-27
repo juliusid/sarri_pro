@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/features/notifications/controllers/notification_controller.dart';
+import 'package:sarri_ride/features/notifications/screens/notification_screen.dart';
 import 'package:sarri_ride/utils/constants/colors.dart'; //
 import 'package:badges/badges.dart' as badges;
 import 'package:sarri_ride/utils/helpers/helper_functions.dart'; // Add badges package
@@ -37,14 +38,7 @@ class NotificationIconWidget extends StatelessWidget {
           onPressed:
               onPressed ??
               () {
-                // TODO: Navigate to Notification Screen
-                print(
-                  'Notification Icon Pressed. Unread: ${controller.unreadCount.value}',
-                );
-                // controller.markAsRead(); // Example: Mark as read on tap
-                THelperFunctions.showSnackBar(
-                  'Notification screen not implemented yet.',
-                ); //
+                Get.to(() => const NotificationScreen()); // Navigate here
               },
         ),
       ),

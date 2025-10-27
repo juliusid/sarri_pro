@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sarri_ride/features/communication/controllers/chat_controller.dart';
+import 'package:sarri_ride/features/communication/screens/chat_list_screen.dart';
 import 'package:sarri_ride/features/communication/screens/message_screen.dart';
+import 'package:sarri_ride/features/notifications/screens/notification_screen.dart';
 import 'package:sarri_ride/features/ride/controllers/ride_controller.dart';
 import 'package:sarri_ride/utils/constants/colors.dart'; //
 import 'package:sarri_ride/features/location/services/location_service.dart'; //
@@ -128,38 +130,9 @@ class MapDrawerWidget extends StatelessWidget {
             title: const Text('Messages'),
             onTap: () {
               Navigator.pop(context); // Close drawer
-              // TODO: Navigate to a Chat List Screen or the active chat if only one exists
-              // For now, maybe just go to the current ride's chat if active?
-              final rideController = Get.find<RideController>();
-              if (rideController.currentState.value ==
-                      BookingState.driverAssigned ||
-                  rideController.currentState.value ==
-                      BookingState.driverArrived ||
-                  rideController.currentState.value ==
-                      BookingState.tripInProgress) {
-                final chatId = rideController.activeRideChatId.value;
-                if (chatId.isNotEmpty &&
-                    rideController.assignedDriver.value != null) {
-                  Get.to(
-                    () => MessageScreen(
-                      //
-                      driverName: rideController.assignedDriver.value!.name,
-                      carModel: rideController.assignedDriver.value!.carModel,
-                      plateNumber:
-                          rideController.assignedDriver.value!.plateNumber,
-                      rating: rideController.assignedDriver.value!.rating,
-                      chatId: chatId,
-                    ),
-                  );
-                  // Mark as read when navigating
-                  chatController.markChatAsRead(chatId);
-                } else {
-                  THelperFunctions.showSnackBar('No active ride chat found.');
-                }
-              } else {
-                THelperFunctions.showSnackBar('Messages screen pending.');
-                // Get.to(() => const ChatListScreen()); // Navigate to general chat list if implemented
-              }
+              Get.to(
+                () => const ChatListScreen(),
+              ); // Navigate to Chat List Screen
             },
           ),
 
@@ -183,12 +156,7 @@ class MapDrawerWidget extends StatelessWidget {
             ),
             title: const Text('Notifications'),
             onTap: () {
-              Navigator.pop(context); // Close drawer
-              // TODO: Navigate to Notification Screen
-              // Get.to(() => const NotificationScreen());
-              // Optionally mark as read when navigating
-              // notificationController.markAsRead();
-              THelperFunctions.showSnackBar('Notification screen pending.');
+              Get.to(() => const NotificationScreen()); // Navigate here
             },
           ),
 
