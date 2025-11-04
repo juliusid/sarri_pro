@@ -1,3 +1,4 @@
+// lib/config/api_config.dart
 class ApiConfig {
   // Base URLs for different environments
   static const String _devBaseUrl =
@@ -44,40 +45,47 @@ class ApiConfig {
   static Map<String, String> get defaultHeaders => Map.from(_defaultHeaders);
 
   /// Returns the base URL for the WebSocket connection.
-  static String get webSocketUrl => '$baseUrl/driver/websocket';
+  static String get webSocketUrl => baseUrl;
 
   // Auth endpoints
-  static String get loginEndpoint => '$baseUrl/auth/client/login'; // Corrected
-  static String get signupEndpoint =>
-      '$baseUrl/auth/client/register'; // Corrected
-  static String get verifyEndpoint =>
-      '$baseUrl/auth/client/verify-otp'; // Corrected
-  static String get googleAuthEndpoint => '$baseUrl/client/google'; // New
-  static String get logoutEndpoint => '$baseUrl/auth/logout';
+  static String get loginEndpoint => '$baseUrl/auth/client/login';
+  static String get signupEndpoint => '$baseUrl/auth/client/register';
+  // Removed verifyEndpoint as verifyOtpEndpoint covers it
+  static String get googleAuthEndpoint =>
+      '$baseUrl/client/google'; // Assuming correct path
+  static String get logoutEndpoint =>
+      '$baseUrl/auth/logout'; // Assuming correct path
 
-  // -- NEW UNIFIED REGISTRATION ENDPOINTS --
+  // -- UNIFIED REGISTRATION ENDPOINTS --
   static String get verifyUserEmailEndpoint =>
       '$baseUrl/auth/user/verifyUserEmail';
   static String get verifyOtpEndpoint => '$baseUrl/auth/user/verify-otp';
 
-  // New Driver Endpoints
-  // static String get driverVerifyEmailEndpoint =>
-  //     '$baseUrl/driverAuth/driver/verifyDriverEmail';
-  // static String get driverVerifyOtpEndpoint =>
-  //     '$baseUrl/driverAuth/driver/verifyDriverOtp';
+  // --- REFRESH TOKEN ENDPOINTS (FROM USER) ---
+  static String get clientRefreshEndpoint =>
+      '$baseUrl/auth/client/refresh-Token'; // Corrected path
+  static String get driverRefreshEndpoint =>
+      '$baseUrl/driverAuth/driver/refresh-token'; // Corrected path
+  // --- END REFRESH ENDPOINTS ---
+
+  // Driver Endpoints
   static String get driverRegisterEndpoint =>
       '$baseUrl/driverAuth/driver/register';
   static String get driverLoginEndpoint => '$baseUrl/driverAuth/driver/login';
-  static String get driverUploadImagesEndpoint =>
-      '$baseUrl/driverAuth/driver/upload-images';
+  static String get driverProfileEndpoint =>
+      '$baseUrl/driverRides/driver/profile'; // Added profile endpoint
+  static String get driverStatusEndpoint => '$baseUrl/driverRides/getStatus';
+  static String get startBreakEndpoint => '$baseUrl/driverRides/break/start';
+  static String get endBreakEndpoint => '$baseUrl/driverRides/break/end';
+  // static String get driverUploadImagesEndpoint => '$baseUrl/driverAuth/driver/upload-images'; // Confirm path
 
-  // New Password Reset Endpoints
+  // Password Reset Endpoints
   static String get forgotPasswordEndpoint =>
       '$baseUrl/auth/user/forgot-password';
   static String get resetPasswordEndpoint =>
       '$baseUrl/auth/user/reset-password';
 
-  // New Client Ride Endpoints
+  // Client Ride Endpoints
   static String get calculatePriceEndpoint =>
       '$baseUrl/clientRide/calculate-price';
   static String get bookRideEndpoint => '$baseUrl/clientRide/bookRide';
@@ -86,22 +94,4 @@ class ApiConfig {
   static String get cancelRideEndpoint => '$baseUrl/clientRide/cancel-ride';
   static String get checkRideStatusEndpoint =>
       '$baseUrl/clientRide/checkRideStatus';
-
-  //   // User endpoints
-  //   static String get userProfileEndpoint => '$baseUrl/user/profile';
-  //   static String get updateProfileEndpoint => '$baseUrl/user/profile';
-
-  //   // Ride endpoints
-  //   static String get rideRequestEndpoint => '$baseUrl/rides/request';
-  //   static String get rideStatusEndpoint => '$baseUrl/rides';
-  //   static String get rideHistoryEndpoint => '$baseUrl/rides/history';
-
-  //   // Payment endpoints
-  //   static String get paymentMethodsEndpoint => '$baseUrl/payments/methods';
-  //   static String get walletEndpoint => '$baseUrl/payments/wallet';
-
-  //   // Driver endpoints
-  //   static String get nearbyDriversEndpoint => '$baseUrl/drivers/nearby';
-  //   static String get driverLocationEndpoint => '$baseUrl/drivers/location';
-  //
 }

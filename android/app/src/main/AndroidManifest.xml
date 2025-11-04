@@ -7,6 +7,9 @@
         android:label="sarri_ride"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <meta-data
+        android:name="com.google.android.geo.API_KEY"
+        android:value="AIzaSyChNPec0LnXwnWRon4-fT0SsjrPW0mroPE" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

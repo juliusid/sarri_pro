@@ -1,54 +1,66 @@
+// lib/features/location/services/places_service.dart
+
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class PlacesService {
   static const String _baseUrl = 'https://maps.googleapis.com/maps/api/place';
-  static const String _geocodingUrl = 'https://maps.googleapis.com/maps/api/geocode';
+  static const String _geocodingUrl =
+      'https://maps.googleapis.com/maps/api/geocode';
   // TODO: Replace with your actual Google Places API key
-  static const String _apiKey = 'AIzaSyChNPec0LnXwnWRon4-fT0SsjrPW0mroPE';
-  
+  static const String _apiKey = 'AIzaSyAuzjqoVRhu70vqDQKFtDuOnZE6UE6kXVM'; //
+
   // Get place autocomplete suggestions
-  static Future<List<PlaceSuggestion>> getPlaceSuggestions(String query, {LatLng? location}) async {
+  static Future<List<PlaceSuggestion>> getPlaceSuggestions(
+    String query, {
+    LatLng? location,
+  }) async {
     if (query.length < 3) return [];
-    
+
     try {
       String locationBias = '';
       if (location != null) {
-        // Bias results to current location
-        locationBias = '&location=${location.latitude},${location.longitude}&radius=50000';
+        locationBias =
+            '&location=${location.latitude},${location.longitude}&radius=50000';
       } else {
-        // Default to Lagos, Nigeria
-        locationBias = '&location=6.5244,3.3792&radius=50000';
+        locationBias =
+            '&location=6.5244,3.3792&radius=50000'; // Default to Lagos
       }
-      
-      final String url = '$_baseUrl/autocomplete/json'
+
+      final String url =
+          '$_baseUrl/autocomplete/json'
           '?input=${Uri.encodeComponent(query)}'
           '&key=$_apiKey'
           '&components=country:ng' // Restrict to Nigeria
           '$locationBias'
-          '&types=establishment|geocode'; // Include places and addresses
-      
+          '&types=establishment|geocode';
+
       final response = await http.get(Uri.parse(url));
-      
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data['status'] == 'OK') {
           List<PlaceSuggestion> suggestions = [];
-          
+
           for (var prediction in data['predictions']) {
-            suggestions.add(PlaceSuggestion(
-              placeId: prediction['place_id'],
-              description: prediction['description'],
-              mainText: prediction['structured_formatting']['main_text'],
-              secondaryText: prediction['structured_formatting']['secondary_text'] ?? '',
-            ));
+            suggestions.add(
+              PlaceSuggestion(
+                placeId: prediction['place_id'],
+                description: prediction['description'],
+                mainText: prediction['structured_formatting']['main_text'],
+                secondaryText:
+                    prediction['structured_formatting']['secondary_text'] ?? '',
+              ),
+            );
           }
-          
+
           return suggestions;
         } else {
-          print('Places API Error: ${data['status']} - ${data['error_message'] ?? 'Unknown error'}');
+          print(
+            'Places API Error: ${data['status']} - ${data['error_message'] ?? 'Unknown error'}',
+          );
           return [];
         }
       } else {
@@ -60,24 +72,29 @@ class PlacesService {
       return [];
     }
   }
-  
-  // Get place details including coordinates
+
+  // --- MODIFIED: getPlaceDetails ---
+  /// Get place details including coordinates and address components (for state)
   static Future<PlaceDetails?> getPlaceDetails(String placeId) async {
     try {
-      final String url = '$_baseUrl/details/json'
+      // --- MODIFIED: Added 'address_component' to fields ---
+      final String url =
+          '$_baseUrl/details/json'
           '?place_id=$placeId'
-          '&fields=name,formatted_address,geometry'
+          '&fields=name,formatted_address,geometry,address_component'
           '&key=$_apiKey';
-      
+      // --- END MODIFICATION ---
+
       final response = await http.get(Uri.parse(url));
-      
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data['status'] == 'OK') {
           final result = data['result'];
           final geometry = result['geometry']['location'];
-          
+
+          // --- MODIFIED: Pass 'address_components' to PlaceDetails constructor ---
           return PlaceDetails(
             name: result['name'] ?? '',
             formattedAddress: result['formatted_address'],
@@ -85,9 +102,15 @@ class PlacesService {
               geometry['lat'].toDouble(),
               geometry['lng'].toDouble(),
             ),
+            addressComponents: List<Map<String, dynamic>>.from(
+              result['address_components'] ?? [],
+            ),
           );
+          // --- END MODIFICATION ---
         } else {
-          print('Place Details API Error: ${data['status']} - ${data['error_message'] ?? 'Unknown error'}');
+          print(
+            'Place Details API Error: ${data['status']} - ${data['error_message'] ?? 'Unknown error'}',
+          );
           return null;
         }
       } else {
@@ -99,25 +122,32 @@ class PlacesService {
       return null;
     }
   }
+  // --- END MODIFIED ---
 
   // Get address from coordinates (reverse geocoding)
-  static Future<String?> getAddressFromCoordinates(double latitude, double longitude) async {
+  static Future<String?> getAddressFromCoordinates(
+    double latitude,
+    double longitude,
+  ) async {
     try {
-      final String url = '$_geocodingUrl/json'
+      final String url =
+          '$_geocodingUrl/json'
           '?latlng=$latitude,$longitude'
           '&key=$_apiKey'
           '&result_type=street_address|route|neighborhood|political';
-      
+
       final response = await http.get(Uri.parse(url));
-      
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data['status'] == 'OK' && data['results'].isNotEmpty) {
           // Return the most specific address (first result)
           return data['results'][0]['formatted_address'];
         } else {
-          print('Geocoding API Error: ${data['status']} - ${data['error_message'] ?? 'Unknown error'}');
+          print(
+            'Geocoding API Error: ${data['status']} - ${data['error_message'] ?? 'Unknown error'}',
+          );
           return 'Unknown location';
         }
       } else {
@@ -130,30 +160,35 @@ class PlacesService {
     }
   }
 
-  // Get detailed place information from coordinates
-  static Future<PlaceDetails?> getPlaceDetailsFromCoordinates(double latitude, double longitude) async {
+  // --- MODIFIED: getPlaceDetailsFromCoordinates ---
+  /// Get detailed place information (including state) from coordinates
+  static Future<PlaceDetails?> getPlaceDetailsFromCoordinates(
+    double latitude,
+    double longitude,
+  ) async {
     try {
-      final String url = '$_geocodingUrl/json'
+      final String url =
+          '$_geocodingUrl/json'
           '?latlng=$latitude,$longitude'
           '&key=$_apiKey'
           '&result_type=establishment|street_address|route';
-      
+
       final response = await http.get(Uri.parse(url));
-      
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data['status'] == 'OK' && data['results'].isNotEmpty) {
           final result = data['results'][0];
           final geometry = result['geometry']['location'];
-          
-          // Extract name from address components or use formatted address
+
           String name = result['formatted_address'];
-          if (result['address_components'] != null && result['address_components'].isNotEmpty) {
-            // Try to get establishment name or street name
+          if (result['address_components'] != null &&
+              result['address_components'].isNotEmpty) {
             for (var component in result['address_components']) {
               final types = List<String>.from(component['types']);
-              if (types.contains('establishment') || types.contains('point_of_interest')) {
+              if (types.contains('establishment') ||
+                  types.contains('point_of_interest')) {
                 name = component['long_name'];
                 break;
               } else if (types.contains('route')) {
@@ -161,7 +196,8 @@ class PlacesService {
               }
             }
           }
-          
+
+          // --- MODIFIED: Pass 'address_components' to PlaceDetails constructor ---
           return PlaceDetails(
             name: name,
             formattedAddress: result['formatted_address'],
@@ -169,9 +205,15 @@ class PlacesService {
               geometry['lat'].toDouble(),
               geometry['lng'].toDouble(),
             ),
+            addressComponents: List<Map<String, dynamic>>.from(
+              result['address_components'] ?? [],
+            ),
           );
+          // --- END MODIFICATION ---
         } else {
-          print('Geocoding API Error: ${data['status']} - ${data['error_message'] ?? 'Unknown error'}');
+          print(
+            'Geocoding API Error: ${data['status']} - ${data['error_message'] ?? 'Unknown error'}',
+          );
           return null;
         }
       } else {
@@ -184,13 +226,14 @@ class PlacesService {
     }
   }
 }
+// --- END MODIFIED ---
 
 class PlaceSuggestion {
   final String placeId;
   final String description;
   final String mainText;
   final String secondaryText;
-  
+
   PlaceSuggestion({
     required this.placeId,
     required this.description,
@@ -199,14 +242,40 @@ class PlaceSuggestion {
   });
 }
 
+// --- MODIFIED: PlaceDetails Model ---
 class PlaceDetails {
   final String name;
   final String formattedAddress;
   final LatLng location;
-  
+  // --- ADDED: Store address components ---
+  final List<Map<String, dynamic>> addressComponents;
+  // --- END ADDED ---
+
   PlaceDetails({
     required this.name,
     required this.formattedAddress,
     required this.location,
+    this.addressComponents = const [], // Default to empty list
   });
+
+  // --- ADDED: Helper getter to extract the state ---
+  /// Finds and returns the "state" (e.g., "Lagos") from the address components.
+  String get state {
+    try {
+      for (var component in addressComponents) {
+        final types = List<String>.from(component['types'] ?? []);
+        // 'administrative_area_level_1' is the Google Maps type for state/province
+        if (types.contains('administrative_area_level_1')) {
+          return component['long_name'] ?? ''; // e.g., "Lagos"
+        }
+      }
+    } catch (e) {
+      print('Error parsing state from addressComponents: $e');
+    }
+    // Fallback if not found
+    return '';
+  }
+
+  // --- END ADDED ---
 } 
+// --- END MODIFIED ---

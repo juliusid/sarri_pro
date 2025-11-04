@@ -78,12 +78,18 @@ class RiderSignupController extends GetxController {
         'client',
       );
       if (result.success) {
-        THelperFunctions.showSnackBar(
+        // --- CORRECTED ---
+        THelperFunctions.showSuccessSnackBar(
+          'Success',
           result.message ?? 'OTP sent successfully!',
         );
         nextStep();
       } else {
-        THelperFunctions.showSnackBar(result.error ?? 'Failed to send OTP.');
+        // --- CORRECTED ---
+        THelperFunctions.showErrorSnackBar(
+          'Error',
+          result.error ?? 'Failed to send OTP.',
+        );
       }
     } finally {
       isLoading.value = false;
@@ -100,10 +106,18 @@ class RiderSignupController extends GetxController {
         'client',
       );
       if (result.success) {
-        THelperFunctions.showSnackBar(result.message ?? 'Email verified!');
+        // --- CORRECTED ---
+        THelperFunctions.showSuccessSnackBar(
+          'Success',
+          result.message ?? 'Email verified!',
+        );
         nextStep(); // Move to details screen
       } else {
-        THelperFunctions.showSnackBar(result.error ?? 'Invalid OTP.');
+        // --- CORRECTED ---
+        THelperFunctions.showErrorSnackBar(
+          'Error',
+          result.error ?? 'Invalid OTP.',
+        );
       }
     } finally {
       isLoading.value = false;
@@ -123,16 +137,21 @@ class RiderSignupController extends GetxController {
 
       if (authResult.success) {
         Get.offAll(() => const LoginScreenGetX());
-        THelperFunctions.showSnackBar(
+        // --- CORRECTED ---
+        THelperFunctions.showSuccessSnackBar(
+          'Success',
           'Registration successful! Please log in to your new account.',
         );
       } else {
-        THelperFunctions.showSnackBar(
+        // --- CORRECTED ---
+        THelperFunctions.showErrorSnackBar(
+          'Signup Failed',
           authResult.error ?? 'Signup failed. Please try again.',
         );
       }
     } catch (e) {
-      THelperFunctions.showSnackBar('Signup failed: ${e.toString()}');
+      // --- CORRECTED ---
+      THelperFunctions.showErrorSnackBar('Signup Failed', e.toString());
     } finally {
       isLoading.value = false;
     }

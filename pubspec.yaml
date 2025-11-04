@@ -1,13 +1,12 @@
 name: sarri_ride
 description: "A new Flutter project."
 
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 version: 1.0.0+1
 
 environment:
   sdk: ^3.8.1
-
 
 dependencies:
   flutter:
@@ -28,20 +27,19 @@ dependencies:
   connectivity_plus: ^6.1.4
   lottie: ^3.3.1 # OR RIVE
   flutter_secure_storage: ^9.0.0
+  shared_preferences: ^2.0.15
 
- 
-
-# State Management
+  # State Management
   get: ^4.7.2
   get_storage: ^2.1.1
 
-# Product Specific
+  # Product Specific
   readmore: ^3.0.0
   carousel_slider: ^5.0.0
   flutter_rating_bar: ^4.0.1
   capped_progress_indicator: ^0.0.2
 
-# Map and Location
+  # Map and Location
   google_maps_flutter: ^2.10.0
   sliding_up_panel: ^2.0.0+1
   geolocator: ^13.0.2
@@ -51,28 +49,23 @@ dependencies:
   socket_io_client: ^3.1.2
   badges: ^3.1.2
 
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  
   flutter_lints: ^5.0.0
 
-
 flutter:
-
- 
   uses-material-design: true
-
 
   assets:
     - assets/logos/
     - assets/images/content/
     - assets/icons/payment_methods/
     - assets/images/on_boarding_images/
+    - assets/icons/maps/
 
-   #--------------- LOCAL FONTS ------------------#
+    #--------------- LOCAL FONTS ------------------#
   fonts:
     - family: Poppins
       fonts:
@@ -91,8 +84,3 @@ flutter:
           weight: 600
         - asset: assets/fonts/Poppins-Bold.ttf
           weight: 800
-
-
-
-  
-  

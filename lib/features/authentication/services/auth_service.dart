@@ -83,7 +83,7 @@ class AuthService extends GetxService {
       final request = VerifyRequest(email: email, otp: otp, role: role);
 
       final response = await _httpService.post(
-        ApiConfig.verifyEndpoint,
+        ApiConfig.verifyOtpEndpoint,
         body: request.toJson(),
       );
       final responseData = _httpService.handleResponse(response);

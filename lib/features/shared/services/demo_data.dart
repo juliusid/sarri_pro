@@ -20,8 +20,8 @@ class DemoDataService {
 
   void initializeDemoData() {
     _demoUsers.clear();
-    
-    // Create demo rider
+
+    // Create demo rider (remains the same)
     final riderUser = User(
       id: 'rider_001',
       email: riderEmail,
@@ -49,7 +49,7 @@ class DemoDataService {
       ),
     );
 
-    // Create demo driver
+    // --- UPDATED DEMO DRIVER ---
     final driverUser = User(
       id: 'driver_001',
       email: driverEmail,
@@ -60,65 +60,74 @@ class DemoDataService {
       createdAt: DateTime.now().subtract(const Duration(days: 90)),
       updatedAt: DateTime.now(),
       driverProfile: DriverProfile(
+        // Use the new structure
         userId: 'driver_001',
-        licenseNumber: 'LOS-123456789',
-        vehicle: Vehicle(
+        // Example nested objects
+        drivingLicense: DrivingLicenseModel(
+          // Example
+          issueDate: DateTime.now().subtract(const Duration(days: 85)),
+          expiryDate: DateTime.now().add(const Duration(days: 1095)),
+          // Add image URLs if needed for demo
+        ),
+        currentAddress: AddressModel(
+          // Example
+          address: '10 Driver St',
+          city: 'Ikeja',
+          state: 'Lagos',
+          country: 'Nigeria',
+          postalCode: '100001',
+        ),
+        permanentAddress: AddressModel(
+          // Example
+          address: '10 Driver St',
+          city: 'Ikeja',
+          state: 'Lagos',
+          country: 'Nigeria',
+          postalCode: '100001',
+        ),
+        bankDetails: BankDetailsModel(
+          // Example
+          bankAccountNumber: '1234567890',
+          bankName: 'Demo Bank',
+          bankAccountName: 'Mike Driver',
+        ),
+        vehicleDetails: Vehicle(
+          // Use VehicleDetails nested object
           make: 'Toyota',
           model: 'Camry',
           year: 2020,
-          plateNumber: 'ABC-123-XY',
+          plateNumber: 'ABC-123-XY', // Use plateNumber
           color: 'Black',
           type: VehicleType.sedan,
-          seats: 4,
+          seats: 4, // Seats now part of Vehicle
         ),
-        documents: [
-          Document(
-            id: 'doc_001',
-            type: DocumentType.driverLicense,
-            fileName: 'license.jpg',
-            filePath: '/documents/license.jpg',
-            status: DocumentStatus.approved,
-            uploadedAt: DateTime.now().subtract(const Duration(days: 85)),
-            expiryDate: DateTime.now().add(const Duration(days: 1095)), // 3 years
-          ),
-          Document(
-            id: 'doc_002',
-            type: DocumentType.vehicleRegistration,
-            fileName: 'registration.jpg',
-            filePath: '/documents/registration.jpg',
-            status: DocumentStatus.approved,
-            uploadedAt: DateTime.now().subtract(const Duration(days: 85)),
-          ),
-          Document(
-            id: 'doc_003',
-            type: DocumentType.insurance,
-            fileName: 'insurance.jpg',
-            filePath: '/documents/insurance.jpg',
-            status: DocumentStatus.approved,
-            uploadedAt: DateTime.now().subtract(const Duration(days: 85)),
-            expiryDate: DateTime.now().add(const Duration(days: 365)), // 1 year
-          ),
-          Document(
-            id: 'doc_004',
-            type: DocumentType.profilePhoto,
-            fileName: 'profile.jpg',
-            filePath: '/documents/profile.jpg',
-            status: DocumentStatus.approved,
-            uploadedAt: DateTime.now().subtract(const Duration(days: 85)),
-          ),
-        ],
-        status: DriverStatus.online,
+        location: LocationModel(
+          // Use Location nested object
+          type: 'Point',
+          coordinates: const LatLng(6.5244, 3.3792), // Use coordinates
+          state: 'Lagos',
+        ),
+        // Fields directly in DriverProfile
+        isVerified: true,
+        adminVerified: false, // Example
+        availabilityStatus: 'available', // Match API field
+        status: 'active', // Match API field
+        lastLocationUpdate: DateTime.now().subtract(const Duration(minutes: 2)),
+        // dateOfBirth: DateTime(1990, 5, 15), // Example
+        // gender: 'male', // Example
+        emergencyContactNumber: '+2348076543210',
+        licenseNumber: 'LOS-123456789', // Example
+        // seat: 4, // Seat is now inside vehicleDetails
+
+        // Stats (keep using direct fields as defined in DriverProfile)
         rating: 4.9,
         totalTrips: 1250,
         totalEarnings: 2850000.0, // ₦2,850,000
-        currentLocation: const LatLng(6.5244, 3.3792), // Lagos coordinates
-        lastLocationUpdate: DateTime.now().subtract(const Duration(minutes: 2)),
-        isVerified: true,
         acceptanceRate: 95.5,
         cancellationRate: 2.1,
-        emergencyContact: '+2348076543210',
       ),
     );
+    // --- END UPDATED DEMO DRIVER ---
 
     _demoUsers[riderEmail] = riderUser;
     _demoUsers[driverEmail] = driverUser;
@@ -190,7 +199,7 @@ class DemoDataService {
     return updatedUser;
   }
 
-  // Update driver location
+  // Update driver location (updates nested LocationModel)
   Future<void> updateDriverLocation(String userId, LatLng location) async {
     try {
       final user = _demoUsers.values.firstWhere(
@@ -199,9 +208,10 @@ class DemoDataService {
       );
 
       if (user.driverProfile != null) {
+        // Use copyWith on DriverProfile to update the nested LocationModel
         final updatedDriverProfile = user.driverProfile!.copyWith(
-          currentLocation: location,
-          lastLocationUpdate: DateTime.now(),
+          currentLocation: location, // Pass LatLng directly to copyWith
+          // lastLocationUpdate is handled by copyWith
         );
 
         final updatedUser = user.copyWith(
@@ -212,13 +222,18 @@ class DemoDataService {
         _demoUsers[user.email] = updatedUser;
       }
     } catch (e) {
-      print('Warning: Could not update driver location for userId: $userId. Error: $e');
-      // Silently fail for demo purposes - in a real app, this would be logged properly
+      print(
+        'Warning: Could not update driver location for userId: $userId. Error: $e',
+      );
     }
   }
 
-  // Update driver status
-  Future<void> updateDriverStatus(String userId, DriverStatus status) async {
+  // Update driver status (updates availabilityStatus)
+  Future<void> updateDriverStatus(
+    String userId,
+    String availabilityStatus,
+  ) async {
+    // Use String for status
     try {
       final user = _demoUsers.values.firstWhere(
         (user) => user.id == userId && user.userType == UserType.driver,
@@ -226,8 +241,9 @@ class DemoDataService {
       );
 
       if (user.driverProfile != null) {
+        // Use copyWith on DriverProfile to update availabilityStatus
         final updatedDriverProfile = user.driverProfile!.copyWith(
-          status: status,
+          availabilityStatus: availabilityStatus, // Update availabilityStatus
         );
 
         final updatedUser = user.copyWith(
@@ -238,23 +254,31 @@ class DemoDataService {
         _demoUsers[user.email] = updatedUser;
       }
     } catch (e) {
-      print('Warning: Could not update driver status for userId: $userId. Error: $e');
-      // Silently fail for demo purposes - in a real app, this would be logged properly
+      print(
+        'Warning: Could not update driver status for userId: $userId. Error: $e',
+      );
     }
   }
 
-  // Get nearby drivers (mock implementation)
+  // Get nearby drivers (uses nested location)
   List<User> getNearbyDrivers(LatLng location, {double radiusKm = 5.0}) {
     return _demoUsers.values
-        .where((user) =>
-            user.userType == UserType.driver &&
-            user.driverProfile?.status == DriverStatus.online &&
-            user.driverProfile?.currentLocation != null)
+        .where(
+          (user) =>
+              user.userType == UserType.driver &&
+              user.driverProfile?.availabilityStatus ==
+                  'available' && // Check availabilityStatus
+              user.driverProfile?.location.coordinates != null,
+        ) // Check nested coordinates
         .toList();
+    // TODO: Implement actual distance check using user.driverProfile.location.coordinates
   }
 
   // Mock trip data
-  List<Map<String, dynamic>> getMockTripsForUser(String userId, UserType userType) {
+  List<Map<String, dynamic>> getMockTripsForUser(
+    String userId,
+    UserType userType,
+  ) {
     if (userType == UserType.rider) {
       return [
         {
@@ -330,26 +354,10 @@ class DemoDataService {
   // Mock earnings data for drivers
   Map<String, dynamic> getMockEarningsData(String driverId) {
     return {
-      'today': {
-        'trips': 8,
-        'earnings': 28500.0,
-        'hours': 6.5,
-      },
-      'thisWeek': {
-        'trips': 45,
-        'earnings': 185000.0,
-        'hours': 35.0,
-      },
-      'thisMonth': {
-        'trips': 180,
-        'earnings': 720000.0,
-        'hours': 140.0,
-      },
-      'allTime': {
-        'trips': 1250,
-        'earnings': 2850000.0,
-        'hours': 950.0,
-      },
+      'today': {'trips': 8, 'earnings': 28500.0, 'hours': 6.5},
+      'thisWeek': {'trips': 45, 'earnings': 185000.0, 'hours': 35.0},
+      'thisMonth': {'trips': 180, 'earnings': 720000.0, 'hours': 140.0},
+      'allTime': {'trips': 1250, 'earnings': 2850000.0, 'hours': 950.0},
     };
   }
-} 
+}

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:sarri_ride/features/driver/controllers/driver_dashboard_controller.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
@@ -349,7 +350,7 @@ class DriverProfileScreen extends StatelessWidget {
           const SizedBox(height: TSizes.spaceBtwItems),
           Obx(() {
             final vehicle =
-                controller.currentDriver.value?.driverProfile?.vehicle;
+                controller.currentDriver.value?.driverProfile?.vehicleDetails;
             if (vehicle == null) {
               return const Text('No vehicle information available');
             }
@@ -358,25 +359,34 @@ class DriverProfileScreen extends StatelessWidget {
               children: [
                 _buildInfoRow(
                   'Make & Model',
-                  '${vehicle.make} ${vehicle.model}',
+                  vehicle.displayName,
                   Iconsax.car,
-                ),
+                ), // Use displayName getter
                 _buildInfoRow(
                   'Year',
-                  vehicle.year.toString(),
+                  vehicle.year?.toString() ?? 'N/A',
                   Iconsax.calendar,
                 ),
                 _buildInfoRow(
                   'Plate Number',
-                  vehicle.plateNumber,
+                  vehicle.plateNumber ?? 'N/A',
                   Iconsax.hashtag,
                 ),
-                _buildInfoRow('Color', vehicle.color, Iconsax.colorfilter),
+                _buildInfoRow(
+                  'Color',
+                  vehicle.color ?? 'N/A',
+                  Iconsax.colorfilter,
+                ),
                 _buildInfoRow(
                   'Seats',
                   '${vehicle.seats} passengers',
                   Iconsax.profile_2user,
                 ),
+                _buildInfoRow(
+                  'Type',
+                  vehicle.type.toString().split('.').last,
+                  Iconsax.category,
+                ), // Show vehicle type
               ],
             );
           }),
@@ -430,28 +440,96 @@ class DriverProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: TSizes.spaceBtwItems),
           Obx(() {
-            final documents =
-                controller.currentDriver.value?.driverProfile?.documents ?? [];
-            if (documents.isEmpty) {
-              return const Text('No documents uploaded');
+            // Access documents/images from drivingLicense object
+            final licenseInfo =
+                controller.currentDriver.value?.driverProfile?.drivingLicense;
+            final isVerified =
+                controller.currentDriver.value?.driverProfile?.isVerified ??
+                false;
+            final accountStatus =
+                controller.currentDriver.value?.driverProfile?.status ??
+                'pending'; // 'pending', 'active', 'rejected' etc.
+
+            // Determine overall document status based on account status and verification
+            String overallStatus = accountStatus; // Start with account status
+            Color statusColor = TColors.warning; // Default to pending/warning
+            IconData statusIcon = Iconsax.clock;
+
+            if (isVerified && accountStatus == 'active') {
+              overallStatus = 'Approved';
+              statusColor = TColors.success;
+              statusIcon = Iconsax.tick_circle;
+            } else if (accountStatus == 'rejected') {
+              overallStatus = 'Rejected';
+              statusColor = TColors.error;
+              statusIcon = Iconsax.close_circle;
+            } else if (accountStatus == 'pending' ||
+                accountStatus == 'unverified') {
+              overallStatus = 'Pending Review';
+              // Keep warning color/icon
             }
 
-            return Column(
-              children: documents
-                  .map((doc) => _buildDocumentItem(doc, context, dark))
-                  .toList(),
+            // Build document list (simplified view for now)
+            List<Widget> docItems = [];
+
+            // Example: Show overall status and specific document info if available
+            docItems.add(
+              _buildDocumentItemNew(
+                'Overall Status',
+                overallStatus,
+                statusIcon,
+                statusColor,
+                context,
+                dark,
+              ),
             );
+
+            if (licenseInfo?.issueDate != null) {
+              docItems.add(
+                _buildDocumentItemNew(
+                  'License Issued',
+                  DateFormat('dd MMM yyyy').format(licenseInfo!.issueDate!),
+                  Iconsax.calendar_add,
+                  TColors.info,
+                  context,
+                  dark,
+                ),
+              );
+            }
+            if (licenseInfo?.expiryDate != null) {
+              docItems.add(
+                _buildDocumentItemNew(
+                  'License Expires',
+                  DateFormat('dd MMM yyyy').format(licenseInfo!.expiryDate!),
+                  Iconsax.calendar_remove,
+                  TColors.warning,
+                  context,
+                  dark,
+                ),
+              );
+            }
+            // Add entries for image URLs if needed
+            // if (licenseInfo?.frontsideImage != null) { /* ... */ }
+
+            if (docItems.isEmpty) {
+              return const Text('Document information not available.');
+            }
+
+            return Column(children: docItems);
           }),
         ],
       ),
     );
   }
 
-  Widget _buildDocumentItem(dynamic doc, BuildContext context, bool dark) {
-    final String title = _getDocumentTitle(doc.type.toString());
-    final Color statusColor = _getDocumentStatusColor(doc.status.toString());
-    final IconData statusIcon = _getDocumentStatusIcon(doc.status.toString());
-
+  Widget _buildDocumentItemNew(
+    String title,
+    String subtitle,
+    IconData icon,
+    Color color,
+    BuildContext context,
+    bool dark,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: TSizes.spaceBtwItems),
       child: Row(
@@ -459,10 +537,10 @@ class DriverProfileScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(TSizes.sm),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
+              color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(TSizes.borderRadiusMd),
             ),
-            child: Icon(statusIcon, color: statusColor, size: TSizes.iconSm),
+            child: Icon(icon, color: color, size: TSizes.iconSm),
           ),
           const SizedBox(width: TSizes.spaceBtwItems),
           Expanded(
@@ -476,15 +554,17 @@ class DriverProfileScreen extends StatelessWidget {
                   ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 Text(
-                  doc.status.toString().split('.').last.toUpperCase(),
+                  subtitle,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: statusColor,
+                    color: color,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
           ),
+          // Optional: Add view button if you have image URLs
+          // IconButton( onPressed: () { /* View Image */ }, icon: Icon(Iconsax.eye, size: TSizes.iconSm, color: TColors.darkGrey,),),
         ],
       ),
     );

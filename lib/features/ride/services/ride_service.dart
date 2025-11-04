@@ -1,3 +1,5 @@
+// lib/features/ride/services/ride_service.dart
+
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sarri_ride/config/api_config.dart';
@@ -36,13 +38,16 @@ class RideService extends GetxService {
   }
 
   /// Books a ride for the client
+  // --- MODIFIED SIGNATURE ---
   Future<BookRideResponse> bookRide({
     required String pickupName,
     required String destinationName,
     required LatLng pickupCoords,
     required LatLng destinationCoords,
     required String category,
+    required String state, // --- ADDED ---
   }) async {
+    // --- END MODIFICATION ---
     try {
       final request = BookRideRequest(
         currentLocationName: pickupName,
@@ -50,6 +55,7 @@ class RideService extends GetxService {
         currentLocation: pickupCoords,
         destination: destinationCoords,
         category: category,
+        state: state, // --- ADDED ---
       );
       final response = await _httpService.post(
         ApiConfig.bookRideEndpoint,
@@ -65,6 +71,7 @@ class RideService extends GetxService {
     }
   }
 
+  /// Checks the status of an ongoing ride
   Future<CheckRideStatusResponse> checkRideStatus(String rideId) async {
     try {
       final request = CheckRideStatusRequest(rideId: rideId);

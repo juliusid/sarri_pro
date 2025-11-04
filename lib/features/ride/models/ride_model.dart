@@ -1,6 +1,9 @@
+// lib/features/ride/models/ride_model.dart
+
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 // --- CALCULATE PRICE ---
+// (This section remains unchanged as the API doc provided is for booking)
 
 class CalculatePriceRequest {
   final LatLng currentLocation;
@@ -12,7 +15,6 @@ class CalculatePriceRequest {
   });
 
   Map<String, dynamic> toJson() => {
-    // REVERTED TO SIMPLE FORMAT
     "currentLocation": {
       "latitude": currentLocation.latitude,
       "longitude": currentLocation.longitude,
@@ -92,7 +94,7 @@ class PriceCategory {
   }
 }
 
-// --- BOOK RIDE ---
+// --- BOOK RIDE (MODIFIED) ---
 
 class BookRideRequest {
   final String currentLocationName;
@@ -100,6 +102,7 @@ class BookRideRequest {
   final LatLng currentLocation;
   final LatLng destination;
   final String category;
+  final String state; // --- ADDED ---
 
   BookRideRequest({
     required this.currentLocationName,
@@ -107,12 +110,12 @@ class BookRideRequest {
     required this.currentLocation,
     required this.destination,
     required this.category,
+    required this.state, // --- ADDED ---
   });
 
   Map<String, dynamic> toJson() => {
     "currentLocationName": currentLocationName,
     "destinationName": destinationName,
-    // REVERTED TO SIMPLE FORMAT
     "currentLocation": {
       "latitude": currentLocation.latitude,
       "longitude": currentLocation.longitude,
@@ -122,6 +125,7 @@ class BookRideRequest {
       "longitude": destination.longitude,
     },
     "category": category.toLowerCase(),
+    "state": state, // --- ADDED ---
   };
 }
 
@@ -143,7 +147,7 @@ class BookRideResponse {
 
 class BookRideData {
   final String rideId;
-  final int price;
+  final int price; // Kept as int, as "16183" is an integer
   final double distanceKm;
 
   BookRideData({
@@ -153,13 +157,29 @@ class BookRideData {
   });
 
   factory BookRideData.fromJson(Map<String, dynamic> json) {
+    // --- MODIFIED Price Parsing ---
+    int parsedPrice = 0;
+    if (json['price'] != null &&
+        json['price'] is Map &&
+        json['price']['\$numberDecimal'] != null) {
+      // Parse the string value from "$numberDecimal"
+      parsedPrice =
+          int.tryParse(json['price']['\$numberDecimal'].toString()) ?? 0;
+    } else if (json['price'] is num) {
+      // Fallback if it's ever sent as a simple number
+      parsedPrice = (json['price'] as num).toInt();
+    }
+    // --- END MODIFICATION ---
+
     return BookRideData(
       rideId: json['rideId'] ?? '',
-      price: (json['price'] as num?)?.toInt() ?? 0,
+      price: parsedPrice, // Use the parsed price
       distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }
+
+// --- OTHER MODELS (Unchanged) ---
 
 class CancelRideRequest {
   final String rideId;
@@ -219,6 +239,18 @@ class RideStatusData {
   });
 
   factory RideStatusData.fromJson(Map<String, dynamic> json) {
+    // --- PARSE PRICE FROM EITHER BSON OR SIMPLE NUMBER ---
+    int parsedPrice = 0;
+    if (json['price'] != null &&
+        json['price'] is Map &&
+        json['price']['\$numberDecimal'] != null) {
+      parsedPrice =
+          int.tryParse(json['price']['\$numberDecimal'].toString()) ?? 0;
+    } else if (json['price'] is num) {
+      parsedPrice = (json['price'] as num).toInt();
+    }
+    // --- END PARSE ---
+
     return RideStatusData(
       rideId: json['rideId'] ?? '',
       status: json['status'] ?? 'unknown',
@@ -227,7 +259,7 @@ class RideStatusData {
           : null,
       currentLocationName: json['currentLocationName'] ?? 'Unknown',
       destinationName: json['destinationName'] ?? 'Unknown',
-      price: (json['price'] as num?)?.toInt() ?? 0,
+      price: parsedPrice, // Use parsed price
       distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0.0,
       category: json['category'] ?? '',
     );

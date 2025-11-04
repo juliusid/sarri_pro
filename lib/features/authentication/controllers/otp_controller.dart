@@ -1,4 +1,4 @@
-// File Path: features/authentication/controllers/otp_controller.dart
+// lib/features/authentication/controllers/otp_controller.dart
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -22,7 +22,9 @@ class OTPController extends GetxController {
     } else {
       // Handle case where email is not passed, maybe navigate back
       Get.back();
-      THelperFunctions.showSnackBar(
+      // --- CORRECTED ---
+      THelperFunctions.showErrorSnackBar(
+        'Error',
         'An error occurred. Please try signing up again.',
       );
     }
@@ -35,7 +37,11 @@ class OTPController extends GetxController {
 
     if (otpController.text.trim().length != 6) {
       // Basic validation for OTP length
-      THelperFunctions.showSnackBar('Please enter a valid 6-digit OTP.');
+      // --- CORRECTED ---
+      THelperFunctions.showErrorSnackBar(
+        'Invalid OTP',
+        'Please enter a valid 6-digit OTP.',
+      );
       return;
     }
 
@@ -51,17 +57,25 @@ class OTPController extends GetxController {
 
       if (result.success) {
         // IMPORTANT: Verification successful. Redirect to the Login screen.
-        Get.offAll(() => const LoginScreenGetX()); // Add binding
-        THelperFunctions.showSnackBar(
+        Get.offAll(() => const LoginScreenGetX());
+        // --- CORRECTED ---
+        THelperFunctions.showSuccessSnackBar(
+          'Success',
           'Verification successful! Please log in to your new account.',
         );
       } else {
-        THelperFunctions.showSnackBar(
+        // --- CORRECTED ---
+        THelperFunctions.showErrorSnackBar(
+          'Verification Failed',
           result.error ?? 'Invalid OTP. Please try again.',
         );
       }
     } catch (e) {
-      THelperFunctions.showSnackBar('An error occurred: ${e.toString()}');
+      // --- CORRECTED ---
+      THelperFunctions.showErrorSnackBar(
+        'Error',
+        'An error occurred: ${e.toString()}',
+      );
     } finally {
       isLoading.value = false;
     }

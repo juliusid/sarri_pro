@@ -1,14 +1,13 @@
+// lib/features/authentication/controllers/driver_signup_controller.dart
+
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sarri_ride/features/authentication/models/driver_auth_model.dart';
-import 'package:sarri_ride/features/authentication/services/auth_service.dart';
 import 'package:sarri_ride/features/authentication/screens/login/login_screen_getx.dart';
+import 'package:sarri_ride/features/authentication/services/auth_service.dart';
+import 'package:sarri_ride/utils/formatters/formatter.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
-// Note: You'll need to add the image_picker package to your pubspec.yaml
-// flutter pub add image_picker
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import 'dart:convert';
 
 enum DriverSignupStep { email, otp, details }
 
@@ -59,11 +58,6 @@ class DriverSignupController extends GetxController {
   final vehicleYearController = TextEditingController();
   final vehiclePlateController = TextEditingController();
   final vehicleSeatController = TextEditingController();
-
-  // Step 4: Document Upload
-  final Rx<File?> frontSideImage = Rx<File?>(null);
-  final Rx<File?> backSideImage = Rx<File?>(null);
-  final Rx<File?> profilePicture = Rx<File?>(null);
 
   @override
   void onClose() {
@@ -132,12 +126,18 @@ class DriverSignupController extends GetxController {
         'driver', // Specify the role
       );
       if (result.success) {
-        THelperFunctions.showSnackBar(
+        // --- CORRECTED ---
+        THelperFunctions.showSuccessSnackBar(
+          'Success',
           result.message ?? 'OTP sent successfully!',
         );
         nextStep();
       } else {
-        THelperFunctions.showSnackBar(result.error ?? 'Failed to send OTP.');
+        // --- CORRECTED ---
+        THelperFunctions.showErrorSnackBar(
+          'Error',
+          result.error ?? 'Failed to send OTP.',
+        );
       }
     } finally {
       isLoading.value = false;
@@ -155,10 +155,18 @@ class DriverSignupController extends GetxController {
         'driver', // Specify the role
       );
       if (result.success) {
-        THelperFunctions.showSnackBar(result.message ?? 'Email verified!');
+        // --- CORRECTED ---
+        THelperFunctions.showSuccessSnackBar(
+          'Success',
+          result.message ?? 'Email verified!',
+        );
         nextStep();
       } else {
-        THelperFunctions.showSnackBar(result.error ?? 'Invalid OTP.');
+        // --- CORRECTED ---
+        THelperFunctions.showErrorSnackBar(
+          'Error',
+          result.error ?? 'Invalid OTP.',
+        );
       }
     } finally {
       isLoading.value = false;
@@ -171,7 +179,6 @@ class DriverSignupController extends GetxController {
     isLoading.value = true;
     try {
       // --- FIX: Ensure required permanentAddress fields are included ---
-      // Since the form doesn't collect permanent State/City, we default to the current values to avoid 400 error.
       String finalPermanentState = permanentStateController.text.trim().isEmpty
           ? currentStateController.text.trim()
           : permanentStateController.text.trim();
@@ -180,6 +187,14 @@ class DriverSignupController extends GetxController {
           ? currentCityController.text.trim()
           : permanentCityController.text.trim();
       // --- END FIX ---
+      final formattedPhoneNumber = TFormatter.formatNigeriaPhoneNumber(
+        phoneNumberController.text.trim(),
+      );
+
+      final formattedemergencyContactNumber =
+          TFormatter.formatNigeriaPhoneNumber(
+            emergencyContactController.text.trim(),
+          );
 
       // Create the request object from controllers
       final request = DriverRegistrationRequest(
@@ -187,7 +202,7 @@ class DriverSignupController extends GetxController {
         FirstName: firstNameController.text.trim(),
         LastName: lastNameController.text.trim(),
         password: passwordController.text.trim(),
-        phoneNumber: phoneNumberController.text.trim(),
+        phoneNumber: formattedPhoneNumber,
         DateOfBirth: dobController.text.trim(), // Ensure format is YYYY-MM-DD
         Gender: genderController.text.trim().toLowerCase(),
         licenseNumber: licenseNumberController.text.trim(),
@@ -204,12 +219,12 @@ class DriverSignupController extends GetxController {
         ),
         permanentAddress: Address(
           address: permanentAddressController.text.trim(),
-          state: finalPermanentState, // <-- Now uses the corrected value
-          city: finalPermanentCity, // <-- Now uses the corrected value
+          state: finalPermanentState,
+          city: finalPermanentCity,
           country: 'Nigeria',
           postalCode: '100001', // Placeholder
         ),
-        emergencyContactNumber: emergencyContactController.text.trim(),
+        emergencyContactNumber: formattedemergencyContactNumber,
         bankDetails: BankDetails(
           bankAccountNumber: bankAccountNumberController.text.trim(),
           bankName: bankNameController.text.trim(),
@@ -221,63 +236,32 @@ class DriverSignupController extends GetxController {
           year: int.tryParse(vehicleYearController.text.trim()) ?? 2020,
           licensePlate: vehiclePlateController.text.trim(),
         ),
-        seat:
-            int.tryParse(vehicleSeatController.text.trim()) ??
-            4, // <-- PASS 'seat' HERE
+        seat: int.tryParse(vehicleSeatController.text.trim()) ?? 4,
       );
-      // --- PRINT THE PAYLOAD (Requested by user) ---
+
       print('Sending Driver Registration Request:');
       print(json.encode(request.toJson()));
-      // ---------------------------------------------
 
       final result = await AuthService.instance.registerDriver(request);
 
       if (result.success) {
-        THelperFunctions.showSnackBar(
-          result.message ?? 'Details saved successfully!',
+        // --- CORRECTED ---
+        THelperFunctions.showSuccessSnackBar(
+          'Success',
+          result.message ?? 'Registration successful! Please login.',
         );
-        nextStep(); // Move to document upload
+        // Navigate to login screen after successful registration
+        Get.offAll(() => const LoginScreenGetX());
       } else {
-        THelperFunctions.showSnackBar(result.error ?? 'Registration failed.');
+        // --- CORRECTED ---
+        THelperFunctions.showErrorSnackBar(
+          'Registration Failed',
+          result.error ?? 'Registration failed.',
+        );
       }
     } catch (e) {
-      THelperFunctions.showSnackBar("An error occurred: $e");
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  // --- Image Picker ---
-  Future<void> pickImage(ImageSource source, Rx<File?> imageFile) async {
-    final pickedFile = await ImagePicker().pickImage(source: source);
-    if (pickedFile != null) {
-      imageFile.value = File(pickedFile.path);
-    }
-  }
-
-  // Step 4: Upload Documents
-  Future<void> uploadDocuments() async {
-    if (frontSideImage.value == null || backSideImage.value == null) {
-      THelperFunctions.showSnackBar(
-        'Please upload front and back images of your license.',
-      );
-      return;
-    }
-    isLoading.value = true;
-    try {
-      // NOTE: The backend endpoint for image upload is not in your spec.
-      // This is a placeholder for how you would call it.
-      // You will need a method in HttpService that handles multipart/form-data.
-      // For now, we simulate success and redirect.
-
-      await Future.delayed(const Duration(seconds: 2)); // Simulating upload
-
-      THelperFunctions.showSnackBar(
-        'Documents uploaded! Your application is under review.',
-      );
-      Get.offAll(() => const LoginScreenGetX()); // Redirect to login
-    } catch (e) {
-      THelperFunctions.showSnackBar("An error occurred during upload: $e");
+      // --- CORRECTED ---
+      THelperFunctions.showErrorSnackBar("An error occurred", e.toString());
     } finally {
       isLoading.value = false;
     }

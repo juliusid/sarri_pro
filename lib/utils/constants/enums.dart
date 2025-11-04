@@ -22,7 +22,7 @@ enum PaymentMethods {
 
 enum UserType { rider, driver }
 
-enum DriverStatus { offline, online, onTrip, unavailable }
+enum DriverStatus { offline, online, onTrip, unavailable, onBreak }
 
 enum VehicleType { sedan, suv, hatchback, motorcycle, van, truck }
 

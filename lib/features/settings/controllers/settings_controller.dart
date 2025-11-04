@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:sarri_ride/features/authentication/screens/login/login_screen_getx.dart';
 import 'package:sarri_ride/features/authentication/services/auth_service.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
@@ -23,6 +24,10 @@ class SettingsController extends GetxController {
     print(
       "AuthService logout result: Success=${result.success}, Error=${result.error}",
     ); // Optional logging
+
+    final storage = GetStorage(); //
+    storage.remove('user_role'); // Clear the role on logout
+    print("Cleared user_role from storage."); // Optional logging
 
     // Navigate regardless of API logout success, as local tokens are cleared
     Get.offAll(() => const LoginScreenGetX());

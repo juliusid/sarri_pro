@@ -28,7 +28,7 @@ class BookingInitialWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
-    
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -50,14 +50,16 @@ class BookingInitialWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Where are you going input (disabled)
           GestureDetector(
             onTap: onDestinationTap,
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: dark ? TColors.darkerGrey.withOpacity(0.3) : Colors.grey[100],
+                color: dark
+                    ? TColors.darkerGrey.withOpacity(0.3)
+                    : Colors.grey[100],
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: dark ? TColors.darkerGrey : Colors.grey[300]!,
@@ -66,8 +68,8 @@ class BookingInitialWidget extends StatelessWidget {
               child: Row(
                 children: [
                   Icon(
-                    Icons.search, 
-                    color: dark ? TColors.lightGrey : Colors.grey[600], 
+                    Icons.search,
+                    color: dark ? TColors.lightGrey : Colors.grey[600],
                     size: 20,
                   ),
                   const SizedBox(width: 12),
@@ -85,9 +87,9 @@ class BookingInitialWidget extends StatelessWidget {
               ),
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Choose a ride title
           Text(
             'Choose a ride',
@@ -97,9 +99,9 @@ class BookingInitialWidget extends StatelessWidget {
               color: dark ? TColors.white : TColors.black,
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Ride type options
           Row(
             children: [
@@ -131,9 +133,9 @@ class BookingInitialWidget extends StatelessWidget {
               ),
             ],
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Recent destinations section
           Text(
             'Recent destinations',
@@ -143,9 +145,9 @@ class BookingInitialWidget extends StatelessWidget {
               color: dark ? TColors.white : TColors.black,
             ),
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           // Recent destinations list
           SizedBox(
             height: 120,
@@ -161,13 +163,13 @@ class BookingInitialWidget extends StatelessWidget {
               },
             ),
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // Location status indicator
           const LocationStatusIndicator(),
         ],
       ),
     );
   }
-} 
+}

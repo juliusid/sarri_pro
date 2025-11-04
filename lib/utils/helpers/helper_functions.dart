@@ -1,10 +1,14 @@
+// lib/utils/helpers/helper_functions.dart
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:sarri_ride/utils/constants/colors.dart'; //
+import 'package:iconsax/iconsax.dart'; // We'll add icons
 
 class THelperFunctions {
   static Color? getColor(String value) {
-    /// Define your product specific colors here and it will match the attribute colors and show specific 🟠🟡🟢🔵🟣🟤
+    /// Define your product specific colors here and it will match the attribute colors and show specific 泛泯泙鳩泪洟
 
     if (value == 'Green') {
       return Colors.green;
@@ -39,11 +43,63 @@ class THelperFunctions {
     }
   }
 
-  static void showSnackBar(String message) {
-    ScaffoldMessenger.of(Get.context!).showSnackBar(
-      SnackBar(content: Text(message)),
+  // --- OLD SNACKBAR (REMOVED) ---
+  // static void showSnackBar(String message) {
+  //   ScaffoldMessenger.of(Get.context!).showSnackBar(
+  //     SnackBar(content: Text(message)),
+  //   );
+  // }
+  // --- END OLD ---
+
+  // --- NEW: SUCCESS SNACKBAR ---
+  static void showSuccessSnackBar(String title, String message) {
+    Get.snackbar(
+      title,
+      message,
+      isDismissible: true,
+      shouldIconPulse: true,
+      colorText: TColors.white,
+      backgroundColor: TColors.success.withOpacity(0.9), //
+      snackPosition: SnackPosition.TOP,
+      duration: const Duration(seconds: 3),
+      margin: const EdgeInsets.all(15),
+      icon: const Icon(Iconsax.tick_circle, color: TColors.white),
     );
   }
+
+  // --- NEW: ERROR SNACKBAR ---
+  static void showErrorSnackBar(String title, String message) {
+    Get.snackbar(
+      title,
+      message,
+      isDismissible: true,
+      shouldIconPulse: true,
+      colorText: TColors.white,
+      backgroundColor: TColors.error.withOpacity(0.9), //
+      snackPosition: SnackPosition.TOP,
+      duration: const Duration(seconds: 3),
+      margin: const EdgeInsets.all(15),
+      icon: const Icon(Iconsax.warning_2, color: TColors.white),
+    );
+  }
+
+  // --- NEW: WARNING/INFO SNACKBAR ---
+  static void showSnackBar(String message) {
+    // This will be for general info/notices
+    Get.snackbar(
+      'Notice',
+      message,
+      isDismissible: true,
+      shouldIconPulse: false,
+      colorText: TColors.white,
+      backgroundColor: TColors.info.withOpacity(0.9), //
+      snackPosition: SnackPosition.TOP,
+      duration: const Duration(seconds: 3),
+      margin: const EdgeInsets.all(15),
+      icon: const Icon(Iconsax.info_circle, color: TColors.white),
+    );
+  }
+  // --- END NEW ---
 
   static void showAlert(String title, String message) {
     showDialog<void>(
@@ -64,10 +120,7 @@ class THelperFunctions {
   }
 
   static void navigateToScreen(BuildContext context, Widget screen) {
-    Navigator.push(
-      context,
-      MaterialPageRoute<void>(builder: (_) => screen),
-    );
+    Navigator.push(context, MaterialPageRoute<void>(builder: (_) => screen));
   }
 
   static String truncateText(String text, int maxLength) {
@@ -94,7 +147,10 @@ class THelperFunctions {
     return MediaQuery.of(Get.context!).size.width;
   }
 
-  static String getFormattedDate(DateTime date, {String format = 'dd MMM yyyy'}) {
+  static String getFormattedDate(
+    DateTime date, {
+    String format = 'dd MMM yyyy',
+  }) {
     return DateFormat(format).format(date);
   }
 
@@ -105,7 +161,10 @@ class THelperFunctions {
   static List<Widget> wrapWidgets(List<Widget> widgets, int rowSize) {
     final wrappedList = <Widget>[];
     for (var i = 0; i < widgets.length; i += rowSize) {
-      final rowChildren = widgets.sublist(i, i + rowSize > widgets.length ? widgets.length : i + rowSize);
+      final rowChildren = widgets.sublist(
+        i,
+        i + rowSize > widgets.length ? widgets.length : i + rowSize,
+      );
       wrappedList.add(Row(children: rowChildren));
     }
     return wrappedList;

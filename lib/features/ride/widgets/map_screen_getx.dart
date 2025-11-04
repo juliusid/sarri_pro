@@ -1,183 +1,44 @@
+// lib/features/ride/widgets/map_screen_getx.dart
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:sarri_ride/common/widgets/notifications/notification_icon.dart';
-import 'package:sarri_ride/features/notifications/controllers/notification_controller.dart';
+import 'package:sarri_ride/common/widgets/notifications/notification_icon.dart'; //
+import 'package:sarri_ride/features/notifications/controllers/notification_controller.dart'; //
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 
-import 'package:sarri_ride/features/ride/controllers/ride_controller.dart';
-import 'package:sarri_ride/features/location/services/location_service.dart';
-import 'package:sarri_ride/utils/constants/colors.dart';
-import 'package:sarri_ride/utils/helpers/helper_functions.dart';
+import 'package:sarri_ride/features/ride/controllers/ride_controller.dart'; //
+import 'package:sarri_ride/features/location/services/location_service.dart'; //
+import 'package:sarri_ride/utils/constants/colors.dart'; //
+import 'package:sarri_ride/utils/helpers/helper_functions.dart'; //
 
 // Widget Components - Import all from index
-import 'package:sarri_ride/features/ride/widgets/map_screen_widgets_index.dart';
+import 'package:sarri_ride/features/ride/widgets/map_screen_widgets_index.dart'; //
 
 class MapScreenGetX extends StatelessWidget {
   const MapScreenGetX({super.key});
 
-  // Dark map style
+  // Dark map style (as before)
   static const String _darkMapStyle = '''
     [
-      {
-        "elementType": "geometry",
-        "stylers": [
-          {
-            "color": "#242f3e"
-          }
-        ]
-      },
-      {
-        "elementType": "labels.text.fill",
-        "stylers": [
-          {
-            "color": "#746855"
-          }
-        ]
-      },
-      {
-        "elementType": "labels.text.stroke",
-        "stylers": [
-          {
-            "color": "#242f3e"
-          }
-        ]
-      },
-      {
-        "featureType": "administrative.locality",
-        "elementType": "labels.text.fill",
-        "stylers": [
-          {
-            "color": "#d59563"
-          }
-        ]
-      },
-      {
-        "featureType": "poi",
-        "elementType": "labels.text.fill",
-        "stylers": [
-          {
-            "color": "#d59563"
-          }
-        ]
-      },
-      {
-        "featureType": "poi.park",
-        "elementType": "geometry",
-        "stylers": [
-          {
-            "color": "#263c3f"
-          }
-        ]
-      },
-      {
-        "featureType": "poi.park",
-        "elementType": "labels.text.fill",
-        "stylers": [
-          {
-            "color": "#6b9a76"
-          }
-        ]
-      },
-      {
-        "featureType": "road",
-        "elementType": "geometry",
-        "stylers": [
-          {
-            "color": "#38414e"
-          }
-        ]
-      },
-      {
-        "featureType": "road",
-        "elementType": "geometry.stroke",
-        "stylers": [
-          {
-            "color": "#212a37"
-          }
-        ]
-      },
-      {
-        "featureType": "road",
-        "elementType": "labels.text.fill",
-        "stylers": [
-          {
-            "color": "#9ca5b3"
-          }
-        ]
-      },
-      {
-        "featureType": "road.highway",
-        "elementType": "geometry",
-        "stylers": [
-          {
-            "color": "#746855"
-          }
-        ]
-      },
-      {
-        "featureType": "road.highway",
-        "elementType": "geometry.stroke",
-        "stylers": [
-          {
-            "color": "#1f2835"
-          }
-        ]
-      },
-      {
-        "featureType": "road.highway",
-        "elementType": "labels.text.fill",
-        "stylers": [
-          {
-            "color": "#f3d19c"
-          }
-        ]
-      },
-      {
-        "featureType": "transit",
-        "elementType": "geometry",
-        "stylers": [
-          {
-            "color": "#2f3948"
-          }
-        ]
-      },
-      {
-        "featureType": "transit.station",
-        "elementType": "labels.text.fill",
-        "stylers": [
-          {
-            "color": "#d59563"
-          }
-        ]
-      },
-      {
-        "featureType": "water",
-        "elementType": "geometry",
-        "stylers": [
-          {
-            "color": "#17263c"
-          }
-        ]
-      },
-      {
-        "featureType": "water",
-        "elementType": "labels.text.fill",
-        "stylers": [
-          {
-            "color": "#515c6d"
-          }
-        ]
-      },
-      {
-        "featureType": "water",
-        "elementType": "labels.text.stroke",
-        "stylers": [
-          {
-            "color": "#17263c"
-          }
-        ]
-      }
+      { "elementType": "geometry", "stylers": [ { "color": "#242f3e" } ] },
+      { "elementType": "labels.text.fill", "stylers": [ { "color": "#746855" } ] },
+      { "elementType": "labels.text.stroke", "stylers": [ { "color": "#242f3e" } ] },
+      { "featureType": "administrative.locality", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] },
+      { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] },
+      { "featureType": "poi.park", "elementType": "geometry", "stylers": [ { "color": "#263c3f" } ] },
+      { "featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [ { "color": "#6b9a76" } ] },
+      { "featureType": "road", "elementType": "geometry", "stylers": [ { "color": "#38414e" } ] },
+      { "featureType": "road", "elementType": "geometry.stroke", "stylers": [ { "color": "#212a37" } ] },
+      { "featureType": "road", "elementType": "labels.text.fill", "stylers": [ { "color": "#9ca5b3" } ] },
+      { "featureType": "road.highway", "elementType": "geometry", "stylers": [ { "color": "#746855" } ] },
+      { "featureType": "road.highway", "elementType": "geometry.stroke", "stylers": [ { "color": "#1f2835" } ] },
+      { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [ { "color": "#f3d19c" } ] },
+      { "featureType": "transit", "elementType": "geometry", "stylers": [ { "color": "#2f3948" } ] },
+      { "featureType": "transit.station", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] },
+      { "featureType": "water", "elementType": "geometry", "stylers": [ { "color": "#17263c" } ] },
+      { "featureType": "water", "elementType": "labels.text.fill", "stylers": [ { "color": "#515c6d" } ] },
+      { "featureType": "water", "elementType": "labels.text.stroke", "stylers": [ { "color": "#17263c" } ] }
     ]
   ''';
 
@@ -203,7 +64,6 @@ class MapScreenGetX extends StatelessWidget {
       body: Stack(
         children: [
           SlidingUpPanel(
-            //
             controller: rideController.panelController,
             minHeight: _getMinPanelHeight(context),
             maxHeight: MediaQuery.of(context).size.height * 0.9,
@@ -215,7 +75,6 @@ class MapScreenGetX extends StatelessWidget {
                 // Google Map
                 Obx(
                   () => GoogleMap(
-                    /* ... map config ... */
                     initialCameraPosition: rideController.initialCameraPosition,
                     onMapCreated: (GoogleMapController controller) {
                       rideController.mapController = controller;
@@ -229,6 +88,11 @@ class MapScreenGetX extends StatelessWidget {
                     myLocationButtonEnabled: false,
                     zoomControlsEnabled: false,
                     style: dark ? _darkMapStyle : null,
+
+                    // --- ADDED ---
+                    buildingsEnabled: true, // Show 3D buildings
+                    trafficEnabled: true, // Show live traffic
+                    // --- END ADDED ---
                   ),
                 ),
 
@@ -236,10 +100,8 @@ class MapScreenGetX extends StatelessWidget {
                 Positioned(
                   top: MediaQuery.of(context).padding.top + 16,
                   left: 16,
-                  // Removed right: 16
                   child: Container(
                     decoration: BoxDecoration(
-                      // Drawer button styling
                       color: dark ? TColors.dark : Colors.white,
                       borderRadius: BorderRadius.circular(8),
                       boxShadow: [
@@ -251,11 +113,10 @@ class MapScreenGetX extends StatelessWidget {
                       ],
                     ),
                     child: Builder(
-                      // Needed to get Scaffold context for drawer
+                      // Needed for Scaffold context
                       builder: (context) => IconButton(
                         icon: Obx(
                           () => Stack(
-                            // Keep Obx and Stack for the dot
                             clipBehavior: Clip.none,
                             children: [
                               Icon(
@@ -280,8 +141,7 @@ class MapScreenGetX extends StatelessWidget {
                             ],
                           ),
                         ),
-                        onPressed: () =>
-                            Scaffold.of(context).openDrawer(), // Open drawer
+                        onPressed: () => Scaffold.of(context).openDrawer(),
                       ),
                     ),
                   ),
@@ -289,16 +149,17 @@ class MapScreenGetX extends StatelessWidget {
                 // --- END MODIFICATION ---
               ],
             ),
-            // panel: _buildBottomSheet(rideController),
             panel: _buildBottomSheet(rideController),
             onPanelSlide: (double pos) {
               // Handle panel slide animations if needed
             },
           ),
+          // --- Current Location Button (as before) ---
           Positioned(
             bottom: MediaQuery.of(context).size.height * 0.55,
             right: 16,
             child: Container(
+              // ... (decoration as before) ...
               decoration: BoxDecoration(
                 color: dark ? TColors.dark : Colors.white,
                 borderRadius: BorderRadius.circular(28),
@@ -341,11 +202,13 @@ class MapScreenGetX extends StatelessWidget {
     );
   }
 
+  // --- _buildBottomSheet (as before) ---
   Widget _buildBottomSheet(RideController controller) {
     return Obx(() {
       switch (controller.currentState.value) {
         case BookingState.initial:
           return BookingInitialWidget(
+            //
             onDestinationTap: controller.goToDestinationSearch,
             onCarTap: controller.goToDestinationSearch,
             onPackageTap: controller.goToPackageBooking,
@@ -356,6 +219,7 @@ class MapScreenGetX extends StatelessWidget {
 
         case BookingState.destinationSearch:
           return DestinationSearchWidget(
+            //
             onBackPressed: controller.onBackPressed,
             pickupController: controller.pickupController,
             destinationController: controller.destinationController,
@@ -373,6 +237,7 @@ class MapScreenGetX extends StatelessWidget {
 
         case BookingState.selectRide:
           return RideSelectionWidget(
+            //
             onBackPressed: controller.onBackPressed,
             rideTypes: controller.rideTypes,
             selectedRideType: controller.selectedRideType.value,
@@ -381,10 +246,11 @@ class MapScreenGetX extends StatelessWidget {
           );
 
         case BookingState.searchingDriver:
-          return SearchingDriverWidget(onCancel: controller.cancelRide);
+          return SearchingDriverWidget(onCancel: controller.cancelRide); //
 
         case BookingState.driverAssigned:
           return DriverAssignedWidget(
+            //
             driver: controller.assignedDriver.value!,
             pickupLocation: controller.pickupController.text,
             destinationLocation: controller.destinationController.text,
@@ -393,31 +259,37 @@ class MapScreenGetX extends StatelessWidget {
 
         case BookingState.driverArrived:
           return DriverArrivedWidget(
+            //
             driver: controller.assignedDriver.value!,
-            onStartTrip: controller.startTrip,
+            onStartTrip: () => print('Trip started!'),
           );
 
         case BookingState.tripInProgress:
           return TripInProgressWidget(
+            //
             driver: controller.assignedDriver.value!,
             onEmergency: controller.handleEmergency,
           );
 
         case BookingState.tripCompleted:
           return TripCompletedWidget(
+            //
             selectedRideType: controller.selectedRideType.value,
             isPaymentCompleted: controller.isPaymentCompleted.value,
             onPayWithWallet: () => PaymentDialogs.showWalletPayment(
+              //
               Get.context!,
               selectedRideType: controller.selectedRideType.value,
               onConfirm: controller.completePayment,
             ),
             onPayWithCard: () => PaymentDialogs.showCardPayment(
+              //
               Get.context!,
               selectedRideType: controller.selectedRideType.value,
               onConfirm: controller.completePayment,
             ),
             onPayWithCash: () => PaymentDialogs.showCashPayment(
+              //
               Get.context!,
               selectedRideType: controller.selectedRideType.value,
               onConfirm: controller.completePayment,
@@ -427,6 +299,7 @@ class MapScreenGetX extends StatelessWidget {
 
         case BookingState.packageBooking:
           return PackageBookingWidget(
+            //
             onBackPressed: controller.onBackPressed,
             pickupLocation: controller.pickupController.text,
             onChangePickup: controller.showPickupLocationOptions,
@@ -444,6 +317,7 @@ class MapScreenGetX extends StatelessWidget {
 
         case BookingState.freightBooking:
           return FreightBookingWidget(
+            //
             onBackPressed: controller.onBackPressed,
             pickupLocation: controller.pickupController.text,
             onChangePickup: controller.showPickupLocationOptions,

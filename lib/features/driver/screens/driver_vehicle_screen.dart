@@ -74,12 +74,16 @@ class DriverVehicleScreen extends StatelessWidget {
     bool dark,
   ) {
     return Obx(() {
-      final vehicle = controller.currentDriver.value?.driverProfile?.vehicle;
+      // --- ACCESS vehicleDetails ---
+      final vehicle =
+          controller.currentDriver.value?.driverProfile?.vehicleDetails;
+      // --- END ACCESS ---
       if (vehicle == null) {
-        return _buildNoVehicleCard(context, dark);
+        return _buildNoVehicleCard(context, dark); // Show add vehicle card
       }
 
       return Container(
+        // ... (container decoration remains the same) ...
         width: double.infinity,
         padding: const EdgeInsets.all(TSizes.defaultSpace),
         decoration: BoxDecoration(
@@ -95,6 +99,7 @@ class DriverVehicleScreen extends StatelessWidget {
           children: [
             Row(
               children: [
+                // ... (Icon container remains the same) ...
                 Container(
                   padding: const EdgeInsets.all(TSizes.md),
                   decoration: BoxDecoration(
@@ -113,7 +118,7 @@ class DriverVehicleScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        vehicle.displayName,
+                        vehicle.displayName, // Use getter
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(
                               color: TColors.white,
@@ -122,7 +127,7 @@ class DriverVehicleScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: TSizes.xs),
                       Text(
-                        vehicle.plateNumber,
+                        vehicle.plateNumber ?? 'N/A', // Use plateNumber
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
                               color: TColors.white.withOpacity(0.8),
@@ -134,13 +139,11 @@ class DriverVehicleScreen extends StatelessWidget {
                 ),
               ],
             ),
-
             const SizedBox(height: TSizes.spaceBtwItems),
-
             Row(
               children: [
                 _buildVehicleInfoChip(
-                  vehicle.color,
+                  vehicle.color ?? 'N/A',
                   Iconsax.colorfilter,
                   context,
                 ),
@@ -153,15 +156,100 @@ class DriverVehicleScreen extends StatelessWidget {
                 const SizedBox(width: TSizes.spaceBtwItems),
                 _buildVehicleInfoChip(
                   vehicle.type.toString().split('.').last.toUpperCase(),
-                  Iconsax.car,
+                  Iconsax.category,
                   context,
-                ),
+                ), // Use type
               ],
             ),
           ],
         ),
       );
     });
+  }
+  // --- END UPDATED Vehicle Overview ---
+
+  // --- UPDATED Vehicle Details ---
+  Widget _buildVehicleDetails(
+    BuildContext context,
+    DriverDashboardController controller,
+    bool dark,
+  ) {
+    return Container(
+      // ... (container decoration remains the same) ...
+      padding: const EdgeInsets.all(TSizes.defaultSpace),
+      decoration: BoxDecoration(
+        color: dark ? TColors.cardBackgroundDark : TColors.cardBackground,
+        borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
+        boxShadow: [
+          BoxShadow(
+            color: TColors.black.withOpacity(dark ? 0.3 : 0.1),
+            blurRadius: TSizes.sm,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Vehicle Details',
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: TSizes.spaceBtwItems),
+          Obx(() {
+            // --- ACCESS vehicleDetails ---
+            final vehicle =
+                controller.currentDriver.value?.driverProfile?.vehicleDetails;
+            // --- END ACCESS ---
+            if (vehicle == null) {
+              return const Text('No vehicle information available');
+            }
+
+            return Column(
+              children: [
+                _buildDetailRow(
+                  'Make',
+                  vehicle.make ?? 'N/A',
+                  Iconsax.tag,
+                ), // Use tag icon for make/model?
+                _buildDetailRow(
+                  'Model',
+                  vehicle.model ?? 'N/A',
+                  Iconsax.tag_right,
+                ),
+                _buildDetailRow(
+                  'Year',
+                  vehicle.year?.toString() ?? 'N/A',
+                  Iconsax.calendar,
+                ),
+                _buildDetailRow(
+                  'Color',
+                  vehicle.color ?? 'N/A',
+                  Iconsax.colorfilter,
+                ),
+                _buildDetailRow(
+                  'Plate Number',
+                  vehicle.plateNumber ?? 'N/A',
+                  Iconsax.hashtag,
+                ),
+                _buildDetailRow(
+                  'Vehicle Type',
+                  vehicle.type.toString().split('.').last,
+                  Iconsax.category,
+                ),
+                _buildDetailRow(
+                  'Seating Capacity',
+                  '${vehicle.seats} passengers',
+                  Iconsax.profile_2user,
+                ),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
   }
 
   Widget _buildNoVehicleCard(BuildContext context, bool dark) {
@@ -235,74 +323,6 @@ class DriverVehicleScreen extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVehicleDetails(
-    BuildContext context,
-    DriverDashboardController controller,
-    bool dark,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(TSizes.defaultSpace),
-      decoration: BoxDecoration(
-        color: dark ? TColors.cardBackgroundDark : TColors.cardBackground,
-        borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
-        boxShadow: [
-          BoxShadow(
-            color: TColors.black.withOpacity(dark ? 0.3 : 0.1),
-            blurRadius: TSizes.sm,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Vehicle Details',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: TSizes.spaceBtwItems),
-          Obx(() {
-            final vehicle =
-                controller.currentDriver.value?.driverProfile?.vehicle;
-            if (vehicle == null) {
-              return const Text('No vehicle information available');
-            }
-
-            return Column(
-              children: [
-                _buildDetailRow('Make', vehicle.make, Iconsax.car),
-                _buildDetailRow('Model', vehicle.model, Iconsax.car),
-                _buildDetailRow(
-                  'Year',
-                  vehicle.year.toString(),
-                  Iconsax.calendar,
-                ),
-                _buildDetailRow('Color', vehicle.color, Iconsax.colorfilter),
-                _buildDetailRow(
-                  'Plate Number',
-                  vehicle.plateNumber,
-                  Iconsax.hashtag,
-                ),
-                _buildDetailRow(
-                  'Vehicle Type',
-                  vehicle.type.toString().split('.').last,
-                  Iconsax.category,
-                ),
-                _buildDetailRow(
-                  'Seating Capacity',
-                  '${vehicle.seats} passengers',
-                  Iconsax.profile_2user,
-                ),
-              ],
-            );
-          }),
         ],
       ),
     );
