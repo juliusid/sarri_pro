@@ -77,6 +77,8 @@ class ApiConfig {
   static String get driverStatusEndpoint => '$baseUrl/driverRides/getStatus';
   static String get startBreakEndpoint => '$baseUrl/driverRides/break/start';
   static String get endBreakEndpoint => '$baseUrl/driverRides/break/end';
+  static String get acceptRideEndpoint => '$baseUrl/driverRides/acceptRide';
+  static String get startTripEndpoint => '$baseUrl/driverRides/startTrip';
   // static String get driverUploadImagesEndpoint => '$baseUrl/driverAuth/driver/upload-images'; // Confirm path
 
   // Password Reset Endpoints

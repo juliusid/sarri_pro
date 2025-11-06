@@ -317,29 +317,64 @@ class DriverDashboardController extends GetxController {
         print(
           "Dashboard received Trip Status update from TripController: $tripProgressStatus",
         );
-        if (tripProgressStatus == TripStatus.accepted ||
-            tripProgressStatus == TripStatus.drivingToPickup ||
-            tripProgressStatus == TripStatus.arrivedAtPickup ||
-            tripProgressStatus == TripStatus.tripInProgress ||
-            tripProgressStatus == TripStatus.arrivedAtDestination) {
-          // If a trip is active, task status must be 'on_trip'
-          if (driverTaskStatus.value != 'on_trip') {
-            print("Updating task status to 'on_trip' based on trip progress.");
-            driverTaskStatus.value = 'on_trip';
+
+        String newDriverTaskStatus = driverTaskStatus.value;
+
+        // Map TripStatus to the correct DriverAvailabilityStatus
+        switch (tripProgressStatus) {
+          case TripStatus.accepted:
+            newDriverTaskStatus = 'accepted'; // Use 'accepted' status
+            break;
+          case TripStatus.drivingToPickup:
+          case TripStatus.arrivedAtPickup:
+          case TripStatus.tripInProgress:
+          case TripStatus.arrivedAtDestination:
+            newDriverTaskStatus = 'on_trip'; // Use 'on_trip' status
+            break;
+          case TripStatus.completed:
+          case TripStatus.cancelled:
+          case TripStatus.none:
+            // Trip ended. Re-check status from API.
+            // Only change local state if we were previously on a trip.
+            if (driverTaskStatus.value == 'on_trip' ||
+                driverTaskStatus.value == 'accepted') {
+              print(
+                "Trip ended/cleared. Re-evaluating task status via API check...",
+              );
+              checkDriverStatus(); // Let API determine if now 'available' or 'unavailable'
+            }
+            // Don't change newDriverTaskStatus here, let checkDriverStatus handle it.
+            return; // Exit listener early
+          case TripStatus.requested:
+          default:
+            // No change for these states
+            break;
+        }
+
+        if (driverTaskStatus.value != newDriverTaskStatus) {
+          print(
+            "Updating driverTaskStatus to '$newDriverTaskStatus' based on trip progress.",
+          );
+          driverTaskStatus.value = newDriverTaskStatus;
+
+          // Also update 'isOnline' intent and break status if needed
+          if (newDriverTaskStatus == 'on_trip' ||
+              newDriverTaskStatus == 'accepted') {
             isOnline.value = true; // Driver is busy but logically online
-            isOnBreak.value = false; // Cannot be on break and on trip
-            _breakEndTimer?.cancel();
-            breakEndsAt.value = null;
-            update(); // Update UI
+            if (isOnBreak.value) {
+              // This shouldn't happen, but good to safeguard
+              isOnBreak.value = false;
+              _breakEndTimer?.cancel();
+              breakEndsAt.value = null;
+            }
           }
-        } else if (tripProgressStatus == TripStatus.completed ||
-            tripProgressStatus == TripStatus.cancelled ||
-            tripProgressStatus == TripStatus.none) {
-          // Trip ended or cleared
-          print("Trip ended/cleared. Re-evaluating task status...");
-          // Force a refresh from the API to get the definitive current state
-          checkDriverStatus();
-          // Don't immediately set to available/unavailable here, let checkDriverStatus handle it.
+
+          update(); // Update UI
+
+          // Force an immediate location update with the new status
+          _tripController?.forceLocationUpdate(
+            statusOverride: newDriverTaskStatus,
+          );
         }
       });
     } catch (e) {
@@ -637,7 +672,7 @@ class DriverDashboardController extends GetxController {
 
   // Toggle driver online/offline status (User Action)
   Future<void> toggleDriverStatus() async {
-    // 1. Check Permissions/Conditions
+    // 1. Check Permissions/Conditions (no change here)
     if (driverOperationalStatus.value != 'active') {
       _showOperationalStatusError(); // Show specific error based on status
       return;
@@ -648,19 +683,17 @@ class DriverDashboardController extends GetxController {
       );
       return;
     }
-    // Check trip status via TripManagementController BEFORE allowing toggle
     if (_tripController?.hasActiveTrip ?? false) {
-      // It's possible the dashboard's taskStatus is slightly delayed. Double-check with TripController.
       THelperFunctions.showSnackBar('Cannot change status while on a trip.');
       await checkDriverStatus(); // Refresh status to ensure consistency
       return;
     }
 
-    // 2. Determine Target State & Update Intent
+    // 2. Determine Target State & Update Intent (no change here)
     bool targetIsOnline = !isOnline.value;
     isOnline.value = targetIsOnline; // Update user's intent immediately
 
-    // 3. Show Immediate Feedback & Notify Backend
+    // 3. Show Immediate Feedback & Notify Backend (no change here)
     THelperFunctions.showSnackBar(
       targetIsOnline ? 'Going Online...' : 'Going Offline...',
     );
@@ -682,6 +715,11 @@ class DriverDashboardController extends GetxController {
         );
         return; // Stop the process
       }
+
+      // --- ADDED: Refresh the state cache ---
+      print("Driver going online, refreshing current state from location...");
+      await _tripController?.updateCurrentStateFromLocation();
+      // --- END ADDED ---
     }
 
     // Inform backend via WebSocket
@@ -689,23 +727,33 @@ class DriverDashboardController extends GetxController {
       statusOverride: targetIsOnline ? 'available' : 'unavailable',
     );
 
-    // 4. Schedule a status check shortly after to confirm backend update
+    // 4. Schedule a status check (no change here)
     await Future.delayed(const Duration(seconds: 2));
     await checkDriverStatus();
-    // Show confirmation based on actual status fetched
+    // ... (rest of the method is unchanged)
     final actualStatus = driverTaskStatus.value;
     if (targetIsOnline && actualStatus == 'available') {
-      THelperFunctions.showSnackBar('You are now Online');
+      THelperFunctions.showSuccessSnackBar(
+        'Success',
+        'You are now Online',
+      ); // Use success snackbar
     } else if (!targetIsOnline && actualStatus == 'unavailable') {
-      THelperFunctions.showSnackBar('You are now Offline');
+      THelperFunctions.showSuccessSnackBar(
+        'Success',
+        'You are now Offline',
+      ); // Use success snackbar
     } else if (targetIsOnline && actualStatus != 'available') {
-      THelperFunctions.showSnackBar(
+      THelperFunctions.showErrorSnackBar(
+        // Use error snackbar
+        'Error',
         'Failed to go online. Status: $actualStatus',
       );
       isOnline.value =
           false; // Revert intent if backend didn't update as expected
     } else if (!targetIsOnline && actualStatus != 'unavailable') {
-      THelperFunctions.showSnackBar(
+      THelperFunctions.showErrorSnackBar(
+        // Use error snackbar
+        'Error',
         'Failed to go offline. Status: $actualStatus',
       );
       isOnline.value = true; // Revert intent

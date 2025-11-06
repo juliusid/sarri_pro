@@ -29,25 +29,30 @@ class RideService extends GetxService {
       final responseData = _httpService.handleResponse(response);
       return CalculatePriceResponse.fromJson(responseData);
     } catch (e) {
-      // Return a response object with an error message
+      // --- MODIFIED ERROR HANDLING ---
+      String errorMessage;
+      if (e is ApiException) {
+        errorMessage = e.message; // Use the clean message from the API
+      } else {
+        errorMessage = e.toString(); // Fallback for unexpected errors
+      }
       return CalculatePriceResponse(
         status: 'error',
-        message: 'Could not calculate prices: ${e.toString()}',
+        message: 'Could not calculate prices: $errorMessage',
       );
+      // --- END MODIFICATION ---
     }
   }
 
   /// Books a ride for the client
-  // --- MODIFIED SIGNATURE ---
   Future<BookRideResponse> bookRide({
     required String pickupName,
     required String destinationName,
     required LatLng pickupCoords,
     required LatLng destinationCoords,
     required String category,
-    required String state, // --- ADDED ---
+    required String state,
   }) async {
-    // --- END MODIFICATION ---
     try {
       final request = BookRideRequest(
         currentLocationName: pickupName,
@@ -55,23 +60,36 @@ class RideService extends GetxService {
         currentLocation: pickupCoords,
         destination: destinationCoords,
         category: category,
-        state: state, // --- ADDED ---
+        state: state,
       );
       final response = await _httpService.post(
         ApiConfig.bookRideEndpoint,
         body: request.toJson(),
       );
+      // handleResponse will throw an ApiException for 404/500 errors
       final responseData = _httpService.handleResponse(response);
+      // This line is reached only on 2xx status
       return BookRideResponse.fromJson(responseData);
     } catch (e) {
+      // --- MODIFIED ERROR HANDLING ---
+      // This catch block handles network errors, timeouts, and API errors (like 404)
+      String errorMessage;
+      if (e is ApiException) {
+        errorMessage = e
+            .message; // Use the clean message from the API (e.g., "No available drivers...")
+      } else {
+        errorMessage =
+            'An unexpected error occurred. Please try again.'; // Generic fallback
+        print("BookRide Unhandled Error: ${e.toString()}");
+      }
       return BookRideResponse(
         status: 'error',
-        message: 'Could not book ride: ${e.toString()}',
+        message: errorMessage, // Pass the clean (or generic) message
       );
+      // --- END MODIFICATION ---
     }
   }
 
-  /// Checks the status of an ongoing ride
   Future<CheckRideStatusResponse> checkRideStatus(String rideId) async {
     try {
       final request = CheckRideStatusRequest(rideId: rideId);
@@ -82,10 +100,18 @@ class RideService extends GetxService {
       final responseData = _httpService.handleResponse(response);
       return CheckRideStatusResponse.fromJson(responseData);
     } catch (e) {
+      // --- MODIFIED ERROR HANDLING ---
+      String errorMessage;
+      if (e is ApiException) {
+        errorMessage = e.message;
+      } else {
+        errorMessage = e.toString();
+      }
       return CheckRideStatusResponse(
         status: 'error',
-        message: 'Could not check ride status: ${e.toString()}',
+        message: 'Could not check ride status: $errorMessage',
       );
+      // --- END MODIFICATION ---
     }
   }
 
@@ -100,18 +126,28 @@ class RideService extends GetxService {
       final responseData = _httpService.handleResponse(response);
 
       if (responseData['status'] == 'success') {
-        THelperFunctions.showSnackBar(
+        // --- MODIFIED SNACKBAR ---
+        THelperFunctions.showSuccessSnackBar(
+          'Cancelled',
           responseData['message'] ?? 'Ride cancelled successfully',
         );
+        // --- END MODIFICATION ---
         return true;
       } else {
-        THelperFunctions.showSnackBar(
+        // --- MODIFIED SNACKBAR ---
+        THelperFunctions.showErrorSnackBar(
+          'Error',
           responseData['message'] ?? 'Failed to cancel ride',
         );
+        // --- END MODIFICATION ---
         return false;
       }
     } catch (e) {
-      THelperFunctions.showSnackBar('An error occurred: ${e.toString()}');
+      // --- MODIFIED SNACKBAR ---
+      String errorMessage = "An error occurred";
+      if (e is ApiException) errorMessage = e.message;
+      THelperFunctions.showErrorSnackBar('Error', errorMessage);
+      // --- END MODIFICATION ---
       return false;
     }
   }

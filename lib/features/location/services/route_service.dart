@@ -86,6 +86,16 @@ class RouteService {
               .map((point) => LatLng(point.latitude, point.longitude))
               .toList();
 
+          // --- ADD THIS FIX ---
+          // If decoding fails or returns no points, use the fallback
+          if (routePoints.isEmpty) {
+            print(
+              "RouteService: 'OK' status but no polyline points. Using fallback.",
+            );
+            return _getFallbackRouteInfo(origin, destination);
+          }
+          // --- END FIX ---
+
           return RouteInfo(
             points: routePoints,
             distance: leg['distance']['text'],

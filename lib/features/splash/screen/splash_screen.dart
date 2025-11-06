@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart'; //
 import 'package:sarri_ride/core/services/websocket_service.dart'; // <-- Import WebSocketService
 import 'package:sarri_ride/features/authentication/services/auth_service.dart'; //
+import 'package:sarri_ride/features/driver/controllers/trip_management_controller.dart';
 import 'package:sarri_ride/features/onboarding/screen/onboarding_screen.dart'; //
 import 'package:sarri_ride/features/location/services/location_service.dart'; //
 import 'package:sarri_ride/features/ride/controllers/ride_controller.dart'; //
@@ -97,9 +98,15 @@ class _SplashScreenState
         final userRole = storage.read<String>('user_role'); //
         final rideId = storage.read<String>('active_ride_id'); //
 
-        // --- ADD WebSocket Connect for Driver ---
+        // --- Connect WebSocket based on role ---
         if (userRole == 'driver') {
           print("SplashScreen: User is a driver, connecting WebSocket...");
+          Get.put(TripManagementController(), permanent: true);
+          WebSocketService.instance.connect(); // Connect the socket
+        }
+        // --- ADDED: Connect rider as well ---
+        else if (userRole == 'client') {
+          print("SplashScreen: User is a client, connecting WebSocket...");
           WebSocketService.instance.connect(); // Connect the socket
         }
         // --- END WebSocket Connect ---

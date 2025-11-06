@@ -114,10 +114,11 @@ class LoginController extends GetxController {
           "LOGIN_CONTROLLER: Immediate token refresh successful. Navigating...",
         );
 
-        // Connect WebSocket (Handled by destination screens)
+        // Connect WebSocket
         print(
-          "LOGIN_CONTROLLER: Skipping WebSocket connect (will be handled by next screen).",
+          "LOGIN_CONTROLLER: Connecting WebSocket for '${loginResult.client!.role}'...",
         );
+        WebSocketService.instance.connect();
 
         // Navigate based on actual role from response
         if (loginResult.client!.role == "client") {

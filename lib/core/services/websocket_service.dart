@@ -282,15 +282,14 @@ class WebSocketService extends GetxService {
     required double latitude,
     required double longitude,
     required String availabilityStatus,
-    String? state, // Make state optional, as it's not in the doc
+    required String state, // Make state required
   }) {
     // Payload must match the documentation
     final payload = {
       'latitude': latitude,
       'longitude': longitude,
       'availabilityStatus': availabilityStatus,
-      // The "state" field is NOT in the documentation, so we remove it.
-      // 'state': state,
+      'state': state, // Add the state field
     };
 
     // Use emitWithAck to get the server response
@@ -299,10 +298,10 @@ class WebSocketService extends GetxService {
       payload,
       ack: (response) {
         if (response is Map && response['status'] == 'success') {
-          // Success, location updated. Response data example:
-          // { status: "success", message: "Location updated successfully", data: { ... } }
-          //
-          // print("Location update acknowledged by server."); // Can be too noisy
+          // Success, location updated.
+          // print(
+          //   "Location update acknowledged by server.${response}",
+          // ); // Can be too noisy
         } else {
           // Handle failure
           print('Location update failed: ${response?['message']}');
@@ -447,6 +446,20 @@ class WebSocketService extends GetxService {
       }
     });
 
+    _listen('ride:searching', (data) {
+      print('[WS Rcvd] ride:searching -> $data');
+      if (data is Map<String, dynamic> && data['tripId'] != null) {
+        try {
+          if (Get.isRegistered<RideController>()) {
+            final rideController = Get.find<RideController>();
+            rideController.handleRideSearching(data);
+          }
+        } catch (e) {
+          print("WS Error handling ride:searching: $e");
+        }
+      }
+    });
+
     // Driver Ride Events
     _listen('ride:request', (data) {
       print('[WebSocket Received] ride:request -> $data');
@@ -455,13 +468,18 @@ class WebSocketService extends GetxService {
           final tripController = Get.find<TripManagementController>();
 
           LatLng parseLatLng(dynamic locationData, LatLng fallback) {
-            if (locationData is Map &&
-                locationData['latitude'] is num &&
-                locationData['longitude'] is num) {
-              return LatLng(
-                (locationData['latitude'] as num).toDouble(),
-                (locationData['longitude'] as num).toDouble(),
-              );
+            if (locationData is Map) {
+              // Try parsing as double, then as int, then as String
+              final lat =
+                  (locationData['latitude'] as num?)?.toDouble() ??
+                  double.tryParse(locationData['latitude'].toString());
+              final lon =
+                  (locationData['longitude'] as num?)?.toDouble() ??
+                  double.tryParse(locationData['longitude'].toString());
+
+              if (lat != null && lon != null) {
+                return LatLng(lat, lon);
+              }
             }
             print(
               "Warning: Could not parse LatLng from ride:request payload. Using fallback.",
@@ -469,13 +487,26 @@ class WebSocketService extends GetxService {
             return fallback;
           }
 
+          //  Look for 'dropoffLocation' first ---
+          final dynamic dropoffData =
+              data['dropoffLocation'] ?? data['destinationLocation'];
+          LatLng destLoc = parseLatLng(
+            dropoffData, // Use the new variable
+            const LatLng(6.42, 3.42),
+          );
+
           LatLng pickupLoc = parseLatLng(
             data['pickupLocation'],
             const LatLng(6.52, 3.37),
           );
-          LatLng destLoc = parseLatLng(
-            data['destinationLocation'],
-            const LatLng(6.42, 3.42),
+
+          final expiresAtTimestamp =
+              (data['expiresAt'] as num?)?.toInt() ??
+              DateTime.now()
+                  .add(const Duration(seconds: 15))
+                  .millisecondsSinceEpoch;
+          final expiresAt = DateTime.fromMillisecondsSinceEpoch(
+            expiresAtTimestamp,
           );
 
           final request = TripRequest(
@@ -486,16 +517,21 @@ class WebSocketService extends GetxService {
             riderRating: (data['riderRating'] as num?)?.toDouble() ?? 4.0,
             pickupLocation: pickupLoc,
             destinationLocation: destLoc,
-            pickupAddress: data['pickupAddress'] ?? 'Unknown Pickup',
+            pickupAddress:
+                data['currentLocationName'] ??
+                'Unknown Pickup', // Mapped from currentLocationName
             destinationAddress:
-                data['destinationAddress'] ?? 'Unknown Destination',
+                data['destinationName'] ?? 'Unknown Destination',
             requestTime:
                 DateTime.tryParse(data['requestTime'] ?? '') ?? DateTime.now(),
             estimatedFare: (data['price'] as num?)?.toDouble() ?? 0.0,
             estimatedDistance: (data['distanceKm'] as num?)?.toDouble() ?? 0.0,
             estimatedDuration:
                 (data['estimatedDuration'] as num?)?.toInt() ?? 0,
-            rideType: data['rideType'] ?? 'Standard',
+            rideType:
+                data['category'] ?? 'Standard', // <-- MODIFIED: Use 'category'
+            seats: (data['seats'] as num?)?.toInt() ?? 4, // <-- ADDED
+            expiresAt: expiresAt, // <-- ADDED
           );
           tripController.showTripRequest(request);
         } catch (e) {
@@ -510,10 +546,14 @@ class WebSocketService extends GetxService {
 
     _listen('ride:accepted:ack', (data) {
       print('[WebSocket Received] ride:accepted:ack -> $data');
-      // This is the acknowledgment that the driver's 'ride:accept' emit was received.
-      // The main logic is handled in the ack callback in TripManagementController.
+      // This is the acknowledgment that the driver's 'ride:accept' HTTP POST was processed.
+      // The main logic (getting chatId) is now handled by the HTTP response.
+      // We can use this to show a snackbar if needed.
+      if (data is Map && data['message'] != null) {
+        // This will show "Ride accepted successfully" from the backend
+        THelperFunctions.showSuccessSnackBar("Success", data['message']);
+      }
     });
-
     _listen('ride:cancelled', (data) {
       print('[WebSocket Received] ride:cancelled -> $data');
       if (data is Map<String, dynamic> && data['rideId'] != null) {
@@ -557,6 +597,24 @@ class WebSocketService extends GetxService {
           data['tripId'] != null) {
         try {
           final rideController = Get.find<RideController>();
+
+          // --- MODIFICATION: Parse the nested 'driver' object ---
+          final driverData = data['driver'] as Map<String, dynamic>? ?? {};
+          final vehicleData =
+              driverData['vehicleDetails'] as Map<String, dynamic>? ?? {};
+
+          // Use driverData for name, vehicle, etc.
+          final String driverName =
+              driverData['name'] ?? data['driverName'] ?? 'Driver';
+          final String carModel = vehicleData['make'] ?? 'Vehicle';
+          final String plateNumber = vehicleData['licensePlate'] ?? 'N/A';
+          final double driverRating =
+              (driverData['rating'] as num?)?.toDouble() ??
+              4.5; // Assuming rating might be in 'driver' obj
+          final String eta =
+              data['eta'] ?? '...'; // ETA is still at root in example
+
+          // Get driver location (fallback to pickup)
           LatLng driverLoc =
               rideController.pickupLocation.value ?? const LatLng(6.52, 3.37);
           if (data['driverLocation'] is Map) {
@@ -568,17 +626,23 @@ class WebSocketService extends GetxService {
               driverLoc = LatLng(lat, lng);
             }
           }
+          // --- END MODIFICATION ---
+
           final driverDetails = Driver(
-            name: data['driverName'] ?? 'Driver',
-            rating: (data['driverRating'] as num?)?.toDouble() ?? 4.5,
-            carModel: data['carModel'] ?? 'Vehicle',
-            plateNumber: data['plateNumber'] ?? 'N/A',
-            eta: data['eta'] ?? '...',
+            name: driverName,
+            rating: driverRating,
+            carModel: carModel,
+            plateNumber: plateNumber,
+            eta: eta,
             location: driverLoc,
           );
+
+          // Get chatId from the root
           final chatId = data['chatId'] as String? ?? '';
-          if (chatId.isEmpty)
+          if (chatId.isEmpty) {
             print("WS Warning: ride:accepted missing chatId.");
+          }
+
           rideController.handleRideAccepted(driverDetails, chatId);
         } catch (e) {
           print(

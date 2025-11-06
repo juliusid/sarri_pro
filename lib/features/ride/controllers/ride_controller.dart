@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:sarri_ride/core/services/http_service.dart';
 import 'package:sarri_ride/features/ride/models/ride_model.dart';
 import 'package:sarri_ride/features/ride/services/ride_service.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
@@ -20,6 +21,11 @@ import 'package:sarri_ride/utils/constants/enums.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/ride/widgets/pickup_location_modal.dart';
+import 'package:sarri_ride/features/settings/models/saved_place.dart';
+
+// --- ADDED IMPORT ---
+import 'package:sarri_ride/features/ride/widgets/no_drivers_available_widget.dart';
+// --- END ADDED IMPORT ---
 
 // Enums
 enum BookingState {
@@ -52,14 +58,14 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
   final TextEditingController freightDeliveryController =
       TextEditingController();
 
+  final RxString searchingStatusText = "Finding your driver...".obs;
+  final RxString potentialDriverInfo = "".obs;
+
   // Reactive state variables
   final Rx<BookingState> currentState = BookingState.initial.obs;
   final Rx<LatLng?> pickupLocation = Rx<LatLng?>(null);
   final Rx<LatLng?> destinationLocation = Rx<LatLng?>(null);
-
-  // --- ADDED: To store the state (e.g., "Lagos") ---
-  final RxString pickupState = 'Lagos'.obs; // Default to Lagos, will be updated
-  // --- END ADDED ---
+  final RxString pickupState = 'Lagos'.obs;
 
   // Multi-stop support
   final RxList<StopPoint> stops = <StopPoint>[].obs;
@@ -270,6 +276,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     pickupController.text = pickupName.value;
 
     _getAndSetStateFromLatLng(currentLatLng, defaultState: "Lagos");
+
     addPickupMarker();
   }
 
@@ -352,7 +359,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
 
   Future<void> addStop(PlaceSuggestion suggestion) async {
     if (stops.length >= maxStops.value + 1) {
-      // --- CORRECTED ---
       THelperFunctions.showErrorSnackBar(
         'Error',
         'Maximum number of stops reached.',
@@ -387,11 +393,9 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
         updateMapMarkers();
         await recalculateRoute();
         updatePricing();
-        // --- CORRECTED ---
         THelperFunctions.showSuccessSnackBar('Success', 'Stop added!');
       }
     } catch (e) {
-      // --- CORRECTED ---
       THelperFunctions.showErrorSnackBar('Error', 'Error adding stop: $e');
     }
   }
@@ -406,7 +410,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     updateMapMarkers();
     recalculateRoute();
     updatePricing();
-    // --- CORRECTED (using info snackbar) ---
     THelperFunctions.showSnackBar('Stop removed');
   }
 
@@ -461,14 +464,12 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
           startTripAnimation();
         }
       } else {
-        // --- CORRECTED ---
         THelperFunctions.showErrorSnackBar(
           'Error',
           'Could not get details for the selected destination.',
         );
       }
     } catch (e) {
-      // --- CORRECTED ---
       THelperFunctions.showErrorSnackBar(
         'Error',
         'Error updating destination: $e',
@@ -547,7 +548,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       update();
     } catch (e) {
       print('Error recalculating route: $e');
-      // --- CORRECTED ---
       THelperFunctions.showErrorSnackBar('Error', 'Error calculating route');
       polylines.clear();
       currentRoutePoints.clear();
@@ -699,13 +699,11 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
         return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
       case StopType.intermediate:
         final hues = [
-          BitmapDescriptor.hueBlue,
-          BitmapDescriptor.hueCyan,
-          BitmapDescriptor.hueMagenta,
+          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
+          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueMagenta),
         ];
-        return BitmapDescriptor.defaultMarkerWithHue(
-          hues[(index - 1) % hues.length],
-        );
+        return hues[(index - 1) % hues.length];
     }
   }
 
@@ -727,7 +725,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
 
   Future<void> addStopDuringRide(PlaceSuggestion suggestion) async {
     if (!canModifyDuringRide()) {
-      // --- CORRECTED ---
       THelperFunctions.showErrorSnackBar(
         'Error',
         'Cannot add more stops during this ride.',
@@ -738,6 +735,57 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
   }
 
   /// Refresh current location
+  Future<void> refreshCurrentLocation() async {
+    print("Refreshing current location...");
+    await _locationService.refreshLocation();
+    final position = _locationService.getLocationForMap();
+    final newLatLng = LatLng(position.latitude, position.longitude);
+
+    pickupLocation.value = newLatLng;
+    pickupName.value = 'Current Location';
+    String address = 'Updated Location';
+    try {
+      address =
+          await PlacesService.getAddressFromCoordinates(
+            newLatLng.latitude,
+            newLatLng.longitude,
+          ) ??
+          address;
+    } catch (e) {
+      print("Reverse geocoding failed on refresh: $e");
+    }
+    pickupAddress.value = address;
+    pickupController.text = pickupName.value;
+
+    await _getAndSetStateFromLatLng(newLatLng, defaultState: "Lagos");
+
+    if (stops.isNotEmpty && stops.first.type == StopType.pickup) {
+      stops[0] = StopPoint(
+        id: stops.first.id,
+        type: StopType.pickup,
+        location: newLatLng,
+        name: pickupName.value,
+        address: pickupAddress.value,
+        isEditable: false,
+      );
+    } else {
+      initializeStops();
+    }
+
+    addPickupMarker();
+    mapController?.animateCamera(CameraUpdate.newLatLngZoom(newLatLng, 16.0));
+
+    if (destinationLocation.value != null) {
+      await recalculateRoute();
+      updatePricing();
+    }
+
+    THelperFunctions.showSuccessSnackBar(
+      'Success',
+      'Location updated successfully!',
+    );
+    update();
+  }
 
   void addDestinationMarker() {
     print('Adding destination marker...');
@@ -801,7 +849,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       update();
     } catch (e) {
       print('Error drawing route: $e');
-      // --- CORRECTED ---
       THelperFunctions.showSnackBar(
         'Could not calculate route. Using estimated path.',
       );
@@ -883,7 +930,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       print('Error getting destination suggestions: $e');
       destinationSuggestions.clear();
       showDestinationSuggestions.value = false;
-      // --- CORRECTED ---
       THelperFunctions.showErrorSnackBar(
         'Network Error',
         'Unable to search locations. Check connection.',
@@ -933,7 +979,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
           print("Price calculation failed. Staying on destination search.");
         }
       } else {
-        // --- CORRECTED ---
         THelperFunctions.showErrorSnackBar(
           'Error',
           'Could not get location details for ${suggestion.mainText}',
@@ -941,7 +986,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
         destinationController.text = '';
       }
     } catch (e) {
-      // --- CORRECTED ---
       THelperFunctions.showErrorSnackBar(
         'Error',
         'Error selecting destination: $e',
@@ -959,7 +1003,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     print(
       "Fetching prices from ${pickupLocation.value} to ${destinationLocation.value}",
     );
-    // --- CORRECTED ---
     THelperFunctions.showSnackBar('Calculating fares...');
 
     try {
@@ -1014,7 +1057,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
           print(
             "Warning: Price API returned success but no ride categories found.",
           );
-          // --- CORRECTED ---
           THelperFunctions.showSnackBar(
             'No ride types available for this route.',
           );
@@ -1028,7 +1070,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       } else {
         if (!priceResponse.message.toLowerCase().contains('session expired') &&
             !priceResponse.message.toLowerCase().contains("unauthorized")) {
-          // --- CORRECTED ---
           THelperFunctions.showErrorSnackBar(
             'Error',
             priceResponse.message.isNotEmpty
@@ -1042,7 +1083,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       }
     } catch (e) {
       print("Exception during price calculation: $e");
-      // --- CORRECTED ---
       THelperFunctions.showErrorSnackBar(
         'Error',
         'An error occurred while calculating fares.',
@@ -1164,7 +1204,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
           pickupState.value = placeDetails.state;
           print("Pickup state set to: ${placeDetails.state}");
         } else {
-          // Fallback if state is empty from place details (e.g., just "Nigeria")
           await _getAndSetStateFromLatLng(
             placeDetails.location,
             defaultState: "Lagos",
@@ -1195,21 +1234,18 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
           updatePricing();
         }
 
-        // --- CORRECTED ---
         THelperFunctions.showSuccessSnackBar(
           'Success',
           'Pickup location updated.',
         );
         update();
       } else {
-        // --- CORRECTED ---
         THelperFunctions.showErrorSnackBar(
           'Error',
           'Could not get location details.',
         );
       }
     } catch (e) {
-      // --- CORRECTED ---
       THelperFunctions.showErrorSnackBar(
         'Error',
         'Error updating pickup location: $e',
@@ -1275,7 +1311,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
           updatePricing();
         }
 
-        // --- CORRECTED ---
         THelperFunctions.showSuccessSnackBar(
           'Success',
           'Pickup location updated.',
@@ -1285,7 +1320,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
         print("Map picker cancelled or returned null.");
       }
     } catch (e) {
-      // --- CORRECTED ---
       THelperFunctions.showErrorSnackBar(
         'Error',
         'Error selecting location from map: $e',
@@ -1293,59 +1327,58 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     }
   }
 
-  /// Refresh current location
-  Future<void> refreshCurrentLocation() async {
-    print("Refreshing current location...");
-    await _locationService.refreshLocation();
-    final position = _locationService.getLocationForMap();
-    final newLatLng = LatLng(position.latitude, position.longitude);
+  // /// Refresh current location
+  // Future<void> refreshCurrentLocation() async {
+  //   print("Refreshing current location...");
+  //   await _locationService.refreshLocation();
+  //   final position = _locationService.getLocationForMap();
+  //   final newLatLng = LatLng(position.latitude, position.longitude);
 
-    pickupLocation.value = newLatLng;
-    pickupName.value = 'Current Location';
-    String address = 'Updated Location';
-    try {
-      address =
-          await PlacesService.getAddressFromCoordinates(
-            newLatLng.latitude,
-            newLatLng.longitude,
-          ) ??
-          address;
-    } catch (e) {
-      print("Reverse geocoding failed on refresh: $e");
-    }
-    pickupAddress.value = address;
-    pickupController.text = pickupName.value;
+  //   pickupLocation.value = newLatLng;
+  //   pickupName.value = 'Current Location';
+  //   String address = 'Updated Location';
+  //   try {
+  //     address =
+  //         await PlacesService.getAddressFromCoordinates(
+  //           newLatLng.latitude,
+  //           newLatLng.longitude,
+  //         ) ??
+  //         address;
+  //   } catch (e) {
+  //     print("Reverse geocoding failed on refresh: $e");
+  //   }
+  //   pickupAddress.value = address;
+  //   pickupController.text = pickupName.value;
 
-    await _getAndSetStateFromLatLng(newLatLng, defaultState: "Lagos");
+  //   await _getAndSetStateFromLatLng(newLatLng, defaultState: "Lagos");
 
-    if (stops.isNotEmpty && stops.first.type == StopType.pickup) {
-      stops[0] = StopPoint(
-        id: stops.first.id,
-        type: StopType.pickup,
-        location: newLatLng,
-        name: pickupName.value,
-        address: pickupAddress.value,
-        isEditable: false,
-      );
-    } else {
-      initializeStops();
-    }
+  //   if (stops.isNotEmpty && stops.first.type == StopType.pickup) {
+  //     stops[0] = StopPoint(
+  //       id: stops.first.id,
+  //       type: StopType.pickup,
+  //       location: newLatLng,
+  //       name: pickupName.value,
+  //       address: pickupAddress.value,
+  //       isEditable: false,
+  //     );
+  //   } else {
+  //     initializeStops();
+  //   }
 
-    addPickupMarker();
-    mapController?.animateCamera(CameraUpdate.newLatLngZoom(newLatLng, 16.0));
+  //   addPickupMarker();
+  //   mapController?.animateCamera(CameraUpdate.newLatLngZoom(newLatLng, 16.0));
 
-    if (destinationLocation.value != null) {
-      await recalculateRoute();
-      updatePricing();
-    }
+  //   if (destinationLocation.value != null) {
+  //     await recalculateRoute();
+  //     updatePricing();
+  //   }
 
-    // --- CORRECTED ---
-    THelperFunctions.showSuccessSnackBar(
-      'Success',
-      'Location updated successfully!',
-    );
-    update();
-  }
+  //   THelperFunctions.showSuccessSnackBar(
+  //     'Success',
+  //     'Location updated successfully!',
+  //   );
+  //   update();
+  // }
 
   // Helper method to recalculate route
   void _calculateRoute() async {
@@ -1367,17 +1400,14 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
   /// Confirm ride booking
   void confirmRide() async {
     if (selectedRideType.value == null) {
-      // --- CORRECTED ---
       THelperFunctions.showSnackBar('Please select a ride type first.');
       return;
     }
     if (pickupLocation.value == null || destinationLocation.value == null) {
-      // --- CORRECTED ---
       THelperFunctions.showSnackBar('Pickup or destination is missing.');
       return;
     }
     if (pickupState.value.isEmpty) {
-      // --- CORRECTED ---
       THelperFunctions.showSnackBar(
         'Could not determine your state. Please update pickup location.',
       );
@@ -1415,27 +1445,71 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
           seats: selectedRideType.value!.seats,
         );
 
-        // --- CORRECTED ---
         THelperFunctions.showSnackBar('Finding your driver...');
       } else {
         print("Ride booking failed: ${response.message}");
-        // --- CORRECTED ---
-        THelperFunctions.showErrorSnackBar(
-          'Booking Failed',
-          response.message.isNotEmpty
-              ? response.message
-              : 'Failed to book ride. Please try again.',
-        );
-        currentState.value = BookingState.selectRide;
-        if (!panelController.isPanelOpen) panelController.open();
+
+        // --- MODIFICATION ---
+        // Check for the specific "no drivers" message
+        if (response.message.toLowerCase().contains('no available drivers')) {
+          // Show the new custom bottom sheet
+          Get.bottomSheet(
+            NoDriversAvailableWidget(
+              message: response.message,
+              onSearchAgain: () {
+                Get.back(); // Close the bottom sheet
+                currentState.value =
+                    BookingState.selectRide; // Go back to selection
+                if (!panelController.isPanelOpen) panelController.open();
+              },
+            ),
+            backgroundColor: Colors.transparent,
+            isScrollControlled: true,
+          );
+        } else {
+          // Show the generic error snackbar for other errors
+          THelperFunctions.showErrorSnackBar(
+            'Booking Failed',
+            response.message.isNotEmpty
+                ? response.message
+                : 'Failed to book ride. Please try again.',
+          );
+          currentState.value = BookingState.selectRide;
+          if (!panelController.isPanelOpen) panelController.open();
+        }
+        // --- END MODIFICATION ---
       }
     } catch (e) {
       print("Exception during ride booking: $e");
-      // --- CORRECTED ---
-      THelperFunctions.showErrorSnackBar(
-        'Error',
-        'An error occurred while booking. Please try again.',
-      );
+
+      // --- MODIFICATION for catch block ---
+      String errorMessage =
+          'An error occurred while booking. Please try again.';
+      if (e is ApiException) {
+        errorMessage = e.message; // Get the specific message
+      }
+
+      // Check for the "no drivers" message from the exception
+      if (errorMessage.toLowerCase().contains('no available drivers')) {
+        Get.bottomSheet(
+          NoDriversAvailableWidget(
+            message: errorMessage, // Pass the message to the widget
+            onSearchAgain: () {
+              Get.back(); // Close the bottom sheet
+              currentState.value =
+                  BookingState.selectRide; // Go back to selection
+              if (!panelController.isPanelOpen) panelController.open();
+            },
+          ),
+          backgroundColor: Colors.transparent,
+          isScrollControlled: true,
+        );
+      } else {
+        // Show a generic error for anything else
+        THelperFunctions.showErrorSnackBar('Booking Failed', errorMessage);
+      }
+      // --- END MODIFICATION ---
+
       currentState.value = BookingState.selectRide;
       if (!panelController.isPanelOpen) panelController.open();
     }
@@ -1511,7 +1585,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       }
     } catch (e) {
       print("Could not geocode locations to restore route: $e");
-      // --- CORRECTED ---
       THelperFunctions.showErrorSnackBar(
         'Error',
         'Could not display route map.',
@@ -1670,14 +1743,12 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
           TextButton(
             onPressed: () async {
               Get.back();
-              // --- CORRECTED ---
               THelperFunctions.showSnackBar('Cancelling ride...');
               bool success = await _rideService.cancelRide(rideId.value);
               if (success) {
                 print("Ride Cancel API successful.");
               } else {
                 print("Ride Cancel API failed.");
-                // --- CORRECTED ---
                 THelperFunctions.showErrorSnackBar(
                   'Error',
                   'Failed to cancel ride. Please try again.',
@@ -1798,7 +1869,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
         print("Delivery destination set: ${destinationName.value}");
         update();
       } else {
-        // --- CORRECTED ---
         THelperFunctions.showErrorSnackBar(
           'Error',
           'Could not get location details.',
@@ -1807,7 +1877,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       }
     } catch (e) {
       print('Delivery suggestion error: $e');
-      // --- CORRECTED ---
       THelperFunctions.showErrorSnackBar(
         'Error',
         'Error selecting delivery destination.',
@@ -1888,7 +1957,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
 
   void handleEmergency() {
     print("Emergency button pressed!");
-    // --- CORRECTED ---
     THelperFunctions.showSnackBar('Emergency Action Triggered (Simulation)');
   }
 
@@ -1896,6 +1964,36 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     Future.delayed(const Duration(milliseconds: 300), () {
       fitMapToMarkers();
     });
+  }
+
+  // --- ADDED: Handler for 'ride:searching' event ---
+  /// Called by WebSocketService when the server is actively searching for a driver.
+  /// This provides intermediate feedback to the rider.
+  void handleRideSearching(Map<String, dynamic> data) {
+    // Ensure we are still in the searching state
+    if (currentState.value != BookingState.searchingDriver) {
+      print(
+        "Received 'ride:searching' event but not in searching state. Ignoring.",
+      );
+      return;
+    }
+
+    final String driverName = data['driverName'] ?? 'a nearby driver';
+    final int eta = (data['estimatedArrival'] as num?)?.toInt() ?? 5;
+    final String status = data['status'] ?? 'pending';
+
+    if (status == 'pending') {
+      // Update the UI text observables
+      // The 'SearchingDriverWidget' would need to be updated to listen to these.
+      searchingStatusText.value = "We're pinging a potential driver...";
+      potentialDriverInfo.value = "$driverName is $eta minutes away";
+
+      print("Ride Searching: Pinging $driverName ($eta mins)");
+
+      // NOTE: We do NOT set the 'assignedDriver' here.
+      // That only happens in 'handleRideAccepted' when the driver confirms.
+    }
+    update(); // Notify listeners
   }
 
   void handleRideAccepted(Driver driverDetails, String chatId) {
@@ -1908,7 +2006,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       currentState.value = BookingState.driverAssigned;
       _previousDriverLocation = driverDetails.location;
       addDriverMarker(rotation: 0.0);
-      // --- CORRECTED ---
       THelperFunctions.showSuccessSnackBar(
         'Driver Found!',
         'Driver ${driverDetails.name} is on the way!',
@@ -1926,7 +2023,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
   void handleRideRejected(String message) {
     print("RideController: Handling ride rejected. Message: $message");
     if (currentState.value == BookingState.searchingDriver) {
-      // --- CORRECTED ---
       THelperFunctions.showSnackBar(message);
     } else {
       print(
@@ -1937,7 +2033,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
 
   void handleCancellationConfirmed(String message) {
     print("RideController: Handling cancellation confirmed. Message: $message");
-    // --- CORRECTED ---
     THelperFunctions.showSnackBar(message);
     _resetUIState();
   }
@@ -1952,7 +2047,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       startTripAnimation();
       update();
 
-      // --- CORRECTED ---
       THelperFunctions.showSuccessSnackBar(
         'Trip Started',
         'Your trip has started!',
@@ -1983,7 +2077,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
           print("Driver has arrived at pickup!");
           currentState.value = BookingState.driverArrived;
           driverLocationTimer?.cancel();
-          // --- CORRECTED ---
           THelperFunctions.showSuccessSnackBar(
             'Driver Arrived',
             'Your driver has arrived!',
@@ -2021,7 +2114,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       }
       driverLocationTimer?.cancel();
       currentState.value = BookingState.tripCompleted;
-      // --- CORRECTED ---
       THelperFunctions.showSuccessSnackBar(
         'Trip Completed',
         'You have arrived at your destination! Please complete payment.',

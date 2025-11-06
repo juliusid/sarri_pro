@@ -1,15 +1,21 @@
+// lib/features/driver/controllers/trip_management_controller.dart
+
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:sarri_ride/core/services/http_service.dart';
+import 'package:sarri_ride/config/api_config.dart';
 
 // --- Local Imports ---
 import 'package:sarri_ride/features/shared/models/user_model.dart';
 import 'package:sarri_ride/features/shared/services/demo_data.dart';
 import 'package:sarri_ride/features/location/services/location_service.dart';
 import 'package:sarri_ride/features/location/services/route_service.dart';
+import 'package:sarri_ride/features/location/services/places_service.dart';
 import 'package:sarri_ride/utils/constants/enums.dart'; // Ensure TripStatus enum is here
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
@@ -50,6 +56,8 @@ class TripRequest {
   final double estimatedDistance;
   final int estimatedDuration;
   final String rideType;
+  final int seats; // <-- UPDATED
+  final DateTime expiresAt; // <-- UPDATED
 
   const TripRequest({
     required this.id,
@@ -66,6 +74,8 @@ class TripRequest {
     required this.estimatedDistance,
     required this.estimatedDuration,
     required this.rideType,
+    required this.seats, // <-- UPDATED
+    required this.expiresAt, // <-- UPDATED
   });
 }
 
@@ -86,6 +96,7 @@ class ActiveTrip {
   final String rideType;
   final DateTime startTime;
   final TripStatus status;
+  final String chatId; // <-- ADDED
   final DateTime? arrivalTime;
   final DateTime? pickupTime;
   final DateTime? endTime;
@@ -109,6 +120,7 @@ class ActiveTrip {
     required this.rideType,
     required this.startTime,
     required this.status,
+    this.chatId = '', // <-- ADDED with default
     this.arrivalTime,
     this.pickupTime,
     this.endTime,
@@ -133,6 +145,7 @@ class ActiveTrip {
     String? rideType,
     DateTime? startTime,
     TripStatus? status,
+    String? chatId, // <-- ADDED
     DateTime? arrivalTime,
     DateTime? pickupTime,
     DateTime? endTime,
@@ -156,6 +169,7 @@ class ActiveTrip {
       rideType: rideType ?? this.rideType,
       startTime: startTime ?? this.startTime,
       status: status ?? this.status,
+      chatId: chatId ?? this.chatId, // <-- ADDED
       arrivalTime: arrivalTime ?? this.arrivalTime,
       pickupTime: pickupTime ?? this.pickupTime,
       endTime: endTime ?? this.endTime,
@@ -173,6 +187,7 @@ class TripManagementController extends GetxController {
   final LocationService _locationService = LocationService.instance;
   final DemoDataService _demoDataService = DemoDataService.instance;
   final WebSocketService _webSocketService = WebSocketService.instance;
+  final HttpService _httpService = HttpService.instance; // <-- ADDED
   // Use a lazy getter for DashboardController to avoid initialization issues
   DriverDashboardController? get _dashboardController =>
       Get.isRegistered<DriverDashboardController>()
@@ -213,7 +228,10 @@ class TripManagementController extends GetxController {
   final RxDouble distanceToDestination = 0.0.obs;
   final RxInt estimatedTimeToDestination = 0.obs;
   Timer? _navigationTimer;
-  Timer? _locationUpdateTimer;
+  Timer? _locationUpdateLoopTimer; // <-- MODIFIED
+
+  // Cached State for location updates
+  String _currentState = ""; // <-- ADDED
 
   // Initial Route Estimates
   double _initialRouteDistanceKm = 0.0;
@@ -300,11 +318,13 @@ class TripManagementController extends GetxController {
   void onClose() {
     _requestTimer?.cancel();
     _navigationTimer?.cancel();
-    _locationUpdateTimer?.cancel();
+    _locationUpdateLoopTimer?.cancel(); // <-- MODIFIED
     super.onClose();
   }
 
-  // Initialize location tracking AND WebSocket emission
+  // --- NEW: Location Update Logic (Production Ready) ---
+
+  /// Initializes location tracking and starts the update loop.
   void _initializeLocationTracking() {
     _locationService.ensureLocationAvailable();
     final initialPosition = _locationService.getLocationForMap();
@@ -312,65 +332,170 @@ class TripManagementController extends GetxController {
       initialPosition.latitude,
       initialPosition.longitude,
     );
-    _previousDriverLocation =
-        driverLocation.value; // --- ADDED: Set initial previous location
+    _previousDriverLocation = driverLocation.value;
     _updateDriverLocationOnMap(); // Add initial marker
 
-    _locationUpdateTimer?.cancel();
-    _locationUpdateTimer = Timer.periodic(const Duration(seconds: 10), (
-      timer,
-    ) async {
-      try {
-        // --- (This logic is slightly different from RideController, it uses getLocationForMap) ---
-        final position = _locationService.getLocationForMap();
-        final newLocation = LatLng(position.latitude, position.longitude);
+    // --- ADDED: Fetch initial state ---
+    updateCurrentStateFromLocation();
+    // --- END ADDED ---
 
-        if (driverLocation.value == null ||
-            _calculateDistance(driverLocation.value!, newLocation) > 0.01) {
-          driverLocation.value = newLocation;
-          _updateDriverLocationOnMap(); // --- MODIFIED: This will now handle rotation
-        }
+    // --- Start the new recursive timer loop ---
+    _scheduleNextLocationUpdate();
+  }
 
-        // --- (Rest of WebSocket emission logic as before) ---
-        final bool isOnlineIntent =
-            _dashboardController?.isOnline.value ?? false;
-        final bool isOnBreak = _dashboardController?.isOnBreak.value ?? false;
-        final String currentTaskStatus =
-            _dashboardController?.driverTaskStatus.value ?? 'unavailable';
-        final isSocketConnected = _webSocketService.isConnected.value;
+  /// Performs a reverse-geocode to get the driver's current state and caches it.
+  /// This is called infrequently (on init, on going online) to avoid API spam.
+  Future<void> updateCurrentStateFromLocation() async {
+    if (driverLocation.value == null) {
+      print("Cannot update state: Driver location is unknown.");
+      return;
+    }
 
-        if (isSocketConnected && driverLocation.value != null) {
-          String availabilityStatusToSend;
-          if (isOnBreak) {
-            availabilityStatusToSend = 'unavailable';
-          } else if (currentTaskStatus == 'on_trip') {
-            availabilityStatusToSend = 'on_trip';
-          } else if (isOnlineIntent && currentTaskStatus == 'available') {
-            availabilityStatusToSend = 'available';
-          } else {
-            availabilityStatusToSend = 'unavailable';
-          }
+    print("Fetching and caching driver's current state...");
+    try {
+      final placeDetails = await PlacesService.getPlaceDetailsFromCoordinates(
+        driverLocation.value!.latitude,
+        driverLocation.value!.longitude,
+      );
 
-          if (availabilityStatusToSend == 'available' ||
-              availabilityStatusToSend == 'on_trip' ||
-              availabilityStatusToSend == 'unavailable') {
-            _webSocketService.updateDriverLocation(
-              latitude: driverLocation.value!.latitude,
-              longitude: driverLocation.value!.longitude,
-              state: 'Lagos',
-              availabilityStatus: availabilityStatusToSend,
-            );
-          }
-        }
-        // --- End WebSocket logic ---
-      } catch (e) {
-        print("Error in location update timer: $e");
+      if (placeDetails != null && placeDetails.state.isNotEmpty) {
+        _currentState = placeDetails.state;
+        print("Driver state cached: $_currentState");
+      } else {
+        print(
+          "Could not find state from coordinates. Will use last known state: '$_currentState'",
+        );
       }
+    } catch (e) {
+      print(
+        "Error fetching driver state: $e. Will use last known state: '$_currentState'",
+      );
+    }
+  }
+
+  /// Schedules the next location update based on the current driver state.
+  void _scheduleNextLocationUpdate() {
+    _locationUpdateLoopTimer?.cancel();
+
+    // Stop timer if socket is not connected or user is logged out
+    if (!_webSocketService.isConnected.value ||
+        !HttpService.instance.isAuthenticated) {
+      print(
+        "Location update loop stopped (Socket disconnected or user logged out).",
+      );
+      return;
+    }
+
+    // Determine frequency
+    final String currentTaskStatus =
+        _dashboardController?.driverTaskStatus.value ?? 'unavailable';
+    final bool isOnlineIntent = _dashboardController?.isOnline.value ?? false;
+    final bool isOnBreak = _dashboardController?.isOnBreak.value ?? false;
+
+    Duration nextInterval;
+    bool shouldSendUpdate = true;
+
+    if (isOnBreak) {
+      // On break, status is 'unavailable'
+      nextInterval = const Duration(seconds: 15); // Low frequency
+    } else if (currentTaskStatus == 'on_trip' ||
+        currentTaskStatus == 'accepted' ||
+        currentTaskStatus == 'booked') {
+      // On a trip or accepted, high frequency
+      nextInterval = const Duration(seconds: 5); // 5s as requested
+    } else if (isOnlineIntent && currentTaskStatus == 'available') {
+      // Online and available, low frequency
+      nextInterval = const Duration(seconds: 10); // 8-15s range, 10 is good
+    } else {
+      // Offline or any other state
+      shouldSendUpdate = false; // Don't send updates if offline
+      nextInterval = const Duration(
+        seconds: 30,
+      ); // Check again in 30s just in case
+    }
+
+    // Add jitter (randomness) to the interval to avoid thundering herd
+    final jitterMs = (Random().nextDouble() * 1000)
+        .toInt(); // 0-1 second jitter
+    final finalInterval = nextInterval + Duration(milliseconds: jitterMs);
+
+    // Schedule the next run
+    _locationUpdateLoopTimer = Timer(finalInterval, () {
+      _runLocationUpdate(shouldSendUpdate); // Run the update logic
     });
   }
 
-  /// Forces an immediate location update emission via WebSocket.
-  /// Uses the dashboard controller's state to determine the current status unless overridden.
+  /// Fetches location, determines status, and emits the 'updateLocation' event.
+  Future<void> _runLocationUpdate(bool shouldSendUpdate) async {
+    // Check again in case state changed during timer
+    if (!shouldSendUpdate ||
+        !_webSocketService.isConnected.value ||
+        !HttpService.instance.isAuthenticated) {
+      _scheduleNextLocationUpdate(); // Just re-schedule
+      return;
+    }
+
+    try {
+      // 1. Get current location
+      final position = _locationService.getLocationForMap();
+      final newLocation = LatLng(position.latitude, position.longitude);
+
+      // 2. Check for significant movement
+      bool hasMoved =
+          driverLocation.value == null ||
+          _calculateDistance(driverLocation.value!, newLocation) >
+              0.01; // 10 meters
+
+      if (hasMoved) {
+        driverLocation.value = newLocation;
+        _updateDriverLocationOnMap(); // Update map marker
+      }
+
+      // 3. Get cached state (No API call here)
+      // If state is empty (e.g., on first launch failed), try fetching it once.
+      if (_currentState.isEmpty) {
+        await updateCurrentStateFromLocation();
+      }
+
+      // 4. Get availability status
+      final bool isOnlineIntent = _dashboardController?.isOnline.value ?? false;
+      final bool isOnBreak = _dashboardController?.isOnBreak.value ?? false;
+      final String currentTaskStatus =
+          _dashboardController?.driverTaskStatus.value ?? 'unavailable';
+
+      String availabilityStatusToSend;
+      if (isOnBreak) {
+        availabilityStatusToSend = 'unavailable';
+      } else if (currentTaskStatus == 'on_trip' ||
+          currentTaskStatus == 'accepted' ||
+          currentTaskStatus == 'booked') {
+        availabilityStatusToSend =
+            currentTaskStatus; // Send 'on_trip' or 'accepted'
+      } else if (isOnlineIntent && currentTaskStatus == 'available') {
+        availabilityStatusToSend = 'available';
+      } else {
+        availabilityStatusToSend = 'unavailable';
+      }
+
+      // 5. Emit WebSocket event
+      // We must have a state to send. If still empty, default to "Ogun" as a last resort.
+      _webSocketService.updateDriverLocation(
+        latitude: driverLocation.value!.latitude,
+        longitude: driverLocation.value!.longitude,
+        state: _currentState.isEmpty
+            ? "Ogun"
+            : _currentState, // Use cached state
+        availabilityStatus: availabilityStatusToSend,
+      );
+    } catch (e) {
+      print("Error in _runLocationUpdate: $e");
+    } finally {
+      // 6. Schedule the next update
+      _scheduleNextLocationUpdate();
+    }
+  }
+
+  /// Modifies `forceLocationUpdate` to include state and restart the timer loop.
   void forceLocationUpdate({String? statusOverride}) {
     print("Forcing location update emission. Override: $statusOverride");
     if (!_webSocketService.isConnected.value) {
@@ -395,8 +520,10 @@ class TripManagementController extends GetxController {
 
       if (isOnBreak) {
         availabilityStatusToSend = 'unavailable';
-      } else if (currentTaskStatus == 'on_trip') {
-        availabilityStatusToSend = 'on_trip';
+      } else if (currentTaskStatus == 'on_trip' ||
+          currentTaskStatus == 'accepted' ||
+          currentTaskStatus == 'booked') {
+        availabilityStatusToSend = currentTaskStatus;
       } else if (isOnlineIntent && currentTaskStatus == 'available') {
         availabilityStatusToSend = 'available';
       } else {
@@ -407,11 +534,14 @@ class TripManagementController extends GetxController {
     // Only emit relevant statuses
     if (availabilityStatusToSend == 'available' ||
         availabilityStatusToSend == 'on_trip' ||
-        availabilityStatusToSend == 'unavailable') {
+        availabilityStatusToSend == 'unavailable' ||
+        availabilityStatusToSend == 'accepted' ||
+        availabilityStatusToSend == 'booked') {
+      // Use cached state, default to "Ogun" if empty
       _webSocketService.updateDriverLocation(
         latitude: driverLocation.value!.latitude,
         longitude: driverLocation.value!.longitude,
-        state: 'Lagos', // Placeholder
+        state: _currentState.isEmpty ? "Ogun" : _currentState, // <-- MODIFIED
         availabilityStatus: availabilityStatusToSend,
       );
       print(
@@ -422,7 +552,12 @@ class TripManagementController extends GetxController {
         "Skipping forced update: Status '$availabilityStatusToSend' is not relevant.",
       );
     }
+
+    // After forcing an update, immediately reschedule the next loop
+    _scheduleNextLocationUpdate();
   }
+
+  // --- END NEW Location Update Logic ---
 
   // Start listening for trip requests (Simulation - Keep for testing?)
   void _startListeningForTripRequests() {
@@ -452,11 +587,20 @@ class TripManagementController extends GetxController {
     print("Showing trip request: ${request.id}");
     currentTripRequest.value = request;
     hasNewRequest.value = true;
-    requestTimeLeft.value = 15; // Reset timer
 
+    // --- MODIFICATION: Use expiresAt from server ---
     _requestTimer?.cancel();
+
+    // Calculate initial time left
+    final now = DateTime.now();
+    int secondsLeft = request.expiresAt.difference(now).inSeconds;
+    requestTimeLeft.value = secondsLeft > 0 ? secondsLeft : 0;
+
     _requestTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      requestTimeLeft.value--;
+      final newNow = DateTime.now();
+      secondsLeft = request.expiresAt.difference(newNow).inSeconds;
+      requestTimeLeft.value = secondsLeft > 0 ? secondsLeft : 0;
+
       if (requestTimeLeft.value <= 0) {
         timer.cancel();
         // Check if the *same* request is still active before declining
@@ -466,10 +610,11 @@ class TripManagementController extends GetxController {
         }
       }
     });
+    // --- END MODIFICATION ---
 
     _addPickupMarker(request.pickupLocation); // Show pickup on map
 
-    // Navigate to TripRequestScreen only if not already there
+    // Navigate to TripRequestScreen only if not already on it
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (Get.currentRoute != '/TripRequestScreen') {
         Get.to(() => const TripRequestScreen());
@@ -477,7 +622,7 @@ class TripManagementController extends GetxController {
     });
   }
 
-  // Accept trip request
+  // --- MODIFIED: acceptTripRequest to use HTTP POST ---
   Future<void> acceptTripRequest() async {
     if (currentTripRequest.value == null) {
       print("Cannot accept: No current trip request.");
@@ -486,14 +631,12 @@ class TripManagementController extends GetxController {
     _requestTimer?.cancel(); // Stop timeout timer
     hasNewRequest.value = false; // Clear flag immediately for UI feedback
     final request = currentTripRequest.value!; // Store request before clearing
-    print("Accepting trip request: ${request.id}");
+    print("Accepting trip request via HTTP POST: ${request.id}");
 
     // --- TEMPORARILY SET UI STATE ---
     // This provides faster feedback, assuming acceptance is likely.
-    // The state will be corrected if the ack fails.
     tripStatus.value = TripStatus.accepted;
     activeTrip.value = ActiveTrip(
-      // Create a temporary ActiveTrip
       id: request.id,
       riderId: request.riderId,
       riderName: request.riderName,
@@ -509,39 +652,76 @@ class TripManagementController extends GetxController {
       rideType: request.rideType,
       startTime: DateTime.now(),
       status: TripStatus.accepted,
+      chatId: '', // Chat ID will be filled by the response
     );
     currentTripRequest.value = null; // Clear the request object now
     update(); // Update UI optimistically
     // --- END TEMPORARY STATE ---
 
-    _webSocketService.emitWithAck(
-      'ride:accept',
-      {'rideId': request.id},
-      ack: (response) {
-        if (response is Map && response['status'] == 'success') {
+    try {
+      // --- Use HttpService.post instead of WebSocket.emitWithAck ---
+      final response = await _httpService.post(
+        ApiConfig.acceptRideEndpoint,
+        body: {'rideId': request.id},
+      );
+
+      // Handle the response
+      final responseData = _httpService.handleResponse(response);
+
+      if (responseData['status'] == 'success' && responseData['data'] != null) {
+        final String chatId = responseData['data']['chatId'] ?? '';
+        if (chatId.isEmpty) {
           print(
-            "Backend acknowledged ride acceptance for ${request.id}. Proceeding...",
-          );
-          // Confirmation received, proceed with navigation setup
-          _proceedWithAcceptedTrip(request); // Call the main logic now
-        } else {
-          print(
-            "Backend rejected ride acceptance for ${request.id}: ${response['message'] ?? response}",
-          );
-          // --- REVERT UI STATE ON FAILURE ---
-          tripStatus.value = TripStatus.none;
-          activeTrip.value = null; // Clear temporary ActiveTrip
-          currentTripRequest.value = request; // Restore the request object
-          hasNewRequest.value = true; // Show request again
-          update(); // Revert UI
-          // --- END REVERT ---
-          THelperFunctions.showSnackBar(
-            "Could not accept ride: ${response['message'] ?? 'Server error'}",
+            "Warning: HTTP accept response received success but no chatId.",
           );
         }
-      },
+
+        // Update the activeTrip with the new chatId
+        if (activeTrip.value != null && activeTrip.value!.id == request.id) {
+          activeTrip.value = activeTrip.value!.copyWith(chatId: chatId);
+          print(
+            "HTTP ride acceptance successful for ${request.id}. ChatID: $chatId",
+          );
+        }
+
+        // Confirmation received, proceed with navigation setup
+        _proceedWithAcceptedTrip(request); // Call the main logic
+      } else {
+        // HTTP call was successful but backend returned an error status
+        print(
+          "Backend rejected ride acceptance for ${request.id}: ${responseData['message'] ?? 'Unknown error'}",
+        );
+        _revertFailedAcceptance(
+          request,
+          responseData['message'] ?? 'Ride acceptance failed.',
+        );
+      }
+    } catch (e) {
+      // HTTP call itself failed (network error, 401, 500, etc.)
+      print("HTTP Error accepting ride ${request.id}: $e");
+      String errorMessage = "Could not accept ride. Please try again.";
+      if (e is ApiException) {
+        errorMessage = e.message;
+      }
+      _revertFailedAcceptance(request, errorMessage);
+    }
+  }
+
+  /// Helper method to revert UI state if acceptTrip fails
+  void _revertFailedAcceptance(TripRequest request, String errorMessage) {
+    // --- REVERT UI STATE ON FAILURE ---
+    tripStatus.value = TripStatus.none;
+    activeTrip.value = null; // Clear temporary ActiveTrip
+    currentTripRequest.value = request; // Restore the request object
+    hasNewRequest.value = true; // Show request again
+    update(); // Revert UI
+    // --- END REVERT ---
+    THelperFunctions.showErrorSnackBar(
+      "Error",
+      "Could not accept ride: $errorMessage",
     );
   }
+  // --- END MODIFIED METHOD ---
 
   // Handles logic AFTER backend confirms acceptance
   Future<void> _proceedWithAcceptedTrip(TripRequest request) async {
@@ -665,7 +845,7 @@ class TripManagementController extends GetxController {
     update();
   }
 
-  // Start navigation to destination
+  // --- MODIFIED: _startNavigationToDestination to use HTTP POST ---
   Future<void> _startNavigationToDestination() async {
     if (activeTrip.value == null || driverLocation.value == null) {
       print(
@@ -685,13 +865,53 @@ class TripManagementController extends GetxController {
     print(
       "Starting navigation to destination: ${activeTrip.value!.destinationAddress}",
     );
-    tripStatus.value = TripStatus.tripInProgress; // Update status
-    isNavigating.value = true;
-    _webSocketService.emit('ride:start', {
-      'tripId': activeTrip.value!.id,
-    }); // Notify backend
+
+    // --- MODIFICATION: Call HTTP Endpoint ---
+    try {
+      // 1. Call the API to start the trip
+      final tripId = activeTrip.value!.id;
+      final coordinates = [
+        driverLocation.value!.longitude, // longitude first
+        driverLocation.value!.latitude, // latitude second
+      ];
+
+      final response = await _httpService.post(
+        ApiConfig.startTripEndpoint,
+        body: {"tripId": tripId, "coordinates": coordinates},
+      );
+
+      final responseData = _httpService.handleResponse(response);
+
+      if (responseData['status'] != 'success') {
+        // API returned an error
+        print("Backend failed to start trip: ${responseData['message']}");
+        THelperFunctions.showErrorSnackBar(
+          "Error",
+          responseData['message'] ?? 'Could not start trip on server.',
+        );
+        return; // Stop execution
+      }
+
+      // 2. API Call Successful, proceed with UI and navigation
+      print("HTTP 'startTrip' successful. Proceeding with navigation.");
+      tripStatus.value = TripStatus.tripInProgress; // Update status
+      isNavigating.value = true;
+      // The backend will now send 'ride:started' to the rider.
+      // We no longer emit 'ride:start' from here.
+    } catch (e) {
+      // HTTP call itself failed (network, 401, etc.)
+      print("HTTP Error starting trip: $e");
+      String errorMessage = "Could not start trip. Please try again.";
+      if (e is ApiException) {
+        errorMessage = e.message;
+      }
+      THelperFunctions.showErrorSnackBar("Error", errorMessage);
+      return; // Stop execution
+    }
+    // --- END MODIFICATION ---
 
     try {
+      // 3. Calculate and draw the route on the map
       final routeInfo = await RouteService.getRouteInfo(
         driverLocation.value!, // Use current driver location as start
         activeTrip.value!.destinationLocation,
@@ -738,7 +958,10 @@ class TripManagementController extends GetxController {
       );
 
       _fitMapToCurrentRoute(); // Adjust map view
-      THelperFunctions.showSnackBar('Trip started! Navigating to destination.');
+      THelperFunctions.showSuccessSnackBar(
+        'Success',
+        'Trip started! Navigating to destination.',
+      );
     } catch (e) {
       print('Error getting route to destination: $e');
       THelperFunctions.showSnackBar('Error calculating route to destination.');
@@ -754,6 +977,7 @@ class TripManagementController extends GetxController {
     }
     update();
   }
+  // --- END MODIFIED METHOD ---
 
   // Start/Restart navigation update timer
   void _startNavigationUpdates() {
@@ -1145,7 +1369,7 @@ class TripManagementController extends GetxController {
         position: location,
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
         infoWindow: InfoWindow(
-          title: '📍 Pickup Location',
+          title: 'Pickup Location',
           snippet:
               activeTrip.value?.pickupAddress ??
               currentTripRequest.value?.pickupAddress ??
@@ -1165,7 +1389,7 @@ class TripManagementController extends GetxController {
         position: location,
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
         infoWindow: InfoWindow(
-          title: '🎯 Destination',
+          title: 'Destination',
           snippet:
               activeTrip.value?.destinationAddress ??
               currentTripRequest.value?.destinationAddress ??
@@ -1207,7 +1431,7 @@ class TripManagementController extends GetxController {
         flat: true, // Make marker flat
         // --- END MODIFICATION ---
         zIndex: 2,
-        infoWindow: const InfoWindow(title: '🚗 Your Location'),
+        infoWindow: const InfoWindow(title: 'Your Location'),
       ),
     );
     update();
@@ -1352,6 +1576,8 @@ class TripManagementController extends GetxController {
       estimatedDistance: 2.0 + random.nextDouble() * 10.0,
       estimatedDuration: 5 + random.nextInt(25),
       rideType: _getRandomRideType(),
+      seats: 4, // Added
+      expiresAt: DateTime.now().add(const Duration(seconds: 30)), // Added
     );
     riderName.value = request.riderName;
     pickupAddress.value = request.pickupAddress;
