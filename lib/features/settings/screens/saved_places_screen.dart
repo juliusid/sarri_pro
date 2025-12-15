@@ -10,14 +10,14 @@ import 'add_place_screen.dart';
 
 class SavedPlacesScreen extends StatelessWidget {
   SavedPlacesScreen({super.key});
-  
+
   // Ensure controller is properly initialized - this prevents freezing issues
   final SavedPlacesController controller = Get.put(SavedPlacesController());
 
   @override
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Saved Places'),
@@ -35,18 +35,19 @@ class SavedPlacesScreen extends StatelessWidget {
         children: [
           // Header with Add Button
           _buildHeader(context, dark),
-          
+
           // Places List
           Expanded(
             child: Obx(() {
               if (controller.savedPlaces.isEmpty) {
                 return _buildEmptyState(context, dark);
               }
-              
+
               return ListView.separated(
                 padding: const EdgeInsets.all(TSizes.defaultSpace),
                 itemCount: controller.savedPlaces.length,
-                separatorBuilder: (context, index) => const SizedBox(height: TSizes.spaceBtwItems),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: TSizes.spaceBtwItems),
                 itemBuilder: (context, index) {
                   final place = controller.savedPlaces[index];
                   return _buildPlaceCard(place, context, dark);
@@ -56,7 +57,7 @@ class SavedPlacesScreen extends StatelessWidget {
           ),
         ],
       ),
-      
+
       // Floating Action Button
       floatingActionButton: FloatingActionButton(
         onPressed: () => Get.to(() => const AddPlaceScreen()),
@@ -105,14 +106,16 @@ class SavedPlacesScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: TSizes.xs),
-                Obx(() => Text(
-                  controller.savedPlaces.isEmpty
-                      ? 'No saved places yet'
-                      : '${controller.savedPlaces.length} saved place${controller.savedPlaces.length == 1 ? '' : 's'}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: TColors.white.withOpacity(0.8),
+                Obx(
+                  () => Text(
+                    controller.savedPlaces.isEmpty
+                        ? 'No saved places yet'
+                        : '${controller.savedPlaces.length} saved place${controller.savedPlaces.length == 1 ? '' : 's'}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: TColors.white.withOpacity(0.8),
+                    ),
                   ),
-                )),
+                ),
               ],
             ),
           ),
@@ -157,13 +160,15 @@ class SavedPlacesScreen extends StatelessWidget {
           const SizedBox(height: TSizes.spaceBtwItems),
           Text(
             'No Saved Places',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: TSizes.spaceBtwItems),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: TSizes.defaultSpace * 2),
+            padding: const EdgeInsets.symmetric(
+              horizontal: TSizes.defaultSpace * 2,
+            ),
             child: Text(
               'Save your favorite places for quick access when booking rides',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -233,9 +238,8 @@ class SavedPlacesScreen extends StatelessWidget {
                     children: [
                       Text(
                         place.label,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: TSizes.xs),
                       Text(
@@ -257,9 +261,8 @@ class SavedPlacesScreen extends StatelessWidget {
                           const SizedBox(width: TSizes.xs),
                           Text(
                             '${place.lat.toStringAsFixed(4)}, ${place.lng.toStringAsFixed(4)}',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: TColors.primary,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: TColors.primary),
                           ),
                         ],
                       ),
@@ -269,7 +272,7 @@ class SavedPlacesScreen extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Actions
           Container(
             padding: const EdgeInsets.symmetric(
@@ -288,7 +291,8 @@ class SavedPlacesScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: TextButton.icon(
-                    onPressed: () => Get.to(() => AddPlaceScreen(placeToEdit: place)),
+                    onPressed: () =>
+                        Get.to(() => AddPlaceScreen(placeToEdit: place)),
                     icon: Icon(
                       Iconsax.edit,
                       size: TSizes.iconSm,
@@ -307,7 +311,8 @@ class SavedPlacesScreen extends StatelessWidget {
                 ),
                 Expanded(
                   child: TextButton.icon(
-                    onPressed: () => _showDeleteConfirmation(place, context, dark),
+                    onPressed: () =>
+                        _showDeleteConfirmation(place, context, dark),
                     icon: Icon(
                       Iconsax.trash,
                       size: TSizes.iconSm,
@@ -327,7 +332,11 @@ class SavedPlacesScreen extends StatelessWidget {
     );
   }
 
-  void _showDeleteConfirmation(SavedPlace place, BuildContext context, bool dark) {
+  void _showDeleteConfirmation(
+    SavedPlace place,
+    BuildContext context,
+    bool dark,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -357,24 +366,37 @@ class SavedPlacesScreen extends StatelessWidget {
   IconData _getPlaceIcon(String label) {
     final lowerLabel = label.toLowerCase();
     if (lowerLabel.contains('home')) return Iconsax.home;
-    if (lowerLabel.contains('work') || lowerLabel.contains('office')) return Iconsax.building;
-    if (lowerLabel.contains('gym') || lowerLabel.contains('fitness')) return Iconsax.health;
-    if (lowerLabel.contains('school') || lowerLabel.contains('university')) return Iconsax.teacher;
-    if (lowerLabel.contains('hospital') || lowerLabel.contains('clinic')) return Iconsax.hospital;
-    if (lowerLabel.contains('mall') || lowerLabel.contains('shop')) return Iconsax.shop;
-    if (lowerLabel.contains('restaurant') || lowerLabel.contains('cafe')) return Iconsax.cake;
+    if (lowerLabel.contains('work') || lowerLabel.contains('office'))
+      return Iconsax.building;
+    if (lowerLabel.contains('gym') || lowerLabel.contains('fitness'))
+      return Iconsax.health;
+    if (lowerLabel.contains('school') || lowerLabel.contains('university'))
+      return Iconsax.teacher;
+    if (lowerLabel.contains('hospital') || lowerLabel.contains('clinic'))
+      return Iconsax.hospital;
+    if (lowerLabel.contains('mall') || lowerLabel.contains('shop'))
+      return Iconsax.shop;
+    if (lowerLabel.contains('airport'))
+      return Icons.local_airport; // You might want to add this if it's missing
+    // ...
     return Iconsax.location;
   }
 
   Color _getPlaceColor(String label) {
     final lowerLabel = label.toLowerCase();
     if (lowerLabel.contains('home')) return TColors.success;
-    if (lowerLabel.contains('work') || lowerLabel.contains('office')) return TColors.info;
-    if (lowerLabel.contains('gym') || lowerLabel.contains('fitness')) return TColors.warning;
-    if (lowerLabel.contains('school') || lowerLabel.contains('university')) return TColors.secondary;
-    if (lowerLabel.contains('hospital') || lowerLabel.contains('clinic')) return TColors.error;
-    if (lowerLabel.contains('mall') || lowerLabel.contains('shop')) return const Color(0xFF8B5CF6);
-    if (lowerLabel.contains('restaurant') || lowerLabel.contains('cafe')) return const Color(0xFFEC4899);
+    if (lowerLabel.contains('work') || lowerLabel.contains('office'))
+      return TColors.info;
+    if (lowerLabel.contains('gym') || lowerLabel.contains('fitness'))
+      return TColors.warning;
+    if (lowerLabel.contains('school') || lowerLabel.contains('university'))
+      return TColors.secondary;
+    if (lowerLabel.contains('hospital') || lowerLabel.contains('clinic'))
+      return TColors.error;
+    if (lowerLabel.contains('mall') || lowerLabel.contains('shop'))
+      return const Color(0xFF8B5CF6);
+    if (lowerLabel.contains('restaurant') || lowerLabel.contains('cafe'))
+      return const Color(0xFFEC4899);
     return TColors.primary;
   }
 
@@ -383,19 +405,21 @@ class SavedPlacesScreen extends StatelessWidget {
     try {
       print('Attempting to navigate to AddPlaceScreen...');
       THelperFunctions.showSnackBar('Opening Add Place screen...');
-      
+
       // Use a delayed navigation to ensure UI is ready
       Future.delayed(const Duration(milliseconds: 100), () {
-        Get.to(() => const AddPlaceScreen())?.then((_) {
-          print('Navigation completed successfully');
-        }).catchError((error) {
-          print('Navigation error: $error');
-          THelperFunctions.showSnackBar('Error opening add place screen');
-        });
+        Get.to(() => const AddPlaceScreen())
+            ?.then((_) {
+              print('Navigation completed successfully');
+            })
+            .catchError((error) {
+              print('Navigation error: $error');
+              THelperFunctions.showSnackBar('Error opening add place screen');
+            });
       });
     } catch (e) {
       print('Error in _navigateToAddPlace: $e');
       THelperFunctions.showSnackBar('Unable to open add place screen');
     }
   }
-} 
+}

@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-// removed stop/reroute UI for now
+import 'package:sarri_ride/features/communication/controllers/call_controller.dart';
 import 'package:sarri_ride/features/ride/controllers/ride_controller.dart';
+// Import the ShareController
+import 'package:sarri_ride/features/share/controllers/share_controller.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/ride/widgets/common_widgets.dart';
 import 'package:sarri_ride/features/ride/widgets/driver_info_card.dart';
-import 'package:sarri_ride/features/communication/screens/call_screen.dart';
 import 'package:sarri_ride/features/communication/screens/message_screen.dart';
-// import 'package:iconsax/iconsax.dart';
+import 'package:iconsax/iconsax.dart';
 
 class TripInProgressWidget extends StatelessWidget {
   final Driver driver;
@@ -123,8 +124,10 @@ class TripInProgressWidget extends StatelessWidget {
 
   // Function to make normal phone call
   void _makePhoneCall(String driverName) async {
-    // Use the driver's phone number - in a real app, this would come from the driver object
-    const phoneNumber = '+234 901 234 5678';
+    // Use the driver's phone number
+    final phoneNumber = driver.phoneNumber.isNotEmpty
+        ? driver.phoneNumber
+        : '+2349012345678';
     final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
 
     try {
@@ -138,24 +141,15 @@ class TripInProgressWidget extends StatelessWidget {
     }
   }
 
-  // Function to make in-app call (existing functionality)
+  // Function to make in-app call
   void _makeInAppCall() {
-    Get.to(
-      () => CallScreen(
-        driverName: driver.name,
-        driverPhone: '+234 901 234 5678',
-        carModel: driver.carModel,
-        plateNumber: driver.plateNumber,
-        rating: driver.rating,
-      ),
-    );
+    CallController.instance.startCall(driver.id, driver.name, 'Driver');
   }
 
   @override
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
     final rideController = Get.find<RideController>();
-    // stops/reroute controls removed for now
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -335,9 +329,6 @@ class TripInProgressWidget extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-
-              const SizedBox(width: 12),
-
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
@@ -349,10 +340,10 @@ class TripInProgressWidget extends StatelessWidget {
                     child: InkWell(
                       borderRadius: BorderRadius.circular(12),
                       onTap: () {
-                        // --- Get chatId from RideController ---
+                        // Get chatId from RideController
                         final rideController = Get.find<RideController>();
                         final chatId = rideController.activeRideChatId.value;
-                        // --- End Get chatId ---
+
                         Get.to(
                           () => MessageScreen(
                             driverName: driver.name,
@@ -390,28 +381,62 @@ class TripInProgressWidget extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // Emergency button
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: onEmergency,
-              icon: const Icon(Icons.warning, color: TColors.error),
-              label: const Text(
-                'Emergency',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: TColors.error,
+          // Share Trip & Emergency Buttons
+          Row(
+            children: [
+              // Share Trip Button
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    // Initialize ShareController on demand
+                    final shareController = Get.put(ShareController());
+                    shareController.shareTrip();
+                  },
+                  icon: const Icon(Icons.share, color: TColors.primary),
+                  label: const Text(
+                    'Share Trip',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: TColors.primary,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    side: const BorderSide(color: TColors.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                side: const BorderSide(color: TColors.error),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+
+              const SizedBox(width: 12),
+
+              // Emergency (SOS) Button
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onEmergency,
+                  icon: const Icon(
+                    Icons.warning_amber_rounded,
+                    color: TColors.error,
+                  ),
+                  label: const Text(
+                    'SOS',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: TColors.error,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    side: const BorderSide(color: TColors.error),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         ],
       ),

@@ -27,6 +27,7 @@ class SettingsController extends GetxController {
 
     final storage = GetStorage(); //
     storage.remove('user_role'); // Clear the role on logout
+    storage.remove('current_user_data');
     print("Cleared user_role from storage."); // Optional logging
 
     // Navigate regardless of API logout success, as local tokens are cleared

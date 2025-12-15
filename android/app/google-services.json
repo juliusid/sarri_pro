@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "21448281203",
+    "project_id": "sarriride-9c8d1",
+    "storage_bucket": "sarriride-9c8d1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:21448281203:android:17ebba92b036164499ee06",
+        "android_client_info": {
+          "package_name": "com.example.sarri_ride"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "21448281203-k4b65f0gv2f75chs9r174qu2mjudh20a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAJ5rnWUf1u4MAqMYxnqI6Rt172TrAvZHk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "21448281203-k4b65f0gv2f75chs9r174qu2mjudh20a.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "21448281203-h3pdin61q71kfvg79q6e5e0mj7umg7nk.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.sarriRide"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

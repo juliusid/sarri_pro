@@ -1,20 +1,19 @@
-// lib/features/authentication/controllers/login_controller.dart
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:sarri_ride/core/services/websocket_service.dart';
-import 'package:sarri_ride/features/driver/screens/driver_dashboard_screen.dart';
-import 'package:sarri_ride/features/ride/widgets/map_screen_getx.dart';
-import 'package:sarri_ride/features/authentication/services/auth_service.dart';
-import 'package:sarri_ride/utils/constants/enums.dart';
-import 'package:sarri_ride/utils/helpers/helper_functions.dart';
-import 'package:sarri_ride/features/authentication/models/auth_model.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
-import 'package:sarri_ride/utils/validators/validation.dart';
-import 'package:sarri_ride/utils/constants/text_strings.dart';
-import 'package:sarri_ride/features/authentication/screens/forgot_password/forgot_password_screen.dart';
+import 'package:sarri_ride/core/services/websocket_service.dart';
+import 'package:sarri_ride/features/authentication/models/auth_model.dart';
+import 'package:sarri_ride/features/authentication/screens/phone_verification/phone_number_screen.dart';
+import 'package:sarri_ride/features/authentication/services/auth_service.dart';
+import 'package:sarri_ride/features/driver/screens/driver_dashboard_screen.dart';
+import 'package:sarri_ride/features/ride/controllers/drawer_controller.dart';
+import 'package:sarri_ride/features/ride/widgets/map_screen_getx.dart';
+import 'package:sarri_ride/utils/constants/enums.dart';
+import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
 class LoginController extends GetxController {
   static LoginController get instance => Get.find();
@@ -28,13 +27,10 @@ class LoginController extends GetxController {
 
   // Reactive variables
   final RxBool obscurePassword = true.obs;
-  final RxBool isLoading = false.obs;
+  final RxBool isEmailLoading = false.obs;
+  final RxBool isGoogleLoading = false.obs;
+  final RxBool isFacebookLoading = false.obs;
   final selectedRole = UserType.rider.obs;
-
-  @override
-  void onReady() {
-    super.onReady();
-  }
 
   @override
   void onClose() {
@@ -55,121 +51,138 @@ class LoginController extends GetxController {
   Future<void> handleLogin() async {
     if (!formKey.currentState!.validate()) return;
 
-    isLoading.value = true;
+    isEmailLoading.value = true;
     AuthResult loginResult;
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
     final bool isDriverLogin = selectedRole.value == UserType.driver;
 
     try {
-      // --- Call API based on selectedRole ---
+      // Call API based on selectedRole
       if (isDriverLogin) {
         print("LOGIN_CONTROLLER: Attempting login as Driver...");
         loginResult = await AuthService.instance.loginDriver(email, password);
       } else {
-        // Rider
         print("LOGIN_CONTROLLER: Attempting login as Client...");
         loginResult = await AuthService.instance.login(email, password);
       }
-      // --- END Role-based API Call ---
 
-      // --- Process Result ---
+      // Process Result
       if (loginResult.success && loginResult.client != null) {
         print(
           "LOGIN_CONTROLLER: Initial login successful. Storing user data...",
         );
+        print("GOOGLE LOGIN SUCCESS! FULL DATA:");
+        print(jsonEncode(loginResult.client!.toJson()));
+        // -------------------------------
+
+        print(
+          "LOGIN_CONTROLLER: Google login successful via backend. Storing user data...",
+        );
+
         if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
           Get.delete<ClientData>(tag: 'currentUser', force: true);
-          print("LOGIN_CONTROLLER: Removed existing ClientData instance.");
         }
+
         Get.put<ClientData>(
           loginResult.client!,
           tag: 'currentUser',
           permanent: true,
         );
 
+        // Refresh user data in the drawer controller
+        final drawerController = Get.find<MapDrawerController>();
+        await drawerController.refreshUserData();
+
         final storage = GetStorage();
         storage.write('user_role', loginResult.client!.role);
+        storage.write('current_user_data', loginResult.client!.toJson());
+
         print(
           "LOGIN_CONTROLLER: Stored user role: ${loginResult.client!.role}",
         );
 
-        // --- IMMEDIATELY REFRESH TOKEN ---
+        // IMMEDIATELY REFRESH TOKEN
         print("LOGIN_CONTROLLER: Attempting immediate token refresh...");
         final String userId = loginResult.client!.id;
 
         bool refreshSuccess = await HttpService.instance
             .refreshTokenImmediately(isDriver: isDriverLogin, userId: userId);
-        // --- END ---
 
         if (!refreshSuccess) {
           print(
-            "LOGIN_CONTROLLER: Immediate token refresh failed after login. Logout initiated by HttpService.",
+            "LOGIN_CONTROLLER: Immediate token refresh failed. Logout initiated.",
           );
-          isLoading.value = false;
-          return; // Stop execution
+          isEmailLoading.value = false;
+          return;
         }
 
         print(
           "LOGIN_CONTROLLER: Immediate token refresh successful. Navigating...",
         );
 
-        // Connect WebSocket
-        print(
-          "LOGIN_CONTROLLER: Connecting WebSocket for '${loginResult.client!.role}'...",
-        );
-        WebSocketService.instance.connect();
+        // CHECK FOR PHONE NUMBER (Rider Only)
+        final profile = drawerController.fullProfile.value;
 
-        // Navigate based on actual role from response
+        // Connect WebSocket
+        if (loginResult.client!.role == "client" ||
+            loginResult.client!.role == "driver") {
+          WebSocketService.instance.connect();
+        }
+
         if (loginResult.client!.role == "client") {
-          // Client (Rider) flow
-          Get.offAll(() => const MapScreenGetX());
-          // --- MODIFIED ---
-          THelperFunctions.showSuccessSnackBar(
-            'Success',
-            'Welcome back, Rider!',
-          );
-          // --- END MODIFIED ---
+          // Check if profile exists and phone number is missing OR not verified
+          if (profile == null || profile.phoneNumberVerified == false) {
+            print(
+              "LOGIN_CONTROLLER: Phone number missing or not verified. Forcing verification.",
+            );
+            // Get.offAll(() => const PhoneNumberScreen());
+            Get.offAll(() => const MapScreenGetX());
+
+            THelperFunctions.showSnackBar(
+              'Please verify your phone number to continue.',
+            );
+          } else {
+            // Phone number exists and is verified
+            Get.offAll(() => const MapScreenGetX());
+            THelperFunctions.showSuccessSnackBar(
+              'Success',
+              'Welcome back, Rider!',
+            );
+          }
         } else if (loginResult.client!.role == "driver") {
           // Driver flow
           Get.offAll(() => const DriverDashboardScreen());
-          // --- MODIFIED ---
           THelperFunctions.showSuccessSnackBar(
             'Success',
             'Welcome back, Driver!',
           );
-          // --- END MODIFIED ---
         } else {
           THelperFunctions.showSnackBar(
             'Login successful, but role is unknown.',
           );
-          Get.offAll(() => const MapScreenGetX()); // Default navigation
+          Get.offAll(() => const MapScreenGetX());
         }
       } else {
-        // --- MODIFIED ---
         THelperFunctions.showErrorSnackBar(
           'Login Failed',
           loginResult.error ??
               'Please check your credentials and selected role.',
         );
-        // --- END MODIFIED ---
       }
     } catch (e) {
       print("LOGIN_CONTROLLER: Error during login process: $e");
-      // --- MODIFIED ---
       THelperFunctions.showErrorSnackBar(
         'Login Failed',
         'An unexpected error occurred. Please try again.',
       );
-      // --- END MODIFIED ---
       if (HttpService.instance.isAuthenticated) {
-        print("LOGIN_CONTROLLER: Clearing tokens due to error during login...");
         await HttpService.instance.clearTokens();
         WebSocketService.instance.disconnect();
       }
     } finally {
       if (!isClosed) {
-        isLoading.value = false;
+        isEmailLoading.value = false;
       }
     }
   }
@@ -177,19 +190,23 @@ class LoginController extends GetxController {
   // Handle social login (Google)
   Future<void> handleGoogleLogin() async {
     if (selectedRole.value != UserType.rider) {
-      // --- MODIFIED ---
       THelperFunctions.showErrorSnackBar(
         'Error',
         "Google Sign-In is currently only available for Riders.",
       );
-      // --- END MODIFIED ---
       return;
     }
 
-    isLoading.value = true;
+    isGoogleLoading.value = true;
     try {
-      final googleSignIn = GoogleSignIn();
-      await googleSignIn.signOut();
+      // --- CONFIGURE GOOGLE SIGN IN ---
+      final googleSignIn = GoogleSignIn(
+        // Use the "Web" Client ID here as serverClientId to get a valid ID token for backend
+        serverClientId:
+            '189458277367-bnqmk6rsrtnh7no8u05vltkmsch4n6ig.apps.googleusercontent.com',
+      );
+
+      await googleSignIn.signOut(); // Force account picker
       final googleUser = await googleSignIn.signIn();
 
       if (googleUser != null) {
@@ -206,14 +223,20 @@ class LoginController extends GetxController {
             print(
               "LOGIN_CONTROLLER: Google login successful via backend. Storing user data...",
             );
+
             if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
               Get.delete<ClientData>(tag: 'currentUser', force: true);
             }
+
             Get.put<ClientData>(
               loginResult.client!,
               tag: 'currentUser',
               permanent: true,
             );
+
+            // Refresh user data
+            final drawerController = Get.find<MapDrawerController>();
+            await drawerController.refreshUserData();
 
             final storage = GetStorage();
             storage.write('user_role', loginResult.client!.role);
@@ -233,63 +256,76 @@ class LoginController extends GetxController {
                 "LOGIN_CONTROLLER: Immediate refresh failed after Google login. Logout initiated.",
               );
               await googleSignIn.signOut();
-              isLoading.value = false;
+              isGoogleLoading.value = false;
               return;
             }
-            print(
-              "LOGIN_CONTROLLER: Immediate token refresh successful after Google login.",
-            );
+            print("LOGIN_CONTROLLER: Immediate token refresh successful.");
 
             print("LOGIN_CONTROLLER: Connecting WebSocket for Rider...");
             WebSocketService.instance.connect();
 
-            Get.offAll(() => const MapScreenGetX());
-            // --- MODIFIED ---
-            THelperFunctions.showSuccessSnackBar('Success', 'Welcome!');
-            // --- END MODIFIED ---
+            // CHECK FOR PHONE NUMBER
+            final profile = drawerController.fullProfile.value;
+
+            // Check if profile exists and phone number is missing OR not verified
+            if (profile != null && profile.phoneNumberVerified == false) {
+              print(
+                "LOGIN_CONTROLLER: Phone number missing. Forcing verification.",
+              );
+              // Get.offAll(() => const PhoneNumberScreen());
+              // Redirect to map for now as requested in prev steps, user can verify later
+              Get.offAll(() => const MapScreenGetX());
+
+              THelperFunctions.showSnackBar(
+                'Please verify your phone number to continue.',
+              );
+            } else {
+              // Phone number exists, proceed to map
+              Get.offAll(() => const MapScreenGetX());
+              THelperFunctions.showSuccessSnackBar('Success', 'Welcome!');
+            }
           } else {
             await googleSignIn.signOut();
-            // --- MODIFIED ---
             THelperFunctions.showErrorSnackBar(
               'Login Failed',
               loginResult.error ?? 'Google login failed on our server.',
             );
-            // --- END MODIFIED ---
           }
         } else {
           await googleSignIn.signOut();
-          // --- MODIFIED ---
           THelperFunctions.showErrorSnackBar(
             'Error',
             'Could not get Google ID token.',
           );
-          // --- END MODIFIED ---
         }
       } else {
         print("LOGIN_CONTROLLER: Google Sign-In cancelled by user.");
       }
     } catch (e) {
-      // --- MODIFIED ---
       THelperFunctions.showErrorSnackBar(
         'Error',
         'Google login failed: ${e.toString()}',
       );
-      // --- END MODIFIED ---
       print("LOGIN_CONTROLLER: Google Sign-In Error: $e");
       try {
         await GoogleSignIn().signOut();
       } catch (_) {}
     } finally {
       if (!isClosed) {
-        isLoading.value = false;
+        isGoogleLoading.value = false;
       }
     }
   }
 
   // Placeholder for other social logins
-  void handleSocialLogin(String provider) {
+  void handleSocialLogin(String provider) async {
     if (provider.toLowerCase() == 'google') {
-      handleGoogleLogin();
+      await handleGoogleLogin();
+    } else if (provider.toLowerCase() == 'facebook') {
+      isFacebookLoading.value = true;
+      await Future.delayed(const Duration(seconds: 2));
+      THelperFunctions.showSnackBar('Facebook login is not implemented yet.');
+      isFacebookLoading.value = false;
     } else {
       THelperFunctions.showSnackBar('$provider login is not implemented yet.');
     }

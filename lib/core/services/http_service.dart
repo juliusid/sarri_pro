@@ -1,6 +1,7 @@
 // lib/core/services/http_service.dart
 
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math'; // For min function
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -24,6 +25,13 @@ class HttpService extends GetxService {
   String? _cachedRefreshToken;
   bool _isRefreshing = false; // Flag to prevent concurrent refresh attempts
 
+  Future<HttpService> init() async {
+    _client = http.Client();
+    await _loadCachedTokens();
+    return this;
+    print("HttpService onInit (client and tokens loaded via init())");
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -40,6 +48,16 @@ class HttpService extends GetxService {
   Future<void> _loadCachedTokens() async {
     _cachedAccessToken = await _storage.read(key: _accessTokenKey);
     _cachedRefreshToken = await _storage.read(key: _refreshTokenKey);
+    if (_cachedAccessToken != null) {
+      print(
+        "=================================================================",
+      );
+      print("USER ACCESS TOKEN (Copy for Postman):");
+      print(_cachedAccessToken);
+      print(
+        "=================================================================",
+      );
+    }
     print(
       "HTTP_SERVICE: Loaded cached tokens - Access: ${_cachedAccessToken != null}, Refresh: ${_cachedRefreshToken != null}",
     );
@@ -407,6 +425,122 @@ class HttpService extends GetxService {
       queryParameters: queryParameters,
       requiresAuth: requiresAuth,
     );
+  }
+
+  Future<http.Response> putMultipart(
+    String endpoint, {
+    required String fileKey,
+    required File file,
+    Map<String, String>? fields,
+    bool requiresAuth = true,
+  }) async {
+    // This method does not use the `_makeRequest` wrapper because
+    // multipart request logic is different.
+    // It will, however, handle a 401 and attempt a refresh manually.
+
+    http.Response response;
+
+    try {
+      final uri = Uri.parse(endpoint);
+      var request = http.MultipartRequest('PUT', uri);
+
+      // Add headers
+      final headers = _getHeaders(requiresAuth: requiresAuth);
+      request.headers.addAll(headers);
+
+      // Add text fields
+      if (fields != null) {
+        request.fields.addAll(fields);
+      }
+
+      // Add file
+      request.files.add(await http.MultipartFile.fromPath(fileKey, file.path));
+
+      // Send request
+      var streamedResponse = await _client
+          .send(request)
+          .timeout(ApiConfig.receiveTimeout);
+      response = await http.Response.fromStream(streamedResponse);
+    } catch (e) {
+      print(
+        "HTTP_SERVICE: Network or timeout error during multipart request ($endpoint): $e",
+      );
+      return http.Response(
+        json.encode({
+          'status': 'error',
+          'message': 'Network error: ${e.toString()}',
+        }),
+        503,
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    // Handle 401 retry
+    if (response.statusCode == 401 && requiresAuth) {
+      print(
+        "HTTP_SERVICE: Received 401 for PUT multipart. Attempting token refresh...",
+      );
+
+      ClientData? currentUser = Get.isRegistered<ClientData>(tag: 'currentUser')
+          ? Get.find<ClientData>(tag: 'currentUser')
+          : null;
+
+      if (currentUser == null || currentUser.id.isEmpty) {
+        _handleLogoutRedirect("Session invalid. Please log in again.");
+        return response; // Return original 401
+      }
+
+      bool isDriver = currentUser.role == 'driver';
+      String userId = currentUser.id;
+
+      bool refreshed = await refreshTokenImmediately(
+        isDriver: isDriver,
+        userId: userId,
+      );
+
+      if (refreshed) {
+        print(
+          "HTTP_SERVICE: Token refreshed. Retrying PUT multipart request...",
+        );
+        // Retry the request
+        try {
+          final retryUri = Uri.parse(endpoint);
+          var retryRequest = http.MultipartRequest('PUT', retryUri);
+
+          final retryHeaders = _getHeaders(
+            requiresAuth: true,
+          ); // Now has new token
+          retryRequest.headers.addAll(retryHeaders);
+
+          if (fields != null) retryRequest.fields.addAll(fields);
+
+          retryRequest.files.add(
+            await http.MultipartFile.fromPath(fileKey, file.path),
+          );
+
+          var retryStreamedResponse = await _client
+              .send(retryRequest)
+              .timeout(ApiConfig.receiveTimeout);
+          response = await http.Response.fromStream(retryStreamedResponse);
+
+          print(
+            "HTTP_SERVICE: Retry PUT multipart completed with status: ${response.statusCode}",
+          );
+        } catch (e) {
+          print("HTTP_SERVICE: Error during multipart retry: $e");
+          return http.Response(
+            json.encode({
+              'status': 'error',
+              'message': 'Network error on retry: ${e.toString()}',
+            }),
+            503,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+      }
+    }
+
+    return response;
   }
 
   Future<http.Response> delete(

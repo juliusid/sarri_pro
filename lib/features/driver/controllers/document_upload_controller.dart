@@ -2,7 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:sarri_ride/features/authentication/screens/login/login_screen_getx.dart';
+import 'package:sarri_ride/features/authentication/services/auth_service.dart'; // Import AuthService
+import 'package:sarri_ride/features/driver/screens/driver_dashboard_screen.dart'; // Or wherever you navigate after
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
 class DocumentUploadController extends GetxController {
@@ -15,18 +16,37 @@ class DocumentUploadController extends GetxController {
   final Rx<File?> backSideImage = Rx<File?>(null);
   final Rx<File?> profilePicture = Rx<File?>(null);
 
+  // --- ADDED NEW FIELDS ---
+  final Rx<File?> insuranceCertificate = Rx<File?>(null);
+  final Rx<File?> vehicleRegistration = Rx<File?>(null);
+
   // --- Image Picker ---
   Future<void> pickImage(ImageSource source, Rx<File?> imageFile) async {
-    final pickedFile = await ImagePicker().pickImage(source: source);
+    final pickedFile = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 80, // Compress slightly to stay under 5MB
+    );
+
     if (pickedFile != null) {
-      imageFile.value = File(pickedFile.path);
+      // Basic check for file extension (User requirement: Only JPG/PNG)
+      final String path = pickedFile.path.toLowerCase();
+      if (path.endsWith('.jpg') ||
+          path.endsWith('.jpeg') ||
+          path.endsWith('.png')) {
+        imageFile.value = File(pickedFile.path);
+      } else {
+        THelperFunctions.showErrorSnackBar(
+          'Invalid Format',
+          'Please select a JPG or PNG image.',
+        );
+      }
     }
   }
 
   void showImageSourceDialog(Rx<File?> imageFile) {
     Get.bottomSheet(
       Container(
-        color: Colors.white,
+        color: Get.isDarkMode ? Colors.black87 : Colors.white,
         child: Wrap(
           children: <Widget>[
             ListTile(
@@ -56,41 +76,49 @@ class DocumentUploadController extends GetxController {
     // 1. Validation
     if (frontSideImage.value == null || backSideImage.value == null) {
       THelperFunctions.showSnackBar(
-        'Please upload the front and back images of your driver\'s license.',
+        'Please upload both sides of your license.',
       );
       return;
     }
-    if (profilePicture.value == null) {
-      THelperFunctions.showSnackBar('Please upload a profile picture.');
+    if (insuranceCertificate.value == null) {
+      THelperFunctions.showSnackBar(
+        'Please upload your insurance certificate.',
+      );
       return;
     }
+    if (vehicleRegistration.value == null) {
+      THelperFunctions.showSnackBar('Please upload your vehicle registration.');
+      return;
+    }
+    // Profile picture is optional in the API, but usually good to have.
+    // We will proceed even if null, or you can enforce it.
 
     isLoading.value = true;
 
     try {
-      //
-      // NOTE: The API endpoint for document upload will be added here later.
-      // This is a placeholder for how you would call it.
-      // You will need a method in your service that handles multipart/form-data.
-      //
-      print("Simulating document upload...");
-      print("Front Image: ${frontSideImage.value!.path}");
-      print("Back Image: ${backSideImage.value!.path}");
-      print("Profile Picture: ${profilePicture.value!.path}");
-
-      // Simulate network delay
-      await Future.delayed(const Duration(seconds: 3));
-
-      // On success:
-      THelperFunctions.showSnackBar(
-        'Documents uploaded successfully! Your application is now under review.',
+      final result = await AuthService.instance.uploadDriverDocuments(
+        frontsideImage: frontSideImage.value!,
+        backsideImage: backSideImage.value!,
+        insuranceCertificate: insuranceCertificate.value!,
+        vehicleRegistration: vehicleRegistration.value!,
+        picture: profilePicture.value,
       );
 
-      // Redirect user, perhaps to the dashboard or a "pending review" screen
-      // For now, we'll just pop the screen. You might want to navigate somewhere specific.
-      Get.back();
+      if (result.success) {
+        THelperFunctions.showSuccessSnackBar(
+          'Success',
+          'Documents uploaded successfully! Your account is under review.',
+        );
+        // Navigate to Dashboard (where they will see the "Pending" banner)
+        Get.offAll(() => const DriverDashboardScreen());
+      } else {
+        THelperFunctions.showErrorSnackBar(
+          'Upload Failed',
+          result.error ?? 'Unknown error occurred',
+        );
+      }
     } catch (e) {
-      THelperFunctions.showSnackBar("An error occurred during upload: $e");
+      THelperFunctions.showErrorSnackBar("Error", e.toString());
     } finally {
       isLoading.value = false;
     }

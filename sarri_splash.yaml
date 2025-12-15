@@ -2,16 +2,14 @@ flutter_native_splash:
   android: true
   ios: true
   web: false
-  color: '#ffffff'
-  color_dark: '#272727'
+  color: "#ffffff"
+  color_dark: "#272727"
 
-  image_dark: 'assets/logos/SARRI.png'
-  image: 'assets/logos/SARRI-2.png'
-
+  image_dark: "assets/logos/SARRI.png"
+  image: "assets/logos/SARRI-2.png"
 
   android_12:
-    color: '#ffffff'
-    color_dark: '#272727'
-    image_dark: 'assets/logos/SARRI.png'
-    image: 'assets/logos/SARRI-2.png'
-  
+    color: "#ffffff"
+    color_dark: "#272727"
+    image_dark: "assets/logos/SARRI (1).png"
+    image: "assets/logos/SARRI (2).png"

@@ -12,6 +12,36 @@ class RideService extends GetxService {
 
   final HttpService _httpService = HttpService.instance;
 
+  /// Calls the reconnect API and returns a parsed response.
+  Future<ReconnectResponse> reconnectToTrip(
+    String tripId,
+    String userRole,
+  ) async {
+    try {
+      final response = await _httpService.post(
+        ApiConfig.reconnectEndpoint,
+        body: {"tripId": tripId},
+      );
+      // We pass the role to help the factory constructor parse the right data
+      return ReconnectResponse.fromJson(
+        _httpService.handleResponse(response),
+        userRole,
+      );
+    } catch (e) {
+      String errorMessage;
+      if (e is ApiException) {
+        errorMessage = e.message;
+      } else {
+        errorMessage = e.toString();
+      }
+      return ReconnectResponse(
+        status: 'error',
+        message: 'Reconnect failed: $errorMessage',
+        userRole: userRole,
+      );
+    }
+  }
+
   /// Calculates the ride prices for different categories
   Future<CalculatePriceResponse> calculatePrice(
     LatLng pickup,

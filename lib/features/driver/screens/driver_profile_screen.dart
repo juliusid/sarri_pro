@@ -6,6 +6,9 @@ import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:sarri_ride/utils/theme/theme_controller.dart';
+import 'package:sarri_ride/features/settings/controllers/settings_controller.dart';
+import 'bank_details_screen.dart';
 
 class DriverProfileScreen extends StatelessWidget {
   const DriverProfileScreen({super.key});
@@ -63,6 +66,31 @@ class DriverProfileScreen extends StatelessWidget {
 
             // Account Settings
             _buildAccountSettings(context, dark),
+
+            const SizedBox(height: TSizes.spaceBtwSections),
+
+            // LOG OUT
+            Container(
+              margin: const EdgeInsets.symmetric(
+                horizontal: TSizes.defaultSpace,
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _logout(context), // Call helper method
+                  icon: Icon(Iconsax.logout, color: TColors.white),
+                  label: const Text('Logout'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: TColors.error,
+                    foregroundColor: TColors.white,
+                    padding: const EdgeInsets.symmetric(vertical: TSizes.md),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -563,13 +591,12 @@ class DriverProfileScreen extends StatelessWidget {
               ],
             ),
           ),
-          // Optional: Add view button if you have image URLs
-          // IconButton( onPressed: () { /* View Image */ }, icon: Icon(Iconsax.eye, size: TSizes.iconSm, color: TColors.darkGrey,),),
         ],
       ),
     );
   }
 
+  // --- 3. MODIFY THIS WIDGET ---
   Widget _buildAccountSettings(BuildContext context, bool dark) {
     return Container(
       padding: const EdgeInsets.all(TSizes.defaultSpace),
@@ -605,7 +632,7 @@ class DriverProfileScreen extends StatelessWidget {
             'Banking Details',
             'Manage payment and banking info',
             Iconsax.bank,
-            () => THelperFunctions.showSnackBar('Banking details coming soon!'),
+            () => Get.to(() => const BankDetailsScreen()), // <-- MODIFIED
             context,
           ),
           _buildSettingItem(
@@ -615,6 +642,29 @@ class DriverProfileScreen extends StatelessWidget {
             () => THelperFunctions.showSnackBar('Notifications coming soon!'),
             context,
           ),
+
+          // --- ADD THEME MODE ---
+          _buildSettingItem(
+            'Appearance',
+            (() {
+              // This logic finds the theme controller and gets the current mode
+              final themeController = Get.find<ThemeController>();
+              final mode = themeController.themeMode.value;
+              switch (mode) {
+                case ThemeMode.light:
+                  return 'Light Mode';
+                case ThemeMode.dark:
+                  return 'Dark Mode';
+                default:
+                  return 'System Default';
+              }
+            })(),
+            Iconsax.moon,
+            () => _showThemeModeBottomSheet(context, dark), // Call helper
+            context,
+          ),
+
+          // --- END THEME MODE ---
           _buildSettingItem(
             'Privacy & Security',
             'Manage your privacy settings',
@@ -752,6 +802,100 @@ class DriverProfileScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+  // --- 4. ADD HELPER METHODS FOR LOGOUT AND THEME (Copied from rider settings) ---
+
+  /// Shows the theme selection bottom sheet.
+  void _showThemeModeBottomSheet(BuildContext context, bool dark) {
+    final themeController = Get.find<ThemeController>();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(TSizes.defaultSpace),
+        decoration: BoxDecoration(
+          color: dark ? TColors.dark : TColors.white,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(TSizes.cardRadiusLg),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Choose Theme',
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: TSizes.spaceBtwItems),
+            ListTile(
+              leading: Icon(Iconsax.sun_1, color: TColors.primary),
+              title: const Text('Light Mode'),
+              trailing: themeController.themeMode.value == ThemeMode.light
+                  ? Icon(Iconsax.tick_circle, color: TColors.primary)
+                  : null,
+              onTap: () {
+                themeController.setThemeMode(ThemeMode.light);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: Icon(Iconsax.moon, color: TColors.primary),
+              title: const Text('Dark Mode'),
+              trailing: themeController.themeMode.value == ThemeMode.dark
+                  ? Icon(Iconsax.tick_circle, color: TColors.primary)
+                  : null,
+              onTap: () {
+                themeController.setThemeMode(ThemeMode.dark);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: Icon(Iconsax.mobile, color: TColors.primary),
+              title: const Text('System Default'),
+              trailing: themeController.themeMode.value == ThemeMode.system
+                  ? Icon(Iconsax.tick_circle, color: TColors.primary)
+                  : null,
+              onTap: () {
+                themeController.setThemeMode(ThemeMode.system);
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Shows the logout confirmation dialog.
+  void _logout(BuildContext context) {
+    // Instantiate controller
+    final controller = Get.put(SettingsController());
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Logout'),
+          content: const Text('Are you sure you want to logout?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+                controller.logout(); // Call the controller method
+              },
+              child: const Text('Logout'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

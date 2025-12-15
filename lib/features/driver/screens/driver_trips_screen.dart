@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:sarri_ride/features/driver/controllers/driver_dashboard_controller.dart';
+// --- 1. IMPORT THE NEW CONTROLLER ---
+import 'package:sarri_ride/features/driver/controllers/driver_trip_history_controller.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart'; // For formatting dates
 
 class DriverTripsScreen extends StatefulWidget {
   const DriverTripsScreen({super.key});
@@ -16,12 +18,32 @@ class DriverTripsScreen extends StatefulWidget {
 class _DriverTripsScreenState extends State<DriverTripsScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
-  final controller = Get.find<DriverDashboardController>();
+  // --- 2. GET THE NEW CONTROLLER ---
+  final controller = Get.put(DriverTripHistoryController());
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+
+    // --- 3. ADD LISTENER TO TAB CONTROLLER ---
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        // Check which tab is selected and call the controller
+        switch (_tabController.index) {
+          case 0: // All Trips
+            controller.setFiltersAndFetch(status: 'all');
+            break;
+          case 1: // Completed
+            controller.setFiltersAndFetch(status: 'completed');
+            break;
+          case 2: // Cancelled
+            controller.setFiltersAndFetch(status: 'cancelled');
+            break;
+        }
+      }
+    });
+    // --- END 3 ---
   }
 
   @override
@@ -77,9 +99,9 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildTripsList('all', context, dark),
-                _buildTripsList('completed', context, dark),
-                _buildTripsList('cancelled', context, dark),
+                _buildTripsList(context, dark), // No filter needed here
+                _buildTripsList(context, dark),
+                _buildTripsList(context, dark),
               ],
             ),
           ),
@@ -88,6 +110,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
     );
   }
 
+  // --- 4. UPDATE STATS CARD TO USE CONTROLLER ---
   Widget _buildTripStatsCard(BuildContext context, bool dark) {
     return Container(
       margin: const EdgeInsets.all(TSizes.defaultSpace),
@@ -104,50 +127,61 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
         ],
       ),
       child: Obx(
-        () => Row(
-          children: [
-            Expanded(
-              child: _buildStatItem(
-                'Total Trips',
-                controller.recentTrips.length.toString(),
-                Iconsax.route_square,
-                TColors.primary,
-                context,
+        // Wrap with Obx to listen to changes
+        () => controller.isLoading.value && controller.trips.isEmpty
+            ? const Center(
+                child: SizedBox(height: 70, child: CircularProgressIndicator()),
+              ) // Show loader
+            : Row(
+                children: [
+                  Expanded(
+                    child: _buildStatItem(
+                      'Total Trips',
+                      // Use summary data, default to 0
+                      (controller.summary['total'] ?? 0).toString(),
+                      Iconsax.route_square,
+                      TColors.primary,
+                      context,
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    height: TSizes.xl + TSizes.sm,
+                    color: dark ? TColors.darkGrey : TColors.lightGrey,
+                  ),
+                  Expanded(
+                    child: _buildStatItem(
+                      'This Week',
+                      // Use timePeriods data, default to 0
+                      (controller.timePeriods['thisWeek']?['trips'] ?? 0)
+                          .toString(),
+                      Iconsax.calendar,
+                      TColors.success,
+                      context,
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    height: TSizes.xl + TSizes.sm,
+                    color: dark ? TColors.darkGrey : TColors.lightGrey,
+                  ),
+                  Expanded(
+                    child: _buildStatItem(
+                      'Rating',
+                      // Use ratings data, default to 0.0
+                      (controller.ratings['averageRating'] ?? 0.0)
+                          .toStringAsFixed(1),
+                      Iconsax.star1,
+                      TColors.warning,
+                      context,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            Container(
-              width: 1,
-              height: TSizes.xl + TSizes.sm,
-              color: dark ? TColors.darkGrey : TColors.lightGrey,
-            ),
-            Expanded(
-              child: _buildStatItem(
-                'This Week',
-                '45',
-                Iconsax.calendar,
-                TColors.success,
-                context,
-              ),
-            ),
-            Container(
-              width: 1,
-              height: TSizes.xl + TSizes.sm,
-              color: dark ? TColors.darkGrey : TColors.lightGrey,
-            ),
-            Expanded(
-              child: _buildStatItem(
-                'Rating',
-                controller.averageRating.value.toStringAsFixed(1),
-                Iconsax.star1,
-                TColors.warning,
-                context,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
+  // --- END 4 ---
 
   Widget _buildStatItem(
     String title,
@@ -156,6 +190,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
     Color color,
     BuildContext context,
   ) {
+    // ... (This widget is unchanged)
     return Column(
       children: [
         Icon(icon, color: color, size: TSizes.iconLg),
@@ -176,28 +211,54 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
     );
   }
 
-  Widget _buildTripsList(String filter, BuildContext context, bool dark) {
+  // --- 5. UPDATE TRIPS LIST TO USE CONTROLLER ---
+  Widget _buildTripsList(BuildContext context, bool dark) {
     return Obx(() {
-      final trips = controller.recentTrips;
+      if (controller.isLoading.value && controller.trips.isEmpty) {
+        return const Center(child: CircularProgressIndicator());
+      }
 
-      if (trips.isEmpty) {
+      if (controller.trips.isEmpty) {
         return _buildEmptyState(context, dark);
       }
 
-      return ListView.separated(
+      // Use ListView.builder for performance
+      return ListView.builder(
         padding: const EdgeInsets.all(TSizes.defaultSpace),
-        itemCount: trips.length,
-        separatorBuilder: (context, index) =>
-            const SizedBox(height: TSizes.spaceBtwItems),
+        // Add +1 for the "Load More" button if it has a next page
+        itemCount: controller.hasNextPage.value
+            ? controller.trips.length + 1
+            : controller.trips.length,
         itemBuilder: (context, index) {
-          final trip = trips[index];
-          return _buildTripCard(trip, context, dark);
+          // Check if this is the "Load More" button
+          if (index == controller.trips.length) {
+            return controller.isLoadingMore.value
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                : OutlinedButton(
+                    onPressed: () => controller.loadMore(),
+                    child: const Text('Load More'),
+                  );
+          }
+
+          // This is a normal trip card
+          final trip = controller.trips[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: TSizes.spaceBtwItems),
+            child: _buildTripCard(trip, context, dark),
+          );
         },
       );
     });
   }
+  // --- END 5 ---
 
   Widget _buildEmptyState(BuildContext context, bool dark) {
+    // ... (This widget is unchanged)
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -230,13 +291,22 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
     );
   }
 
+  // --- 6. CRITICAL: UPDATE TRIP CARD TO PARSE NEW JSON ---
   Widget _buildTripCard(
     Map<String, dynamic> trip,
     BuildContext context,
     bool dark,
   ) {
-    final isCompleted = trip['status'] == 'completed';
-    final statusColor = isCompleted ? TColors.success : TColors.warning;
+    final status = trip['status']?.toString() ?? 'unknown';
+    final isCompleted = status == 'completed';
+    final statusColor = isCompleted
+        ? TColors.success
+        : (status == 'cancelled' ? TColors.error : TColors.warning);
+
+    // Parse date, fallback to bookedAt if completedAt/cancelledAt is null
+    DateTime? tripDate = DateTime.tryParse(
+      trip['completedAt'] ?? trip['cancelledAt'] ?? trip['bookedAt'] ?? '',
+    );
 
     return GestureDetector(
       onTap: () => _showTripDetails(trip, context, dark),
@@ -270,7 +340,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    trip['status']?.toString().toUpperCase() ?? 'UNKNOWN',
+                    status.toUpperCase(),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: statusColor,
                       fontWeight: FontWeight.w600,
@@ -280,7 +350,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
                 ),
                 const Spacer(),
                 Text(
-                  _formatTripDate(trip['date']),
+                  _formatTripDate(tripDate), // Use formatted date
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: dark ? TColors.lightGrey : TColors.darkGrey,
                   ),
@@ -324,7 +394,8 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        trip['from'] ?? 'Unknown pickup',
+                        trip['pickup']?['name'] ??
+                            'Unknown pickup', // USE NEW KEY
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
@@ -333,7 +404,8 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
                       ),
                       const SizedBox(height: 32),
                       Text(
-                        trip['to'] ?? 'Unknown destination',
+                        trip['destination']?['name'] ??
+                            'Unknown destination', // USE NEW KEY
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
@@ -363,7 +435,8 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        trip['riderName'] ?? 'Unknown rider',
+                        trip['client']?['name'] ??
+                            'Unknown rider', // USE NEW KEY
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
@@ -388,7 +461,8 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
                           Icon(Icons.star, size: 16, color: TColors.warning),
                           const SizedBox(width: 2),
                           Text(
-                            trip['rating']?.toStringAsFixed(1) ?? '0.0',
+                            (trip['rating'] as num?)?.toStringAsFixed(1) ??
+                                'N/A', // USE NEW KEY
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(fontWeight: FontWeight.w600),
                           ),
@@ -409,7 +483,9 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '₦${trip['earnings']?.toStringAsFixed(0) ?? '0'}',
+                        // Use formatted string OR the raw number
+                        trip['formattedEarnings'] ??
+                            '₦${(trip['driverEarnings'] as num?)?.toStringAsFixed(0) ?? '0'}', // USE NEW KEY
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
                               fontWeight: FontWeight.bold,
@@ -426,7 +502,9 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
       ),
     );
   }
+  // --- END 6 ---
 
+  // --- 7. CRITICAL: UPDATE DETAILS MODAL TO PARSE NEW JSON ---
   void _showTripDetails(
     Map<String, dynamic> trip,
     BuildContext context,
@@ -487,10 +565,12 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
                     _buildDetailSection(
                       'Trip Information',
                       [
-                        _buildDetailRow('Trip ID', trip['id'] ?? 'Unknown'),
+                        _buildDetailRow('Trip ID', trip['tripId'] ?? 'Unknown'),
                         _buildDetailRow(
                           'Date',
-                          _formatFullTripDate(trip['date']),
+                          _formatFullTripDate(
+                            DateTime.tryParse(trip['bookedAt'] ?? ''),
+                          ),
                         ),
                         _buildDetailRow(
                           'Status',
@@ -498,11 +578,11 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
                         ),
                         _buildDetailRow(
                           'Duration',
-                          '${(trip['duration'] ?? 25)} min',
+                          '${(trip['tripDuration'] ?? 'N/A')} min',
                         ),
                         _buildDetailRow(
                           'Distance',
-                          '${(trip['distance'] ?? 12.5)} km',
+                          '${(trip['distanceKm'] as num?)?.toStringAsFixed(2) ?? 'N/A'} km',
                         ),
                       ],
                       context,
@@ -514,8 +594,14 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
                     _buildDetailSection(
                       'Route',
                       [
-                        _buildDetailRow('Pickup', trip['from'] ?? 'Unknown'),
-                        _buildDetailRow('Destination', trip['to'] ?? 'Unknown'),
+                        _buildDetailRow(
+                          'Pickup',
+                          trip['pickup']?['name'] ?? 'Unknown',
+                        ),
+                        _buildDetailRow(
+                          'Destination',
+                          trip['destination']?['name'] ?? 'Unknown',
+                        ),
                       ],
                       context,
                       dark,
@@ -526,10 +612,18 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
                     _buildDetailSection(
                       'Rider Information',
                       [
-                        _buildDetailRow('Name', trip['riderName'] ?? 'Unknown'),
+                        _buildDetailRow(
+                          'Name',
+                          trip['client']?['name'] ?? 'Unknown',
+                        ),
                         _buildDetailRow(
                           'Rating Given',
-                          '${trip['rating']?.toStringAsFixed(1) ?? '0.0'} ⭐',
+                          (trip['rating'] as num?)?.toStringAsFixed(1) ??
+                              'Not Rated',
+                        ),
+                        _buildDetailRow(
+                          'Review',
+                          trip['clientReview']?.toString() ?? 'No review',
                         ),
                       ],
                       context,
@@ -542,18 +636,28 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
                       'Payment Details',
                       [
                         _buildDetailRow(
-                          'Fare',
-                          '₦${trip['fare']?.toStringAsFixed(0) ?? '0'}',
+                          'Total Fare',
+                          trip['formattedPrice'] ??
+                              '₦${(trip['price'] as num?)?.toStringAsFixed(2) ?? '0'}',
                         ),
                         _buildDetailRow(
-                          'Commission',
-                          '₦${((trip['fare'] ?? 0) * 0.1).toStringAsFixed(0)}',
+                          'App Commission',
+                          trip['formattedCommission'] ??
+                              '₦${(trip['commission'] as num?)?.toStringAsFixed(2) ?? '0'}',
                         ),
                         _buildDetailRow(
                           'Your Earnings',
-                          '₦${trip['earnings']?.toStringAsFixed(0) ?? '0'}',
+                          trip['formattedEarnings'] ??
+                              '₦${(trip['driverEarnings'] as num?)?.toStringAsFixed(2) ?? '0'}',
                         ),
-                        _buildDetailRow('Payment Method', 'Wallet'),
+                        _buildDetailRow(
+                          'Payment Method',
+                          trip['paymentMethod'] ?? 'N/A',
+                        ),
+                        _buildDetailRow(
+                          'Payment Status',
+                          trip['paymentStatus'] ?? 'N/A',
+                        ),
                       ],
                       context,
                       dark,
@@ -569,6 +673,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
       ),
     );
   }
+  // --- END 7 ---
 
   Widget _buildDetailSection(
     String title,
@@ -576,6 +681,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
     BuildContext context,
     bool dark,
   ) {
+    // ... (This widget is unchanged)
     return Container(
       padding: const EdgeInsets.all(TSizes.defaultSpace),
       decoration: BoxDecoration(
@@ -599,6 +705,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
   }
 
   Widget _buildDetailRow(String label, String value) {
+    // ... (This widget is unchanged)
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -623,6 +730,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
   }
 
   void _showFilterDialog(BuildContext context, bool dark) {
+    // ... (This widget is unchanged for now)
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -658,41 +766,31 @@ class _DriverTripsScreenState extends State<DriverTripsScreen>
     );
   }
 
+  // --- 8. UPDATE DATE FORMATTING LOGIC ---
   String _formatTripDate(DateTime? date) {
     if (date == null) return 'Unknown date';
 
     final now = DateTime.now();
-    final difference = now.difference(date);
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final tripDay = DateTime(date.year, date.month, date.day);
 
-    if (difference.inDays == 0) {
+    if (tripDay == today) {
       return 'Today';
-    } else if (difference.inDays == 1) {
+    } else if (tripDay == yesterday) {
       return 'Yesterday';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} days ago';
+    } else if (now.difference(date).inDays < 7) {
+      return DateFormat('EEEE').format(date); // e.g., 'Tuesday'
     } else {
-      return '${date.day}/${date.month}/${date.year}';
+      return DateFormat('dd MMM yyyy').format(date); // e.g., '07 Nov 2025'
     }
   }
 
   String _formatFullTripDate(DateTime? date) {
     if (date == null) return 'Unknown date';
-
-    final months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-
-    return '${date.day} ${months[date.month - 1]} ${date.year}, ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    // e.g., 07 Nov 2025, 6:03 PM
+    return DateFormat('dd MMM yyyy, h:mm a').format(date);
   }
+
+  // --- END 8 ---
 }

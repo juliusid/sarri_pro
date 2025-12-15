@@ -1,3 +1,5 @@
+// lib/features/authentication/screens/login/login_screen_getx.dart
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -14,6 +16,7 @@ import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/utils/validators/validation.dart';
 import 'package:sarri_ride/features/authentication/screens/forgot_password/forgot_password_screen.dart';
 import 'package:sarri_ride/utils/constants/enums.dart'; // Import Enums
+import 'package:sarri_ride/common/widgets/loading_button.dart'; // <-- 1. IMPORT YOUR NEW WIDGET
 
 // --- CONVERT TO STATEFULWIDGET ---
 class LoginScreenGetX extends StatefulWidget {
@@ -196,29 +199,22 @@ class _LoginScreenGetXState extends State<LoginScreenGetX> {
 
                       const SizedBox(height: TSizes.spaceBtwSections),
 
+                      // --- 2. REPLACE THE BUTTON ---
                       // Login Button with Obx for loading state
                       SizedBox(
                         width: double.infinity,
                         child: Obx(
-                          () => ElevatedButton(
-                            onPressed: controller.isLoading.value
-                                ? null
-                                : controller.handleLogin,
-                            child: controller.isLoading.value
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                : const Text(TTexts.signIn),
+                          () => LoadingElevatedButton(
+                            isLoading: controller.isEmailLoading.value,
+                            text: TTexts.signIn,
+                            loadingText: 'Signing In...',
+                            onPressed: () => controller.handleLogin(),
+                            backgroundColor: TColors.primary,
+                            foregroundColor: TColors.white,
                           ),
                         ),
                       ),
+                      // --- END OF REPLACEMENT ---
                     ],
                   ),
                 ),
@@ -256,23 +252,23 @@ class _LoginScreenGetXState extends State<LoginScreenGetX> {
                   children: [
                     Obx(
                       () => GoogleSignInButton(
-                        isLoading: controller.isLoading.value,
+                        isLoading: controller.isGoogleLoading.value,
                         onPressed: () => controller.handleSocialLogin('google'),
                       ),
                     ),
-                    const SizedBox(height: TSizes.spaceBtwItems),
-                    Obx(
-                      () => SocialButton(
-                        // Keep the Facebook button as is
-                        text: 'Facebook',
-                        icon: const Icon(Icons.facebook, size: 24),
-                        backgroundColor: TColors.info,
-                        textColor: Colors.white,
-                        isLoading: controller.isLoading.value,
-                        onPressed: () =>
-                            controller.handleSocialLogin('facebook'),
-                      ),
-                    ),
+                    // const SizedBox(height: TSizes.spaceBtwItems),
+                    // Obx(
+                    //   () => SocialButton(
+                    //     // Keep the Facebook button as is
+                    //     text: 'Facebook',
+                    //     icon: const Icon(Icons.facebook, size: 24),
+                    //     backgroundColor: TColors.info,
+                    //     textColor: Colors.white,
+                    //     isLoading: controller.isFacebookLoading.value,
+                    //     onPressed: () =>
+                    //         controller.handleSocialLogin('facebook'),
+                    //   ),
+                    // ),
                   ],
                 ),
 
@@ -301,6 +297,21 @@ class _LoginScreenGetXState extends State<LoginScreenGetX> {
                     ),
                   ],
                 ),
+                // to be removed in production
+                // const SizedBox(height: TSizes.spaceBtwItems),
+                // Align(
+                //   alignment: Alignment.center,
+                //   child: TextButton(
+                //     onPressed: () => controller.hardReset(),
+                //     child: Text(
+                //       'Hard Reset / Clear Storage',
+                //       style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                //         color: TColors.error,
+                //         decoration: TextDecoration.underline,
+                //       ),
+                //     ),
+                //   ),
+                // ),
               ],
             ),
           ),

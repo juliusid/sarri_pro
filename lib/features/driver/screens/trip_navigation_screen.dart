@@ -133,10 +133,22 @@ class TripNavigationScreen extends StatelessWidget {
   }
 
   Widget _buildMap(TripManagementController controller) {
-    return Obx(
-      () => GoogleMap(
+    // 1. Listen to the theme change
+    final dark = THelperFunctions.isDarkMode(Get.context!);
+
+    return Obx(() {
+      // 2. If the controller and map are ready, update the style immediately
+      if (controller.mapController != null) {
+        controller.mapController!.setMapStyle(dark ? _darkMapStyle : null);
+      }
+
+      return GoogleMap(
         onMapCreated: (GoogleMapController mapController) {
           controller.mapController = mapController;
+          // 3. Set initial style
+          if (dark) {
+            mapController.setMapStyle(_darkMapStyle);
+          }
         },
         initialCameraPosition: CameraPosition(
           target:
@@ -150,13 +162,36 @@ class TripNavigationScreen extends StatelessWidget {
         zoomControlsEnabled: false,
         mapToolbarEnabled: false,
         trafficEnabled: true,
-
-        // --- ADDED ---
-        buildingsEnabled: true, // Show 3D buildings
-        // --- END ADDED ---
-      ),
-    );
+        buildingsEnabled: true,
+        // 4. Also bind the style property directly for good measure
+        style: dark ? _darkMapStyle : null,
+      );
+    });
   }
+
+  // Add this style definition if it's missing in this file (it was in the rider map)
+  static const String _darkMapStyle = '''
+    [
+      { "elementType": "geometry", "stylers": [ { "color": "#242f3e" } ] },
+      { "elementType": "labels.text.fill", "stylers": [ { "color": "#746855" } ] },
+      { "elementType": "labels.text.stroke", "stylers": [ { "color": "#242f3e" } ] },
+      { "featureType": "administrative.locality", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] },
+      { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] },
+      { "featureType": "poi.park", "elementType": "geometry", "stylers": [ { "color": "#263c3f" } ] },
+      { "featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [ { "color": "#6b9a76" } ] },
+      { "featureType": "road", "elementType": "geometry", "stylers": [ { "color": "#38414e" } ] },
+      { "featureType": "road", "elementType": "geometry.stroke", "stylers": [ { "color": "#212a37" } ] },
+      { "featureType": "road", "elementType": "labels.text.fill", "stylers": [ { "color": "#9ca5b3" } ] },
+      { "featureType": "road.highway", "elementType": "geometry", "stylers": [ { "color": "#746855" } ] },
+      { "featureType": "road.highway", "elementType": "geometry.stroke", "stylers": [ { "color": "#1f2835" } ] },
+      { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [ { "color": "#f3d19c" } ] },
+      { "featureType": "transit", "elementType": "geometry", "stylers": [ { "color": "#2f3948" } ] },
+      { "featureType": "transit.station", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] },
+      { "featureType": "water", "elementType": "geometry", "stylers": [ { "color": "#17263c" } ] },
+      { "featureType": "water", "elementType": "labels.text.fill", "stylers": [ { "color": "#515c6d" } ] },
+      { "featureType": "water", "elementType": "labels.text.stroke", "stylers": [ { "color": "#17263c" } ] }
+    ]
+  ''';
 
   Widget _buildTopNavigationBar(
     BuildContext context,
@@ -375,36 +410,124 @@ class TripNavigationScreen extends StatelessWidget {
     TripManagementController controller,
     bool dark,
   ) {
-    // ... (as before, no changes) ...
     return Obx(() {
       switch (controller.tripStatus.value) {
+        // 1. Driving To Pickup
         case TripStatus.drivingToPickup:
           return Row(
             children: [
+              // Cancel (Small)
               Expanded(
-                child: OutlinedButton.icon(
+                flex: 1,
+                child: OutlinedButton(
                   onPressed: () => _showCancelDialog(context, controller),
-                  icon: Icon(Iconsax.close_circle, color: TColors.error),
-                  label: Text('Cancel', style: TextStyle(color: TColors.error)),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: TSizes.md),
                     side: BorderSide(color: TColors.error),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Icon(Iconsax.close_circle, color: TColors.error),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Message (Medium)
+              Expanded(
+                flex: 2,
+                child: OutlinedButton.icon(
+                  onPressed: () => controller.messageRider(),
+                  icon: const Icon(Iconsax.message, color: TColors.primary),
+                  label: const Text('Chat'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: TSizes.md),
+                    side: const BorderSide(color: TColors.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: TSizes.spaceBtwItems),
+              const SizedBox(width: 8),
+
+              // Call (Medium)
               Expanded(
                 flex: 2,
                 child: ElevatedButton.icon(
                   onPressed: () => controller.contactRider(),
-                  icon: Icon(Iconsax.call, color: TColors.white),
-                  label: Text(
-                    'Call Rider',
-                    style: TextStyle(color: TColors.white),
+                  icon: const Icon(Iconsax.call, color: Colors.white),
+                  label: const Text(
+                    'Call',
+                    style: TextStyle(color: Colors.white),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: TColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: TSizes.md),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+
+        // 2. Trip In Progress
+        case TripStatus.tripInProgress:
+          return Row(
+            children: [
+              // Emergency (Small)
+              Expanded(
+                flex: 1,
+                child: OutlinedButton(
+                  onPressed: () => controller.requestEmergencyAssistance(),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: TSizes.md),
+                    side: BorderSide(color: TColors.error),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Icon(Iconsax.warning_2, color: TColors.error),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Message (Medium)
+              Expanded(
+                flex: 2,
+                child: OutlinedButton.icon(
+                  onPressed: () => controller.messageRider(),
+                  icon: const Icon(Iconsax.message, color: TColors.primary),
+                  label: const Text('Chat'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: TSizes.md),
+                    side: const BorderSide(color: TColors.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Call (Medium)
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: () => controller.contactRider(),
+                  icon: const Icon(Iconsax.call, color: Colors.white),
+                  label: const Text(
+                    'Call',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: TColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: TSizes.md),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
@@ -534,6 +657,31 @@ class TripNavigationScreen extends StatelessWidget {
       top: MediaQuery.of(context).size.height * 0.4,
       child: Column(
         children: [
+          // to be removed later
+
+          // --- SIMULATION BUTTON (DEV ONLY) ---
+          // Obx(
+          //   () => FloatingActionButton(
+          //     heroTag: 'simulate_trip',
+          //     mini: true,
+          //     backgroundColor: controller.isSimulating.value
+          //         ? Colors.red
+          //         : Colors.green,
+          //     onPressed: () {
+          //       if (controller.isSimulating.value) {
+          //         controller.stopSimulation();
+          //       } else {
+          //         controller.startSimulation();
+          //       }
+          //     },
+          //     child: Icon(
+          //       controller.isSimulating.value ? Icons.stop : Icons.play_arrow,
+          //       color: Colors.white,
+          //     ),
+          //   ),
+          // ),
+          const SizedBox(height: TSizes.spaceBtwItems),
+          // remove above
           FloatingActionButton(
             heroTag: 'center_location',
             onPressed: () => _centerMapOnDriver(controller),

@@ -6,9 +6,13 @@ import 'dart:math';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
 import 'package:sarri_ride/config/api_config.dart';
+import 'package:sarri_ride/features/communication/screens/message_screen.dart';
+import 'package:sarri_ride/features/emergency/screens/emergency_reporting_screen.dart';
+import 'package:sarri_ride/features/ride/models/ride_model.dart';
 
 // --- Local Imports ---
 import 'package:sarri_ride/features/shared/models/user_model.dart';
@@ -21,7 +25,6 @@ import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/features/driver/controllers/driver_dashboard_controller.dart';
 import 'package:sarri_ride/core/services/websocket_service.dart';
-import 'package:sarri_ride/features/authentication/screens/login/login_screen_getx.dart';
 import 'package:sarri_ride/features/driver/screens/trip_request_screen.dart';
 import 'package:sarri_ride/features/driver/screens/trip_navigation_screen.dart';
 
@@ -194,6 +197,8 @@ class TripManagementController extends GetxController {
       ? Get.find<DriverDashboardController>()
       : null;
 
+  final _storage = GetStorage();
+
   // State
   final Rx<TripRequest?> currentTripRequest = Rx<TripRequest?>(null);
   final Rx<ActiveTrip?> activeTrip = Rx<ActiveTrip?>(null);
@@ -227,8 +232,8 @@ class TripManagementController extends GetxController {
   final RxString navigationInstruction = ''.obs;
   final RxDouble distanceToDestination = 0.0.obs;
   final RxInt estimatedTimeToDestination = 0.obs;
-  Timer? _navigationTimer;
-  Timer? _locationUpdateLoopTimer; // <-- MODIFIED
+  // Timer? _navigationTimer; // <-- DELETED
+  Timer? _locationUpdateLoopTimer; // <-- Renamed
 
   // Cached State for location updates
   String _currentState = ""; // <-- ADDED
@@ -272,6 +277,9 @@ class TripManagementController extends GetxController {
         return 'Trip Status Unknown';
     }
   }
+
+  final RxBool isWaitingForCash = false.obs;
+  final RxDouble cashAmountToReceive = 0.0.obs;
   // --- END GETTER ---
 
   @override
@@ -279,21 +287,27 @@ class TripManagementController extends GetxController {
     super.onInit();
     _initializeLocationTracking();
     _loadCustomMarker();
+    // --- REGISTER SOCKET LISTENERS ---
+    _webSocketService.registerCashPaymentPendingListener(
+      _handleCashPaymentPending,
+    );
+    _webSocketService.registerPaymentConfirmedListener(_handlePaymentConfirmed);
     // _startListeningForTripRequests(); // Keep commented unless needed for testing
   }
 
   Future<void> _loadCustomMarker() async {
-    try {
-      driverIcon = await BitmapDescriptor.fromAssetImage(
-        const ImageConfiguration(size: Size(48, 48)), // Adjust size as needed
-        'assets/icons/map_pin_darkmode.png', // Path from pubspec.yaml
-      );
-      print("TripManagement: Custom driver icon loaded.");
-      // Update marker if already on map
-      _updateDriverLocationOnMap();
-    } catch (e) {
-      print("TripManagement: Error loading custom driver marker: $e");
-    }
+    // try {
+    //   driverIcon = await BitmapDescriptor.fromAssetImage(
+    //     const ImageConfiguration(size: Size(48, 48)), // Adjust size as needed
+    //     'assets/icons/map_pin_darkmode.png', // Path from pubspec.yaml
+    //   );
+    //   print("TripManagement: Custom driver icon loaded.");
+    //   // Update marker if already on map
+    //   _updateDriverLocationOnMap();
+    // } catch (e) {
+    //   print("TripManagement: Error loading custom driver marker: $e");
+    // }
+    print("TripManagement: Using default Google Maps marker (Safe Mode).");
   }
 
   /// Calculates the bearing between two points in degrees.
@@ -317,15 +331,58 @@ class TripManagementController extends GetxController {
   @override
   void onClose() {
     _requestTimer?.cancel();
-    _navigationTimer?.cancel();
+    // _navigationTimer?.cancel(); // <-- DELETED
     _locationUpdateLoopTimer?.cancel(); // <-- MODIFIED
+    // --- 3. UNREGISTER SOCKET LISTENERS ---
+    _webSocketService.unregisterCashPaymentPendingListener(
+      _handleCashPaymentPending,
+    );
+    _webSocketService.unregisterPaymentConfirmedListener(
+      _handlePaymentConfirmed,
+    );
     super.onClose();
   }
 
+  void _handleCashPaymentPending(dynamic data) {
+    if (data is Map<String, dynamic> &&
+        data['tripId'] == activeTrip.value?.id) {
+      print("TRIP CONTROLLER: Received cash_payment:pending event.");
+      cashAmountToReceive.value =
+          (data['amount'] as num?)?.toDouble() ?? activeTrip.value!.fare;
+      isWaitingForCash.value = true;
+      update(); // Update UI
+    }
+  }
+
+  /// Called by WebSocketService when backend confirms payment (cash or card)
+  void _handlePaymentConfirmed(dynamic data) {
+    if (data is Map<String, dynamic> &&
+        data['tripId'] == activeTrip.value?.id) {
+      print(
+        "TRIP CONTROLLER: Received payment:confirmed event. Resetting state.",
+      );
+      // This is the final confirmation. We can now reset the trip.
+
+      // Update local state to "Completed"
+      tripStatus.value = TripStatus.completed;
+      activeTrip.value = activeTrip.value?.copyWith(
+        status: TripStatus.completed,
+        endTime: DateTime.now(),
+      );
+
+      // Update dashboard earnings
+      _dashboardController?.updateEarningsFromCompletedTrip(activeTrip.value);
+
+      // Reset state after a short delay
+      Future.delayed(const Duration(seconds: 3), _resetTripState);
+      update();
+    }
+  }
   // --- NEW: Location Update Logic (Production Ready) ---
 
   /// Initializes location tracking and starts the update loop.
-  void _initializeLocationTracking() {
+  void _initializeLocationTracking() async {
+    // <-- Make async
     _locationService.ensureLocationAvailable();
     final initialPosition = _locationService.getLocationForMap();
     driverLocation.value = LatLng(
@@ -336,8 +393,18 @@ class TripManagementController extends GetxController {
     _updateDriverLocationOnMap(); // Add initial marker
 
     // --- ADDED: Fetch initial state ---
-    updateCurrentStateFromLocation();
+    await updateCurrentStateFromLocation();
     // --- END ADDED ---
+
+    // --- MODIFICATION: Wait for socket connection ---
+    if (!_webSocketService.isConnected.value) {
+      print("Location loop waiting for WebSocket connection...");
+      await _webSocketService.isConnected.stream.firstWhere(
+        (isConnected) => isConnected == true,
+      );
+      print("WebSocket connected. Starting location loop.");
+    }
+    // --- END MODIFICATION ---
 
     // --- Start the new recursive timer loop ---
     _scheduleNextLocationUpdate();
@@ -383,6 +450,7 @@ class TripManagementController extends GetxController {
       print(
         "Location update loop stopped (Socket disconnected or user logged out).",
       );
+      // Don't restart, wait for a forceLocationUpdate (e.g., onGoOnline)
       return;
     }
 
@@ -428,10 +496,9 @@ class TripManagementController extends GetxController {
   /// Fetches location, determines status, and emits the 'updateLocation' event.
   Future<void> _runLocationUpdate(bool shouldSendUpdate) async {
     // Check again in case state changed during timer
-    if (!shouldSendUpdate ||
-        !_webSocketService.isConnected.value ||
+    if (!_webSocketService.isConnected.value ||
         !HttpService.instance.isAuthenticated) {
-      _scheduleNextLocationUpdate(); // Just re-schedule
+      _scheduleNextLocationUpdate(); // Will see not connected and stop
       return;
     }
 
@@ -477,16 +544,47 @@ class TripManagementController extends GetxController {
         availabilityStatusToSend = 'unavailable';
       }
 
-      // 5. Emit WebSocket event
-      // We must have a state to send. If still empty, default to "Ogun" as a last resort.
-      _webSocketService.updateDriverLocation(
-        latitude: driverLocation.value!.latitude,
-        longitude: driverLocation.value!.longitude,
-        state: _currentState.isEmpty
-            ? "Ogun"
-            : _currentState, // Use cached state
-        availabilityStatus: availabilityStatusToSend,
-      );
+      // 5. Emit WebSocket event (if we are supposed to)
+      if (shouldSendUpdate) {
+        String? currentTripId;
+        if (activeTrip.value != null &&
+            (tripStatus.value == TripStatus.drivingToPickup ||
+                tripStatus.value == TripStatus.tripInProgress)) {
+          currentTripId = activeTrip.value!.id;
+        }
+        _webSocketService.updateDriverLocation(
+          latitude: driverLocation.value!.latitude,
+          longitude: driverLocation.value!.longitude,
+          state: _currentState.isEmpty
+              ? "Ogun"
+              : _currentState, // Use cached state
+          availabilityStatus: availabilityStatusToSend,
+          tripId: currentTripId,
+          heading: position.heading,
+          speed: position.speed,
+        );
+      }
+
+      // --- 6. NEW: Navigation Logic ---
+      if (isNavigating.value &&
+          (availabilityStatusToSend == 'on_trip' ||
+              availabilityStatusToSend ==
+                  'accepted' || // also check for 'accepted'
+              availabilityStatusToSend == 'drivingToPickup')) {
+        // legacy status check
+
+        // Update ETA/Distance display
+        _updateNavigationInstructions();
+
+        // Check for arrival
+        if (_isNearDestination()) {
+          print("Driver is near the target location.");
+          isNavigating.value = false; // Stop navigation updates
+          _handleArrival(); // Handle arrival logic
+          // Note: The loop will continue via finally, but 'isNavigating' is now false
+        }
+      }
+      // --- END NEW ---
     } catch (e) {
       print("Error in _runLocationUpdate: $e");
     } finally {
@@ -498,12 +596,16 @@ class TripManagementController extends GetxController {
   /// Modifies `forceLocationUpdate` to include state and restart the timer loop.
   void forceLocationUpdate({String? statusOverride}) {
     print("Forcing location update emission. Override: $statusOverride");
+    _locationUpdateLoopTimer?.cancel(); // Cancel any pending timer
+
     if (!_webSocketService.isConnected.value) {
       print("Cannot force update: WebSocket not connected.");
+      _scheduleNextLocationUpdate(); // Reschedule
       return;
     }
     if (driverLocation.value == null) {
       print("Cannot force update: Driver location unknown.");
+      _scheduleNextLocationUpdate(); // Reschedule
       return;
     }
 
@@ -628,82 +730,89 @@ class TripManagementController extends GetxController {
       print("Cannot accept: No current trip request.");
       return;
     }
+
     _requestTimer?.cancel(); // Stop timeout timer
-    hasNewRequest.value = false; // Clear flag immediately for UI feedback
-    final request = currentTripRequest.value!; // Store request before clearing
+    // hasNewRequest.value = false; // Don't clear yet, wait for success
+
+    final request = currentTripRequest.value!;
     print("Accepting trip request via HTTP POST: ${request.id}");
 
-    // --- TEMPORARILY SET UI STATE ---
-    // This provides faster feedback, assuming acceptance is likely.
-    tripStatus.value = TripStatus.accepted;
-    activeTrip.value = ActiveTrip(
-      id: request.id,
-      riderId: request.riderId,
-      riderName: request.riderName,
-      riderPhone: request.riderPhone,
-      riderRating: request.riderRating,
-      pickupLocation: request.pickupLocation,
-      destinationLocation: request.destinationLocation,
-      pickupAddress: request.pickupAddress,
-      destinationAddress: request.destinationAddress,
-      fare: request.estimatedFare,
-      distance: request.estimatedDistance,
-      estimatedDuration: request.estimatedDuration,
-      rideType: request.rideType,
-      startTime: DateTime.now(),
-      status: TripStatus.accepted,
-      chatId: '', // Chat ID will be filled by the response
+    // Show loading using GetX dialog to prevent double taps
+    Get.dialog(
+      const Center(child: CircularProgressIndicator()),
+      barrierDismissible: false,
     );
-    currentTripRequest.value = null; // Clear the request object now
-    update(); // Update UI optimistically
-    // --- END TEMPORARY STATE ---
 
     try {
-      // --- Use HttpService.post instead of WebSocket.emitWithAck ---
+      // Call API FIRST. Do not change local status yet.
       final response = await _httpService.post(
         ApiConfig.acceptRideEndpoint,
         body: {'rideId': request.id},
       );
 
-      // Handle the response
+      // Remove loading dialog
+      if (Get.isDialogOpen!) Get.back();
+
       final responseData = _httpService.handleResponse(response);
 
       if (responseData['status'] == 'success' && responseData['data'] != null) {
         final String chatId = responseData['data']['chatId'] ?? '';
-        if (chatId.isEmpty) {
-          print(
-            "Warning: HTTP accept response received success but no chatId.",
-          );
-        }
 
-        // Update the activeTrip with the new chatId
-        if (activeTrip.value != null && activeTrip.value!.id == request.id) {
-          activeTrip.value = activeTrip.value!.copyWith(chatId: chatId);
-          print(
-            "HTTP ride acceptance successful for ${request.id}. ChatID: $chatId",
-          );
-        }
+        // --- NOW it is safe to update the status ---
+        // The server has officially linked us to the ride.
 
-        // Confirmation received, proceed with navigation setup
-        _proceedWithAcceptedTrip(request); // Call the main logic
+        // 1. Create the ActiveTrip object
+        activeTrip.value = ActiveTrip(
+          id: request.id,
+          riderId: request.riderId,
+          riderName: request.riderName,
+          riderPhone: request.riderPhone,
+          riderRating: request.riderRating,
+          pickupLocation: request.pickupLocation,
+          destinationLocation: request.destinationLocation,
+          pickupAddress: request.pickupAddress,
+          destinationAddress: request.destinationAddress,
+          fare: request.estimatedFare,
+          distance: request.estimatedDistance,
+          estimatedDuration: request.estimatedDuration,
+          rideType: request.rideType,
+          startTime: DateTime.now(),
+          status: TripStatus.accepted,
+          chatId: chatId,
+        );
+
+        // 2. Update Flags
+        hasNewRequest.value = false;
+        currentTripRequest.value = null;
+
+        // 3. Update Trip Status (This triggers the Dashboard listener to send the socket update)
+        // Since the API call already succeeded, the socket update now just confirms state
+        tripStatus.value = TripStatus.accepted;
+
+        _storage.write('active_ride_id', request.id);
+        print("HTTP ride acceptance successful. Transitioning UI.");
+
+        // 4. Proceed with navigation
+        _proceedWithAcceptedTrip(request);
       } else {
-        // HTTP call was successful but backend returned an error status
-        print(
-          "Backend rejected ride acceptance for ${request.id}: ${responseData['message'] ?? 'Unknown error'}",
-        );
-        _revertFailedAcceptance(
-          request,
-          responseData['message'] ?? 'Ride acceptance failed.',
-        );
+        // Backend rejected logic
+        String msg = responseData['message'] ?? 'Ride acceptance failed.';
+        print("Backend rejected ride acceptance: $msg");
+        THelperFunctions.showErrorSnackBar("Error", msg);
+
+        // Restart timer if you want, or just let it fail
+        // For now, we stay on the request screen
       }
     } catch (e) {
-      // HTTP call itself failed (network error, 401, 500, etc.)
+      // Remove loading dialog if error
+      if (Get.isDialogOpen!) Get.back();
+
       print("HTTP Error accepting ride ${request.id}: $e");
       String errorMessage = "Could not accept ride. Please try again.";
       if (e is ApiException) {
         errorMessage = e.message;
       }
-      _revertFailedAcceptance(request, errorMessage);
+      THelperFunctions.showErrorSnackBar("Error", errorMessage);
     }
   }
 
@@ -804,6 +913,12 @@ class TripManagementController extends GetxController {
         "Route to pickup calculated: ${routeInfo.distance}, ${routeInfo.duration}",
       );
 
+      // --- FIX: Check for empty points ---
+      if (routeInfo.points.isEmpty) {
+        throw Exception("RouteService returned empty points for pickup route.");
+      }
+      // --- END FIX ---
+
       currentRoute.assignAll(routeInfo.points);
       _initialRouteDistanceKm = routeInfo.distanceValue / 1000.0;
       _initialRouteDurationMinutes = (routeInfo.durationValue / 60).round();
@@ -824,7 +939,7 @@ class TripManagementController extends GetxController {
       ); // Ensure pickup marker is visible
       _updateDriverLocationOnMap(); // Ensure driver marker is visible
 
-      _startNavigationUpdates(); // Start timer for ETA/distance updates
+      // _startNavigationUpdates(); // <-- DELETED
 
       // Set initial display values
       navigationInstruction.value =
@@ -920,6 +1035,14 @@ class TripManagementController extends GetxController {
         "Route to destination calculated: ${routeInfo.distance}, ${routeInfo.duration}",
       );
 
+      // --- FIX: Check for empty points ---
+      if (routeInfo.points.isEmpty) {
+        throw Exception(
+          "RouteService returned empty points for destination route.",
+        );
+      }
+      // --- END FIX ---
+
       currentRoute.assignAll(routeInfo.points);
       _initialRouteDistanceKm = routeInfo.distanceValue / 1000.0;
       _initialRouteDurationMinutes = (routeInfo.durationValue / 60).round();
@@ -943,7 +1066,7 @@ class TripManagementController extends GetxController {
       ); // Add destination marker
       _updateDriverLocationOnMap(); // Ensure driver marker is visible
 
-      _startNavigationUpdates(); // Restart timer for ETA/distance
+      // _startNavigationUpdates(); // <-- DELETED
 
       // Set initial display values
       navigationInstruction.value =
@@ -977,41 +1100,226 @@ class TripManagementController extends GetxController {
     }
     update();
   }
+
+  // --- UPDATED: restoreDriverRideState with Polyline & Stats Fix ---
+
+  Future<void> restoreDriverRideState(DriverReconnectData data) async {
+    print("Restoring driver state. Status: ${data.status}");
+
+    LatLng? pickupLoc;
+    LatLng? destLoc;
+
+    // 1. Resolve Pickup Location
+    if (data.pickup.toLowerCase().contains('current location')) {
+      final pos = _locationService.getLocationForMap();
+      pickupLoc = LatLng(pos.latitude, pos.longitude);
+    } else {
+      final pSuggestions = await PlacesService.getPlaceSuggestions(data.pickup);
+      if (pSuggestions.isNotEmpty) {
+        final pDetails = await PlacesService.getPlaceDetails(
+          pSuggestions.first.placeId,
+        );
+        pickupLoc = pDetails?.location;
+      }
+    }
+
+    // 2. Resolve Destination Location
+    final dSuggestions = await PlacesService.getPlaceSuggestions(
+      data.destination,
+    );
+    if (dSuggestions.isNotEmpty) {
+      final dDetails = await PlacesService.getPlaceDetails(
+        dSuggestions.first.placeId,
+      );
+      destLoc = dDetails?.location;
+    }
+
+    // 3. Get Current GPS
+    await _locationService.refreshLocation();
+    final currentPos = _locationService.getLocationForMap();
+    final driverCurrentLoc = LatLng(currentPos.latitude, currentPos.longitude);
+    driverLocation.value = driverCurrentLoc;
+
+    // 4. Reconstruct ActiveTrip
+    activeTrip.value = ActiveTrip(
+      id: data.tripId,
+      riderId: data.riderId,
+      riderName: data.riderName,
+      riderPhone: '',
+      riderRating: 0.0,
+      pickupLocation: pickupLoc ?? driverCurrentLoc,
+      destinationLocation: destLoc ?? driverCurrentLoc,
+      pickupAddress: data.pickup,
+      destinationAddress: data.destination,
+      fare: data.price,
+      distance: data.distance,
+      estimatedDuration: 0,
+      rideType: data.category,
+      startTime: DateTime.now(),
+      status: TripStatus.none,
+      chatId: data.chatId,
+    );
+
+    _storage.write('active_ride_id', data.tripId);
+    _updateDriverLocationOnMap();
+
+    // 5. Smart Status Restoration with "Reality Checks"
+    switch (data.status.toLowerCase()) {
+      case 'booked':
+      case 'accepted':
+        // --- FIX: Check if we are ALREADY at the pickup ---
+        final double distToPickup = _calculateDistance(
+          driverCurrentLoc,
+          activeTrip.value!.pickupLocation,
+        );
+        print(
+          "Restore: Distance to pickup is ${distToPickup.toStringAsFixed(2)} km",
+        );
+
+        if (distToPickup < 0.2) {
+          // If within 200 meters
+          print(
+            "Restore: Driver is already at pickup. Auto-transitioning to Arrived.",
+          );
+          tripStatus.value = TripStatus.arrivedAtPickup;
+          _addPickupMarker(activeTrip.value!.pickupLocation);
+          navigationInstruction.value = "Arrived at pickup";
+
+          // IMPORTANT: Tell server we are here (in case it missed the first event)
+          _webSocketService.emit('ride:arrived', {
+            'tripId': activeTrip.value!.id,
+          });
+        } else {
+          // Normal flow: Navigate to pickup
+          tripStatus.value = TripStatus.drivingToPickup;
+          _addPickupMarker(activeTrip.value!.pickupLocation);
+          await _restoreNavigationPath(
+            driverCurrentLoc,
+            activeTrip.value!.pickupLocation,
+            isPickup: true,
+          );
+        }
+        break;
+
+      case 'arrived':
+        tripStatus.value = TripStatus.arrivedAtPickup;
+        _addPickupMarker(activeTrip.value!.pickupLocation);
+        navigationInstruction.value = "Arrived at pickup";
+        break;
+
+      case 'on-trip':
+      case 'in_progress':
+        // Check if we are ALREADY at the destination
+        final double distToDest = _calculateDistance(
+          driverCurrentLoc,
+          activeTrip.value!.destinationLocation,
+        );
+        print(
+          "Restore: Distance to dest is ${distToDest.toStringAsFixed(2)} km",
+        );
+
+        if (distToDest < 0.2) {
+          // If within 200 meters
+          print(
+            "Restore: Driver is already at destination. Skipping navigation.",
+          );
+          tripStatus.value = TripStatus.arrivedAtDestination;
+          _addDestinationMarker(activeTrip.value!.destinationLocation);
+          navigationInstruction.value =
+              'Arrived at destination. Tap "Complete Trip".';
+        } else {
+          print("Restore: Driver is en route. Resuming navigation.");
+          tripStatus.value = TripStatus.tripInProgress;
+          _addDestinationMarker(activeTrip.value!.destinationLocation);
+          await _restoreNavigationPath(
+            driverCurrentLoc,
+            activeTrip.value!.destinationLocation,
+            isPickup: false,
+          );
+        }
+        break;
+
+      default:
+        _resetTripState();
+        return;
+    }
+
+    // Restart location updates
+    _scheduleNextLocationUpdate();
+    update();
+  }
+
+  // --- NEW HELPER: Calculates Route, Draws Polyline, Updates Top Bar Stats ---
+  Future<void> _restoreNavigationPath(
+    LatLng from,
+    LatLng to, {
+    required bool isPickup,
+  }) async {
+    print("Restoring navigation route...");
+    try {
+      final routeInfo = await RouteService.getRouteInfo(from, to);
+
+      if (routeInfo.points.isNotEmpty) {
+        // 1. Draw Polyline
+        mapPolylines.clear();
+        mapPolylines.add(
+          Polyline(
+            polylineId: PolylineId(
+              isPickup ? 'route_to_pickup' : 'route_to_destination',
+            ),
+            points: routeInfo.points,
+            color: isPickup ? TColors.primary : TColors.success,
+            width: 5,
+          ),
+        );
+
+        // 2. Populate Top Bar Stats (Distance & ETA)
+        distanceToDestination.value = routeInfo.distanceValue / 1000.0;
+        estimatedTimeToDestination.value = (routeInfo.durationValue / 60)
+            .round();
+
+        // 3. Set Navigation Logic Variables
+        isNavigating.value = true;
+        _initialRouteDistanceKm = distanceToDestination.value;
+        _initialRouteDurationMinutes = estimatedTimeToDestination.value;
+        _navigationStartTime = DateTime.now();
+
+        // 4. Set Instruction Text
+        navigationInstruction.value = isPickup
+            ? 'Head to pickup: ${activeTrip.value?.pickupAddress}'
+            : 'Head to destination: ${activeTrip.value?.destinationAddress}';
+
+        // 5. Fit Map
+        _fitMapToCurrentRoute();
+      }
+    } catch (e) {
+      print("Error restoring navigation path: $e");
+    }
+  }
   // --- END MODIFIED METHOD ---
 
-  // Start/Restart navigation update timer
-  void _startNavigationUpdates() {
-    _navigationTimer?.cancel();
-    if (currentRoute.isEmpty) {
-      print("Cannot start navigation updates: Route is empty.");
-      isNavigating.value = false;
+  // --- Message Rider ---
+  void messageRider() {
+    if (activeTrip.value == null) {
+      THelperFunctions.showSnackBar('No active trip to message.');
       return;
     }
-    print("Starting navigation updates timer.");
-    isNavigating.value = true;
-    _navigationTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      // Check conditions to continue timer
-      if (!isNavigating.value ||
-          currentRoute.isEmpty ||
-          activeTrip.value == null ||
-          (tripStatus.value != TripStatus.drivingToPickup &&
-              tripStatus.value != TripStatus.tripInProgress)) {
-        print("Stopping navigation updates timer. Conditions met.");
-        timer.cancel();
-        isNavigating.value = false; // Ensure navigation flag is off
-        return;
-      }
 
-      _updateNavigationInstructions(); // Update distance/ETA display
+    final trip = activeTrip.value!;
 
-      // Check proximity only if navigating
-      if (_isNearDestination()) {
-        print("Driver is near the target location.");
-        timer.cancel(); // Stop timer before handling arrival
-        isNavigating.value = false;
-        _handleArrival(); // Handle arrival logic
-      }
-    });
+    if (trip.chatId.isEmpty) {
+      THelperFunctions.showSnackBar('Chat not available for this trip.');
+      return;
+    }
+
+    Get.to(
+      () => MessageScreen(
+        driverName: trip.riderName, // "driverName" param acts as Peer Name
+        subtitle: 'Rider', // Rider doesn't have car/plate
+        rating: trip.riderRating,
+        chatId: trip.chatId,
+      ),
+    );
   }
 
   // Update navigation display info (distance/ETA)
@@ -1020,10 +1328,6 @@ class TripManagementController extends GetxController {
         !isNavigating.value ||
         _navigationStartTime == null ||
         (_initialRouteDurationMinutes <= 0 && _initialRouteDistanceKm <= 0)) {
-      // Add check for valid initial values
-      // Reset values if navigation shouldn't be active or initial data invalid
-      // distanceToDestination.value = 0.0;
-      // estimatedTimeToDestination.value = 0;
       return;
     }
 
@@ -1039,38 +1343,26 @@ class TripManagementController extends GetxController {
       navigationInstruction.value =
           'Continue to destination: ${activeTrip.value!.destinationAddress}';
     } else {
-      // Should not happen if timer check is correct, but as a safeguard
       isNavigating.value = false;
-      _navigationTimer?.cancel();
       return;
     }
 
-    // Simple linear estimation based on initial route (more sophisticated logic needed for real-time traffic)
+    // Simple linear estimation based on initial route
     if (initialDuration > 0) {
       final elapsedSeconds = DateTime.now().difference(startTime).inSeconds;
-      // Use seconds for potentially better granularity if needed, convert back to minutes
       final elapsedMinutes = elapsedSeconds / 60.0;
 
-      // Calculate remaining time, clamp to avoid negative values
       final remainingMinutes = max(0, initialDuration - elapsedMinutes.round());
-
-      // Calculate progress ratio based on time (can also use distance traveled if available)
-      final progress = min(
-        1.0,
-        elapsedMinutes / initialDuration,
-      ); // Clamp progress to max 1.0
-
-      // Estimate remaining distance based on progress
+      final progress = min(1.0, elapsedMinutes / initialDuration);
       final remainingDistance = max(0.0, initialDistance * (1.0 - progress));
 
       distanceToDestination.value = remainingDistance;
       estimatedTimeToDestination.value = remainingMinutes;
     } else {
-      // Handle cases where initial duration was zero (very short trips)
       distanceToDestination.value = 0.0;
       estimatedTimeToDestination.value = 0;
-      // Optionally trigger arrival check immediately if duration was 0
       if (_isNearDestination()) {
+        isNavigating.value = false;
         _handleArrival();
       }
     }
@@ -1101,7 +1393,7 @@ class TripManagementController extends GetxController {
   void _handleArrival() {
     if (activeTrip.value == null) return;
     print("Handling arrival at target...");
-    _navigationTimer?.cancel(); // Stop ETA updates
+    // _navigationTimer?.cancel(); // <-- DELETED
     isNavigating.value = false; // Mark navigation as complete for this leg
 
     if (tripStatus.value == TripStatus.drivingToPickup) {
@@ -1142,8 +1434,40 @@ class TripManagementController extends GetxController {
     _startNavigationToDestination();
   }
 
-  // Manually complete the trip (called by button press)
-  void completeTripManual() {
+  Future<bool> _confirmCashPayment() async {
+    if (activeTrip.value == null) return false;
+
+    final tripId = activeTrip.value!.id;
+    print("Driver confirming cash payment for trip: $tripId");
+
+    try {
+      final response = await _httpService.post(
+        ApiConfig.cashPaymentConfirmEndpoint,
+        body: {"tripId": tripId},
+      );
+      final responseData = _httpService.handleResponse(response);
+
+      if (responseData['status'] == 'success') {
+        THelperFunctions.showSuccessSnackBar(
+          'Success',
+          responseData['message'] ?? 'Cash payment confirmed!',
+        );
+        return true;
+      } else {
+        throw Exception(
+          responseData['message'] ?? 'Failed to confirm cash payment',
+        );
+      }
+    } catch (e) {
+      String msg = e is ApiException ? e.message : e.toString();
+      THelperFunctions.showErrorSnackBar("Error", msg);
+      return false;
+    }
+  }
+
+  // --- MODIFIED: Manually complete the trip (called by button press) ---
+  void completeTripManual() async {
+    // <-- Make async
     if (activeTrip.value == null) {
       print("Cannot complete trip: No active trip.");
       return;
@@ -1158,52 +1482,90 @@ class TripManagementController extends GetxController {
       );
       return;
     }
+    if (driverLocation.value == null) {
+      print("Cannot complete trip: Driver location is null.");
+      THelperFunctions.showErrorSnackBar(
+        "Error",
+        "Cannot get your current location.",
+      );
+      return;
+    }
 
     print("Driver manually completing trip ID: ${activeTrip.value!.id}");
-    _navigationTimer?.cancel(); // Ensure timer is stopped
+    // _navigationTimer?.cancel(); // <-- DELETED
     isNavigating.value = false;
-    tripStatus.value = TripStatus.completed; // Update status
+    bool success = false;
+    if (isWaitingForCash.value) {
+      // --- CASH PAYMENT FLOW ---
+      // The rider has selected cash. We just need to confirm it.
+      success = await _confirmCashPayment();
+    } else {
+      // --- CARD/WALLET PAYMENT FLOW ---
+      // The rider has not selected cash, so we call endTrip
+      // to finalize the trip and trigger card/wallet payment.
+      try {
+        final tripId = activeTrip.value!.id;
+        final coordinates = [
+          driverLocation.value!.longitude,
+          driverLocation.value!.latitude,
+        ];
 
-    // Calculate actual duration
-    DateTime tripStartTime =
-        activeTrip.value!.pickupTime ??
-        activeTrip.value!.startTime; // Use pickup time if available
-    int actualDurationMinutes = DateTime.now()
-        .difference(tripStartTime)
-        .inMinutes;
+        final response = await _httpService.post(
+          ApiConfig.endTripEndpoint,
+          body: {"tripId": tripId, "coordinates": coordinates},
+        );
+        final responseData = _httpService.handleResponse(response);
 
-    // Update ActiveTrip state
-    activeTrip.value = activeTrip.value!.copyWith(
-      status: TripStatus.completed,
-      endTime: DateTime.now(),
-      // Use estimated distance for now, replace with calculated if available
-      actualDistance: activeTrip.value!.distance,
-      actualDuration: actualDurationMinutes,
-    );
+        if (responseData['status'] == 'success' &&
+            responseData['data'] != null) {
+          print("HTTP 'endTrip' successful: ${responseData['message']}");
 
-    // Notify backend about trip completion
-    _webSocketService.emit('ride:complete', {
-      'tripId': activeTrip.value!.id,
-      'finalFare': activeTrip.value!.fare, // Send the agreed fare
-      'distance': activeTrip.value!.actualDistance, // Send distance
-      'endTime': activeTrip.value!.endTime?.toIso8601String(),
-      'finalLatitude': driverLocation.value?.latitude, // Send final location
-      'finalLongitude': driverLocation.value?.longitude,
-    });
+          double finalPrice =
+              (responseData['data']['finalPrice'] as num?)?.toDouble() ??
+              activeTrip.value!.fare;
 
-    // Clean up map elements
-    mapPolylines.clear();
-    mapMarkers.removeWhere((m) => m.markerId.value == 'destination');
+          activeTrip.value = activeTrip.value!.copyWith(fare: finalPrice);
+          THelperFunctions.showSuccessSnackBar(
+            'Success',
+            'Trip completed! Waiting for rider payment.',
+          );
+          success = true; // Success here means the trip ended, not paid
+        } else {
+          throw Exception(
+            responseData['message'] ?? 'Could not end trip on server.',
+          );
+        }
+      } catch (e) {
+        String errorMessage = "Could not end trip. Please try again.";
+        if (e is ApiException) errorMessage = e.message;
+        THelperFunctions.showErrorSnackBar("Error", errorMessage);
+        success = false;
+      }
+    }
+    // --- END PAYMENT CHECK ---
 
-    THelperFunctions.showSnackBar('Trip completed successfully!');
+    // --- 6. MODIFY SUCCESS LOGIC ---
+    if (success) {
+      if (isWaitingForCash.value) {
+        // If cash, we are completely done. The backend will
+        // send 'payment:confirmed' which will reset our state.
+        print("Cash confirmed. Waiting for payment:confirmed socket event.");
+      } else {
+        // If card/wallet, we are NOT done. We are just waiting
+        // for the rider to pay. The 'payment:confirmed' socket
+        // will tell us when they have.
+        print(
+          "Trip ended. Waiting for rider to pay (and for payment:confirmed event).",
+        );
+      }
 
-    // Update dashboard earnings (using the now-completed activeTrip value)
-    _dashboardController?.updateEarningsFromCompletedTrip(activeTrip.value);
+      // We no longer reset the state here. We let the
+      // _handlePaymentConfirmed listener do that.
+    }
 
-    // Reset state after a delay
-    Future.delayed(const Duration(seconds: 3), _resetTripState);
-    update(); // Update UI immediately
+    update(); // Update UI
   }
+  // --- END MODIFIED METHOD ---
 
   // Cancel active trip or current request
   void cancelTrip(String reason) {
@@ -1233,13 +1595,14 @@ class TripManagementController extends GetxController {
 
     // Stop timers
     _requestTimer?.cancel();
-    _navigationTimer?.cancel();
+    // _navigationTimer?.cancel(); // <-- DELETED
+    isNavigating.value = false; // <-- ADDED
 
     // Store previous status for logic below
     final previousStatus = tripStatus.value;
     // Update local status immediately
     tripStatus.value = TripStatus.cancelled;
-    isNavigating.value = false;
+    // isNavigating.value = false; // <-- MOVED UP
     hasNewRequest.value = false;
 
     // Determine if the driver initiated this cancellation *after* accepting
@@ -1282,6 +1645,8 @@ class TripManagementController extends GetxController {
 
   // Reset trip state completely
   void _resetTripState() {
+    _storage.remove('active_ride_id');
+    print("TripManagementController: Removed active_ride_id");
     print("Resetting trip state in TripManagementController...");
     // Clear trip data
     activeTrip.value = null;
@@ -1292,7 +1657,7 @@ class TripManagementController extends GetxController {
     hasNewRequest.value = false;
     isNavigating.value = false;
     _requestTimer?.cancel();
-    _navigationTimer?.cancel();
+    // _navigationTimer?.cancel(); // <-- DELETED
 
     // Clear navigation display
     navigationInstruction.value = '';
@@ -1329,10 +1694,11 @@ class TripManagementController extends GetxController {
   // Emergency assistance
   void requestEmergencyAssistance() {
     print("Emergency Assistance Requested!");
-    // TODO: Implement actual emergency API call and logic
-    THelperFunctions.showSnackBar(
-      'Emergency assistance requested. Help is on the way!',
-    );
+
+    // Get current trip ID if available
+    final tripId = activeTrip.value?.id;
+
+    Get.to(() => EmergencyReportingScreen(tripId: tripId));
   }
 
   // Contact rider

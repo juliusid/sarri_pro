@@ -172,7 +172,7 @@ class BookRideData {
     // --- END MODIFICATION ---
 
     return BookRideData(
-      rideId: json['rideId'] ?? '',
+      rideId: json['tripId'] ?? '',
       price: parsedPrice, // Use the parsed price
       distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0.0,
     );
@@ -270,12 +270,14 @@ class RideDriverDetails {
   final String id;
   final String firstName;
   final String lastName;
+  final String? phoneNumber;
   final RideVehicleDetails vehicleDetails;
 
   RideDriverDetails({
     required this.id,
     required this.firstName,
     required this.lastName,
+    required this.phoneNumber,
     required this.vehicleDetails,
   });
 
@@ -284,6 +286,7 @@ class RideDriverDetails {
       id: json['_id'] ?? '',
       firstName: json['FirstName'] ?? 'Driver',
       lastName: json['LastName'] ?? '',
+      phoneNumber: json['PhoneNumber'],
       vehicleDetails: RideVehicleDetails.fromJson(json['vehicleDetails'] ?? {}),
     );
   }
@@ -308,6 +311,135 @@ class RideVehicleDetails {
       model: json['model'] ?? 'Car',
       year: (json['year'] as num?)?.toInt() ?? 2020,
       licensePlate: json['licensePlate'] ?? 'N/A',
+    );
+  }
+}
+
+/// A generic response wrapper for the reconnect API.
+class ReconnectResponse {
+  final String status;
+  final String message;
+  final Map<String, dynamic>? data; // Raw data
+  final String? userRole; // 'driver' or 'client'
+
+  ReconnectResponse({
+    required this.status,
+    required this.message,
+    this.data,
+    this.userRole,
+  });
+
+  factory ReconnectResponse.fromJson(Map<String, dynamic> json, String role) {
+    return ReconnectResponse(
+      status: json['status'] ?? 'error',
+      message: json['message'] ?? 'Failed to reconnect',
+      data: json['data'] as Map<String, dynamic>?,
+      userRole: role,
+    );
+  }
+}
+
+/// Typed data for a DRIVER reconnecting.
+class DriverReconnectData {
+  final String tripId;
+  final String status;
+  final String chatId;
+  final String category;
+  final String pickup;
+  final String destination;
+  final double distance;
+  final double price;
+  final int seats;
+  final String riderId;
+  final String riderName;
+
+  DriverReconnectData({
+    required this.tripId,
+    required this.status,
+    required this.chatId,
+    required this.category,
+    required this.pickup,
+    required this.destination,
+    required this.distance,
+    required this.price,
+    required this.seats,
+    required this.riderId,
+    required this.riderName,
+  });
+
+  factory DriverReconnectData.fromJson(Map<String, dynamic> json) {
+    double parsedPrice = 0.0;
+    if (json['price'] != null && json['price']['\$numberDecimal'] != null) {
+      parsedPrice =
+          double.tryParse(json['price']['\$numberDecimal'].toString()) ?? 0.0;
+    } else if (json['price'] is num) {
+      parsedPrice = (json['price'] as num).toDouble();
+    }
+
+    return DriverReconnectData(
+      tripId: json['tripId'] ?? '',
+      status: json['status'] ?? 'unknown',
+      chatId: json['chatId'] ?? '',
+      category: json['category'] ?? 'unknown',
+      pickup: json['pickup'] ?? 'Unknown',
+      destination: json['destination'] ?? 'Unknown',
+      distance: (json['distance'] as num?)?.toDouble() ?? 0.0,
+      price: parsedPrice,
+      seats: (json['seats'] as num?)?.toInt() ?? 4,
+      riderId: json['rider']?['_id'] ?? '',
+      riderName: json['rider']?['name'] ?? 'Rider',
+    );
+  }
+}
+
+/// Typed data for a RIDER reconnecting.
+class RiderReconnectData {
+  final String tripId;
+  final String status;
+  final String? chatId; // ChatId is not in the 'pending' response
+  final String category;
+  final String pickup;
+  final String destination;
+  final double distance;
+  final double price;
+  final int seats;
+  final RideDriverDetails? driver; // Driver is not in 'pending' response
+
+  RiderReconnectData({
+    required this.tripId,
+    required this.status,
+    this.chatId,
+    required this.category,
+    required this.pickup,
+    required this.destination,
+    required this.distance,
+    required this.price,
+    required this.seats,
+    this.driver,
+  });
+
+  factory RiderReconnectData.fromJson(Map<String, dynamic> json) {
+    double parsedPrice = 0.0;
+    if (json['price'] != null && json['price']['\$numberDecimal'] != null) {
+      parsedPrice =
+          double.tryParse(json['price']['\$numberDecimal'].toString()) ?? 0.0;
+    } else if (json['price'] is num) {
+      parsedPrice = (json['price'] as num).toDouble();
+    }
+
+    return RiderReconnectData(
+      tripId: json['tripId'] ?? '',
+      status: json['status'] ?? 'unknown',
+      chatId: json['chatId'], // Will be null if pending
+      category: json['category'] ?? 'unknown',
+      pickup: json['pickup'] ?? 'Unknown',
+      destination: json['destination'] ?? 'Unknown',
+      distance: (json['distance'] as num?)?.toDouble() ?? 0.0,
+      price: parsedPrice,
+      seats: (json['seats'] as num?)?.toInt() ?? 4,
+      driver: json['driver'] != null
+          ? RideDriverDetails.fromJson(json['driver'])
+          : null,
     );
   }
 }

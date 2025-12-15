@@ -4,6 +4,7 @@ import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:url_launcher/url_launcher.dart'; // <--- ADDED THIS IMPORT
 
 class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key});
@@ -11,7 +12,7 @@ class HelpSupportScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Help & Support'),
@@ -31,24 +32,24 @@ class HelpSupportScreen extends StatelessWidget {
           children: [
             // Header Card
             _buildHeader(context, dark),
-            
+
             const SizedBox(height: TSizes.spaceBtwSections),
-            
+
             // Quick Actions
             _buildQuickActions(context, dark),
-            
+
             const SizedBox(height: TSizes.spaceBtwSections),
-            
+
             // FAQ Section
             _buildFAQSection(context, dark),
-            
+
             const SizedBox(height: TSizes.spaceBtwSections),
-            
+
             // Contact Support
             _buildContactSupport(context, dark),
-            
+
             const SizedBox(height: TSizes.spaceBtwSections),
-            
+
             // App Information
             _buildAppInformation(context, dark),
           ],
@@ -128,13 +129,13 @@ class HelpSupportScreen extends StatelessWidget {
         children: [
           Text(
             'Quick Actions',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
-          
+
           const SizedBox(height: TSizes.spaceBtwItems),
-          
+
           Row(
             children: [
               Expanded(
@@ -162,9 +163,9 @@ class HelpSupportScreen extends StatelessWidget {
               ),
             ],
           ),
-          
+
           const SizedBox(height: TSizes.spaceBtwItems),
-          
+
           Row(
             children: [
               Expanded(
@@ -213,10 +214,7 @@ class HelpSupportScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
-          border: Border.all(
-            color: color.withOpacity(0.3),
-            width: 1,
-          ),
+          border: Border.all(color: color.withOpacity(0.3), width: 1),
         ),
         child: Column(
           children: [
@@ -226,18 +224,14 @@ class HelpSupportScreen extends StatelessWidget {
                 color: color.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(TSizes.cardRadiusSm),
               ),
-              child: Icon(
-                icon,
-                color: color,
-                size: TSizes.iconMd,
-              ),
+              child: Icon(icon, color: color, size: TSizes.iconMd),
             ),
             const SizedBox(height: TSizes.spaceBtwItems),
             Text(
               title,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: TSizes.xs),
@@ -260,23 +254,28 @@ class HelpSupportScreen extends StatelessWidget {
     final faqs = [
       FAQItem(
         question: 'How do I cancel a ride?',
-        answer: 'You can cancel a ride before the driver arrives by tapping the cancel button. Cancellation fees may apply depending on timing.',
+        answer:
+            'You can cancel a ride before the driver arrives by tapping the cancel button. Cancellation fees may apply depending on timing.',
       ),
       FAQItem(
         question: 'How are fares calculated?',
-        answer: 'Fares are calculated based on distance, time, and current demand. You\'ll see the estimated fare before booking.',
+        answer:
+            'Fares are calculated based on distance, time, and current demand. You\'ll see the estimated fare before booking.',
       ),
       FAQItem(
         question: 'What if my driver doesn\'t arrive?',
-        answer: 'If your driver doesn\'t arrive within 10 minutes of the estimated time, please contact support for assistance.',
+        answer:
+            'If your driver doesn\'t arrive within 10 minutes of the estimated time, please contact support for assistance.',
       ),
       FAQItem(
         question: 'How do I update my payment method?',
-        answer: 'Go to Settings > Payment Methods to add, remove, or update your payment options.',
+        answer:
+            'Go to Settings > Payment Methods to add, remove, or update your payment options.',
       ),
       FAQItem(
         question: 'What should I do in case of an emergency?',
-        answer: 'Use the emergency button in the app to alert authorities and your emergency contacts. Your location will be shared automatically.',
+        answer:
+            'Use the emergency button in the app to alert authorities and your emergency contacts. Your location will be shared automatically.',
       ),
     ];
 
@@ -306,20 +305,21 @@ class HelpSupportScreen extends StatelessWidget {
               const SizedBox(width: TSizes.spaceBtwItems),
               Text(
                 'Frequently Asked Questions',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
           ),
-          
+
           const SizedBox(height: TSizes.spaceBtwItems),
-          
+
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: faqs.length,
-            separatorBuilder: (context, index) => const SizedBox(height: TSizes.spaceBtwItems),
+            separatorBuilder: (context, index) =>
+                const SizedBox(height: TSizes.spaceBtwItems),
             itemBuilder: (context, index) {
               return _buildFAQItem(faqs[index], context, dark);
             },
@@ -335,9 +335,9 @@ class HelpSupportScreen extends StatelessWidget {
       child: ExpansionTile(
         title: Text(
           faq.question,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         leading: Icon(
           Iconsax.message_question,
@@ -346,7 +346,12 @@ class HelpSupportScreen extends StatelessWidget {
         ),
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(TSizes.xl, 0, TSizes.md, TSizes.md),
+            padding: const EdgeInsets.fromLTRB(
+              TSizes.xl,
+              0,
+              TSizes.md,
+              TSizes.md,
+            ),
             child: Text(
               faq.answer,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -378,23 +383,19 @@ class HelpSupportScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                Iconsax.call,
-                color: TColors.primary,
-                size: TSizes.iconMd,
-              ),
+              Icon(Iconsax.call, color: TColors.primary, size: TSizes.iconMd),
               const SizedBox(width: TSizes.spaceBtwItems),
               Text(
                 'Contact Support',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
           ),
-          
+
           const SizedBox(height: TSizes.spaceBtwItems),
-          
+
           _buildContactOption(
             'Live Chat',
             'Chat with our support team',
@@ -403,25 +404,25 @@ class HelpSupportScreen extends StatelessWidget {
             () => _startLiveChat(context),
             context,
           ),
-          
+
           _buildContactOption(
             'Email Support',
-            'Send us an email',
+            'sarriride@gmail.com', // Shown in subtitle
             Iconsax.sms,
             TColors.info,
             () => _sendEmail(context),
             context,
           ),
-          
+
           _buildContactOption(
             'Phone Support',
-            '+234 800 RIDE APP',
+            '+234 808 866 5315', // Shown in subtitle
             Iconsax.call,
             TColors.warning,
             () => _callSupport(context),
             context,
           ),
-          
+
           _buildContactOption(
             'WhatsApp',
             'Message us on WhatsApp',
@@ -444,7 +445,7 @@ class HelpSupportScreen extends StatelessWidget {
     BuildContext context,
   ) {
     final dark = THelperFunctions.isDarkMode(context);
-    
+
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Container(
@@ -453,17 +454,13 @@ class HelpSupportScreen extends StatelessWidget {
           color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
         ),
-        child: Icon(
-          icon,
-          color: color,
-          size: TSizes.iconMd,
-        ),
+        child: Icon(icon, color: color, size: TSizes.iconMd),
       ),
       title: Text(
         title,
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          fontWeight: FontWeight.w600,
-        ),
+        style: Theme.of(
+          context,
+        ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
       ),
       subtitle: Text(
         subtitle,
@@ -507,15 +504,15 @@ class HelpSupportScreen extends StatelessWidget {
               const SizedBox(width: TSizes.spaceBtwItems),
               Text(
                 'App Information',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
           ),
-          
+
           const SizedBox(height: TSizes.spaceBtwItems),
-          
+
           _buildInfoRow('App Version', '1.0.0', context),
           _buildInfoRow('Last Updated', 'December 2024', context),
           _buildInfoRow('Platform', 'iOS & Android', context),
@@ -527,7 +524,7 @@ class HelpSupportScreen extends StatelessWidget {
 
   Widget _buildInfoRow(String label, String value, BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: TSizes.spaceBtwItems),
       child: Row(
@@ -541,9 +538,9 @@ class HelpSupportScreen extends StatelessWidget {
           ),
           Text(
             value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -568,19 +565,64 @@ class HelpSupportScreen extends StatelessWidget {
   }
 
   void _startLiveChat(BuildContext context) {
-    THelperFunctions.showSnackBar('Live chat feature coming soon!');
+    // For now, redirect to WhatsApp as a live chat alternative
+    _openWhatsApp(context);
   }
 
-  void _sendEmail(BuildContext context) {
-    THelperFunctions.showSnackBar('Email support feature coming soon!');
+  // --- UPDATED: Send Email ---
+  Future<void> _sendEmail(BuildContext context) async {
+    final Uri emailLaunchUri = Uri(
+      scheme: 'mailto',
+      path: 'sarriride@gmail.com',
+      query: 'subject=Support Request: Sarri Ride App',
+    );
+    try {
+      if (!await launchUrl(emailLaunchUri)) {
+        THelperFunctions.showErrorSnackBar(
+          'Error',
+          'Could not launch email app',
+        );
+      }
+    } catch (e) {
+      THelperFunctions.showErrorSnackBar(
+        'Error',
+        'Could not launch email app: $e',
+      );
+    }
   }
 
-  void _callSupport(BuildContext context) {
-    THelperFunctions.showSnackBar('Phone support feature coming soon!');
+  // --- UPDATED: Call Support ---
+  Future<void> _callSupport(BuildContext context) async {
+    final Uri launchUri = Uri(scheme: 'tel', path: '+2348088665315');
+    try {
+      if (!await launchUrl(launchUri)) {
+        THelperFunctions.showErrorSnackBar("Error", 'Could not launch dialer');
+      }
+    } catch (e) {
+      THelperFunctions.showErrorSnackBar(
+        'Error',
+        'Could not launch dialer: $e',
+      );
+    }
   }
 
-  void _openWhatsApp(BuildContext context) {
-    THelperFunctions.showSnackBar('WhatsApp support feature coming soon!');
+  // --- UPDATED: Open WhatsApp ---
+  Future<void> _openWhatsApp(BuildContext context) async {
+    // WhatsApp URL format: https://wa.me/<number> (no + symbol)
+    final Uri launchUri = Uri.parse('https://wa.me/2348088665315');
+    try {
+      if (!await launchUrl(launchUri, mode: LaunchMode.externalApplication)) {
+        THelperFunctions.showErrorSnackBar(
+          'Error',
+          'Could not launch WhatsApp',
+        );
+      }
+    } catch (e) {
+      THelperFunctions.showErrorSnackBar(
+        "Error",
+        'Could not launch WhatsApp: $e',
+      );
+    }
   }
 }
 
@@ -588,8 +630,5 @@ class FAQItem {
   final String question;
   final String answer;
 
-  const FAQItem({
-    required this.question,
-    required this.answer,
-  });
-} 
+  const FAQItem({required this.question, required this.answer});
+}

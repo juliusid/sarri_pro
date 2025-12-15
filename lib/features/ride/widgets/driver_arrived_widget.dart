@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:sarri_ride/features/communication/controllers/call_controller.dart';
 import 'package:sarri_ride/features/ride/controllers/ride_controller.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
@@ -123,7 +124,7 @@ class DriverArrivedWidget extends StatelessWidget {
   // Function to make normal phone call
   void _makePhoneCall(String driverName) async {
     // Use the driver's phone number - in a real app, this would come from the driver object
-    const phoneNumber = '+234 901 234 5678';
+    final phoneNumber = driver.phoneNumber;
     final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
 
     try {
@@ -139,15 +140,9 @@ class DriverArrivedWidget extends StatelessWidget {
 
   // Function to make in-app call (existing functionality)
   void _makeInAppCall() {
-    Get.to(
-      () => CallScreen(
-        driverName: driver.name,
-        driverPhone: '+234 901 234 5678',
-        carModel: driver.carModel,
-        plateNumber: driver.plateNumber,
-        rating: driver.rating,
-      ),
-    );
+    // Use CallController to initiate the call
+    // This handles the UI navigation and API call
+    CallController.instance.startCall(driver.id, driver.name, 'Driver');
   }
 
   @override

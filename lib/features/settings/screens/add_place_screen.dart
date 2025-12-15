@@ -9,7 +9,7 @@ import '../models/saved_place.dart';
 
 class AddPlaceScreen extends StatefulWidget {
   final SavedPlace? placeToEdit;
-  
+
   const AddPlaceScreen({super.key, this.placeToEdit});
 
   @override
@@ -22,6 +22,17 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   bool _isEditing = false;
   bool _isControllerReady = false;
 
+  // --- DEFINED ALLOWED LABELS ---
+  final List<Map<String, dynamic>> _allowedLabels = [
+    {'value': 'home', 'label': 'Home', 'icon': Iconsax.home},
+    {'value': 'work', 'label': 'Work', 'icon': Iconsax.briefcase},
+    {'value': 'gym', 'label': 'Gym', 'icon': Iconsax.weight},
+    {'value': 'school', 'label': 'School', 'icon': Iconsax.teacher},
+    {'value': 'airport', 'label': 'Airport', 'icon': Iconsax.airplane},
+    {'value': 'mall', 'label': 'Mall', 'icon': Iconsax.shop},
+    {'value': 'other', 'label': 'Other', 'icon': Iconsax.location},
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -30,23 +41,19 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
 
   Future<void> _initializeController() async {
     try {
-      // First try to find existing controller
       controller = Get.find<SavedPlacesController>();
     } catch (e) {
-      // If not found, create a new one
       controller = Get.put(SavedPlacesController());
     }
-    
-    // Wait for next frame to ensure controller is ready
+
     await Future.delayed(Duration.zero);
-    
+
     if (mounted && controller != null) {
       setState(() {
         _isControllerReady = true;
         _isEditing = widget.placeToEdit != null;
       });
-      
-      // Initialize form data
+
       if (_isEditing && widget.placeToEdit != null) {
         controller!.loadPlaceForEditing(widget.placeToEdit!);
       } else {
@@ -54,6 +61,8 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
         controller!.addressController.clear();
         controller!.selectedPlace.value = null;
         controller!.clearSearch();
+        // Default to 'home' if adding new
+        controller!.labelController.text = 'home';
       }
     }
   }
@@ -67,7 +76,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   @override
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
-    
+
     if (!_isControllerReady || controller == null) {
       return Scaffold(
         appBar: AppBar(
@@ -75,12 +84,10 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
         ),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditing ? 'Edit Place' : 'Add Place'),
@@ -97,15 +104,28 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => _savePlace(),
-            child: Text(
-              _isEditing ? 'Update' : 'Save',
-              style: TextStyle(
-                color: TColors.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+          Obx(
+            () => controller!.isLoading.value
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.only(right: 16.0),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  )
+                : TextButton(
+                    onPressed: () => _savePlace(),
+                    child: Text(
+                      _isEditing ? 'Update' : 'Save',
+                      style: const TextStyle(
+                        color: TColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -114,22 +134,12 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             _buildHeader(context, dark),
-            
             const SizedBox(height: TSizes.spaceBtwSections),
-            
-            // Form
             _buildForm(context, dark),
-            
             const SizedBox(height: TSizes.spaceBtwItems),
-            
-            // Address Search with Autocomplete
             _buildAddressSearch(context, dark),
-            
             const SizedBox(height: TSizes.spaceBtwItems),
-            
-            // Search Results
             _buildSearchResults(context, dark),
           ],
         ),
@@ -176,7 +186,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                 ),
                 const SizedBox(height: TSizes.xs),
                 Text(
-                  _isEditing 
+                  _isEditing
                       ? 'Update your saved place details'
                       : 'Save a place for quick access',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -191,9 +201,10 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     );
   }
 
+  // --- FORM WITH CHIPS ---
   Widget _buildForm(BuildContext context, bool dark) {
     if (controller == null) return const SizedBox.shrink();
-    
+
     return Container(
       padding: const EdgeInsets.all(TSizes.defaultSpace),
       decoration: BoxDecoration(
@@ -211,34 +222,65 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Place Details',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            'Select Label',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: TSizes.spaceBtwItems),
-          
-          // Label Field
-          TextFormField(
-            controller: controller!.labelController,
-            decoration: InputDecoration(
-              labelText: 'Label',
-              hintText: 'e.g., Home, Office, Gym',
-              prefixIcon: Icon(
-                Iconsax.tag,
-                color: dark ? TColors.lightGrey : TColors.darkGrey,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(TSizes.inputFieldRadius),
-                borderSide: BorderSide(color: TColors.grey),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(TSizes.inputFieldRadius),
-                borderSide: BorderSide(color: TColors.primary, width: 2),
-              ),
-            ),
-            textInputAction: TextInputAction.next,
-            onFieldSubmitted: (_) => _addressFocusNode.requestFocus(),
+
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: _allowedLabels.map((item) {
+              final isSelected =
+                  controller!.labelController.text.toLowerCase() ==
+                  item['value'];
+
+              return ChoiceChip(
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      item['icon'],
+                      size: 16,
+                      color: isSelected
+                          ? TColors.white
+                          : (dark ? TColors.lightGrey : TColors.darkGrey),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      item['label'],
+                      style: TextStyle(
+                        color: isSelected
+                            ? TColors.white
+                            : (dark ? TColors.light : TColors.black),
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+                selected: isSelected,
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() {
+                      controller!.labelController.text = item['value'];
+                    });
+                  }
+                },
+                selectedColor: TColors.primary,
+                backgroundColor: dark ? TColors.darkerGrey : TColors.lightGrey,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(
+                    color: isSelected ? TColors.primary : Colors.transparent,
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),
@@ -247,7 +289,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
 
   Widget _buildAddressSearch(BuildContext context, bool dark) {
     if (controller == null) return const SizedBox.shrink();
-    
+
     return Container(
       padding: const EdgeInsets.all(TSizes.defaultSpace),
       decoration: BoxDecoration(
@@ -266,13 +308,12 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
         children: [
           Text(
             'Address',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: TSizes.spaceBtwItems),
-          
-          // Address Search Field
+
           TextFormField(
             controller: controller!.addressController,
             focusNode: _addressFocusNode,
@@ -319,8 +360,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
             },
             textInputAction: TextInputAction.search,
           ),
-          
-          // Selected Place Info
+
           Obx(() {
             if (controller?.selectedPlace.value != null) {
               final selectedPlace = controller!.selectedPlace.value!;
@@ -346,16 +386,20 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                         children: [
                           Text(
                             'Place Selected',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: TColors.success,
-                            ),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: TColors.success,
+                                ),
                           ),
                           Text(
                             '${selectedPlace.location.latitude.toStringAsFixed(6)}, ${selectedPlace.location.longitude.toStringAsFixed(6)}',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: dark ? TColors.lightGrey : TColors.darkGrey,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: dark
+                                      ? TColors.lightGrey
+                                      : TColors.darkGrey,
+                                ),
                           ),
                         ],
                       ),
@@ -373,12 +417,12 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
 
   Widget _buildSearchResults(BuildContext context, bool dark) {
     if (controller == null) return const SizedBox.shrink();
-    
+
     return Obx(() {
       if (controller!.placeSuggestions.isEmpty) {
         return const SizedBox.shrink();
       }
-      
+
       return Container(
         decoration: BoxDecoration(
           color: dark ? TColors.dark : Colors.white,
@@ -398,9 +442,9 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
               padding: const EdgeInsets.all(TSizes.defaultSpace),
               child: Text(
                 'Search Results',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
             ListView.separated(
@@ -435,9 +479,12 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                   subtitle: suggestion.secondaryText.isNotEmpty
                       ? Text(
                           suggestion.secondaryText,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: dark ? TColors.lightGrey : TColors.darkGrey,
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: dark
+                                    ? TColors.lightGrey
+                                    : TColors.darkGrey,
+                              ),
                         )
                       : null,
                   trailing: Icon(
@@ -461,18 +508,45 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     controller?.clearSearch();
   }
 
-  void _savePlace() {
+  // --- 3. UPDATED SAVE METHOD WITH SNACKBAR ---
+  void _savePlace() async {
     if (controller == null) return;
-    
-    if (_isEditing && widget.placeToEdit != null) {
-      controller!.updatePlace(widget.placeToEdit!.id);
-    } else {
-      controller!.addPlace();
+
+    // Ensure a label is selected
+    if (controller!.labelController.text.isEmpty) {
+      THelperFunctions.showErrorSnackBar('Error', 'Please select a label');
+      return;
     }
-    
-    // Navigate back after successful save
-    if (controller!.selectedPlace.value != null) {
+
+    // Ensure address is selected
+    if (controller!.addressController.text.isEmpty &&
+        controller!.selectedPlace.value == null &&
+        !_isEditing) {
+      THelperFunctions.showErrorSnackBar(
+        'Error',
+        'Please search and select an address',
+      );
+      return;
+    }
+
+    try {
+      if (_isEditing && widget.placeToEdit != null) {
+        await controller!.updatePlace(widget.placeToEdit!.id);
+        THelperFunctions.showSuccessSnackBar(
+          'Success',
+          'Location updated successfully!',
+        );
+      } else {
+        await controller!.addPlace();
+        THelperFunctions.showSuccessSnackBar('Success', 'New location saved!');
+      }
+
+      // Close the screen and go back
       Get.back();
+    } catch (e) {
+      // The controller might handle errors, but if it bubbles up:
+      print("Save error: $e");
+      // You can add THelperFunctions.showErrorSnackBar here if needed
     }
   }
-} 
+}

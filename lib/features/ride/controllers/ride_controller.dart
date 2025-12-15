@@ -6,8 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
+import 'package:sarri_ride/core/services/websocket_service.dart';
+import 'package:sarri_ride/features/emergency/screens/emergency_reporting_screen.dart';
 import 'package:sarri_ride/features/ride/models/ride_model.dart';
 import 'package:sarri_ride/features/ride/services/ride_service.dart';
+import 'package:sarri_ride/features/ride/widgets/payment_selection_sheet.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 import 'package:get_storage/get_storage.dart';
 
@@ -22,10 +25,7 @@ import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/ride/widgets/pickup_location_modal.dart';
 import 'package:sarri_ride/features/settings/models/saved_place.dart';
-
-// --- ADDED IMPORT ---
 import 'package:sarri_ride/features/ride/widgets/no_drivers_available_widget.dart';
-// --- END ADDED IMPORT ---
 
 // Enums
 enum BookingState {
@@ -44,6 +44,8 @@ enum BookingState {
 class RideController extends GetxController with GetTickerProviderStateMixin {
   static RideController get instance => Get.find();
 
+  final WebSocketService _webSocketService = WebSocketService.instance;
+
   // Controllers
   GoogleMapController? mapController;
   final PanelController panelController = PanelController();
@@ -60,6 +62,12 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
 
   final RxString searchingStatusText = "Finding your driver...".obs;
   final RxString potentialDriverInfo = "".obs;
+
+  /// Stores the currently selected payment method. Defaults to 'Cash'.
+  final RxString selectedPaymentMethod = 'Cash'.obs;
+
+  /// Stores the ID of the selected card (if not 'Cash').
+  final RxString selectedCardId = ''.obs;
 
   // Reactive state variables
   final Rx<BookingState> currentState = BookingState.initial.obs;
@@ -94,6 +102,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
   final RxList<PlaceSuggestion> destinationSuggestions =
       <PlaceSuggestion>[].obs;
   final RxBool showDestinationSuggestions = false.obs;
+  final Rx<DateTime?> actualTripStartTime = Rx<DateTime?>(null);
   final RxBool isPaymentCompleted = false.obs;
   final RxList<RideType> rideTypes = <RideType>[].obs;
 
@@ -219,22 +228,21 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     initializeMap();
     initializeStops();
     _loadCustomMarker();
+    _webSocketService.registerPaymentConfirmedListener(_handlePaymentConfirmed);
   }
 
-  /// Loads the custom driver icon from assets.
   Future<void> _loadCustomMarker() async {
-    try {
-      driverIcon = await BitmapDescriptor.fromAssetImage(
-        const ImageConfiguration(size: Size(48, 48)),
-        'assets/icons/car_marker.png',
-      );
-      print("Custom driver icon loaded successfully.");
-    } catch (e) {
-      print("Error loading custom driver marker: $e");
-    }
+    // try {
+    //   driverIcon = await BitmapDescriptor.fromAssetImage(
+    //     const ImageConfiguration(size: Size(48, 48)),
+    //     'assets/icons/car_marker.png',
+    //   );
+    //   print("Custom driver icon loaded successfully.");
+    // } catch (e) {
+    //   print("Error loading custom driver marker: $e");
+    // }
   }
 
-  /// Calculates the bearing between two points in degrees.
   double _calculateBearing(LatLng start, LatLng end) {
     double lat1 = start.latitude * math.pi / 180;
     double lon1 = start.longitude * math.pi / 180;
@@ -258,10 +266,12 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     pickupController.dispose();
     packageDeliveryController.dispose();
     freightDeliveryController.dispose();
+    _webSocketService.unregisterPaymentConfirmedListener(
+      _handlePaymentConfirmed,
+    );
     super.onClose();
   }
 
-  /// Initializes the map with the user's current or default location and fetches the state.
   void initializeMap() {
     final position = _locationService.getLocationForMap();
     final currentLatLng = LatLng(position.latitude, position.longitude);
@@ -280,7 +290,13 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     addPickupMarker();
   }
 
-  /// Helper to get State from LatLng
+  void _handlePaymentConfirmed(dynamic data) {
+    if (data is Map<String, dynamic> && data['tripId'] == rideId.value) {
+      print("RIDE CONTROLLER: Received payment:confirmed event.");
+      onPaymentSuccess();
+    }
+  }
+
   Future<void> _getAndSetStateFromLatLng(
     LatLng location, {
     String defaultState = '',
@@ -718,6 +734,17 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     }
   }
 
+  void selectPaymentMethod(String method, {String? cardId}) {
+    selectedPaymentMethod.value = method;
+    selectedCardId.value = cardId ?? '';
+    update();
+    print("Payment method set to: $method (ID: ${selectedCardId.value})");
+  }
+
+  void showPaymentMethodPicker(BuildContext context) {
+    PaymentSelectionSheet.show(context);
+  }
+
   bool canModifyDuringRide() {
     return currentState.value == BookingState.tripInProgress &&
         stops.length < maxStops.value + 2;
@@ -734,7 +761,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     await addStop(suggestion);
   }
 
-  /// Refresh current location
   Future<void> refreshCurrentLocation() async {
     print("Refreshing current location...");
     await _locationService.refreshLocation();
@@ -958,7 +984,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
 
         print("Destination details fetched: ${placeDetails.location}");
 
-        bool pricesFetched = await _updatePricesFromApi();
+        bool pricesFetched = await updatePricesFromApi();
         if (pricesFetched) {
           addDestinationMarker();
           stops.removeWhere((s) => s.type == StopType.destination);
@@ -994,7 +1020,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     }
   }
 
-  Future<bool> _updatePricesFromApi() async {
+  Future<bool> updatePricesFromApi() async {
     if (pickupLocation.value == null || destinationLocation.value == null) {
       print("Cannot update prices: Pickup or Destination is null.");
       return false;
@@ -1101,7 +1127,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     destinationAddress.value = destination['address'] as String;
     destinationController.text = destinationName.value;
 
-    bool pricesFetched = await _updatePricesFromApi();
+    bool pricesFetched = await updatePricesFromApi();
     if (pricesFetched) {
       addDestinationMarker();
       stops.removeWhere((s) => s.type == StopType.destination);
@@ -1184,7 +1210,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     }
   }
 
-  /// Handle location selection from autocomplete modal
   void _onPickupLocationSelected(PlaceSuggestion suggestion) async {
     print("Pickup selected from suggestions: ${suggestion.description}");
     try {
@@ -1199,7 +1224,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
         pickupAddress.value = placeDetails.formattedAddress;
         pickupController.text = pickupName.value;
 
-        // --- CLEANED: Get state directly from placeDetails ---
         if (placeDetails.state.isNotEmpty) {
           pickupState.value = placeDetails.state;
           print("Pickup state set to: ${placeDetails.state}");
@@ -1209,7 +1233,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
             defaultState: "Lagos",
           );
         }
-        // --- END CLEANED ---
 
         if (stops.isNotEmpty && stops.first.type == StopType.pickup) {
           stops[0] = StopPoint(
@@ -1253,13 +1276,11 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     }
   }
 
-  // Handle selection of 'Use current location' from modal
   void _onCurrentLocationPressed() async {
     print("Using current location for pickup.");
     await refreshCurrentLocation();
   }
 
-  /// Handle selection of 'Choose on map' from modal
   void _onMapPickerPressed() async {
     print("Opening map picker for pickup location.");
     try {
@@ -1282,7 +1303,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
         pickupAddress.value = selectedAddress;
         pickupController.text = selectedName;
 
-        // --- Use helper function to get state ---
         await _getAndSetStateFromLatLng(
           selectedLocation,
           defaultState: "Lagos",
@@ -1327,60 +1347,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     }
   }
 
-  // /// Refresh current location
-  // Future<void> refreshCurrentLocation() async {
-  //   print("Refreshing current location...");
-  //   await _locationService.refreshLocation();
-  //   final position = _locationService.getLocationForMap();
-  //   final newLatLng = LatLng(position.latitude, position.longitude);
-
-  //   pickupLocation.value = newLatLng;
-  //   pickupName.value = 'Current Location';
-  //   String address = 'Updated Location';
-  //   try {
-  //     address =
-  //         await PlacesService.getAddressFromCoordinates(
-  //           newLatLng.latitude,
-  //           newLatLng.longitude,
-  //         ) ??
-  //         address;
-  //   } catch (e) {
-  //     print("Reverse geocoding failed on refresh: $e");
-  //   }
-  //   pickupAddress.value = address;
-  //   pickupController.text = pickupName.value;
-
-  //   await _getAndSetStateFromLatLng(newLatLng, defaultState: "Lagos");
-
-  //   if (stops.isNotEmpty && stops.first.type == StopType.pickup) {
-  //     stops[0] = StopPoint(
-  //       id: stops.first.id,
-  //       type: StopType.pickup,
-  //       location: newLatLng,
-  //       name: pickupName.value,
-  //       address: pickupAddress.value,
-  //       isEditable: false,
-  //     );
-  //   } else {
-  //     initializeStops();
-  //   }
-
-  //   addPickupMarker();
-  //   mapController?.animateCamera(CameraUpdate.newLatLngZoom(newLatLng, 16.0));
-
-  //   if (destinationLocation.value != null) {
-  //     await recalculateRoute();
-  //     updatePricing();
-  //   }
-
-  //   THelperFunctions.showSuccessSnackBar(
-  //     'Success',
-  //     'Location updated successfully!',
-  //   );
-  //   update();
-  // }
-
-  // Helper method to recalculate route
   void _calculateRoute() async {
     await recalculateRoute();
     updatePricing();
@@ -1397,7 +1363,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     update();
   }
 
-  /// Confirm ride booking
   void confirmRide() async {
     if (selectedRideType.value == null) {
       THelperFunctions.showSnackBar('Please select a ride type first.');
@@ -1414,6 +1379,13 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       return;
     }
 
+    String finalPickupName = pickupName.value;
+    if (finalPickupName.toLowerCase() == "current location" &&
+        pickupAddress.value.isNotEmpty) {
+      finalPickupName = pickupAddress.value;
+      print("Swapped 'Current Location' for actual address: $finalPickupName");
+    }
+
     print(
       "Confirming ride: ${selectedRideType.value!.name} in state: ${pickupState.value}",
     );
@@ -1422,7 +1394,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
 
     try {
       final response = await _rideService.bookRide(
-        pickupName: pickupName.value,
+        pickupName: finalPickupName,
         destinationName: destinationName.value,
         pickupCoords: pickupLocation.value!,
         destinationCoords: destinationLocation.value!,
@@ -1433,9 +1405,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       if (response.status == 'success' && response.data != null) {
         rideId.value = response.data!.rideId;
         _storage.write('active_ride_id', rideId.value);
-        print(
-          "Ride booked successfully. Ride ID: ${rideId.value}, Price: ${response.data!.price}, Dist: ${response.data!.distanceKm}",
-        );
+        print("Ride booked successfully. Ride ID: ${rideId.value}");
 
         selectedRideType.value = RideType(
           name: selectedRideType.value!.name,
@@ -1445,21 +1415,19 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
           seats: selectedRideType.value!.seats,
         );
 
+        pickupName.value = finalPickupName;
+        pickupController.text = finalPickupName;
+
         THelperFunctions.showSnackBar('Finding your driver...');
       } else {
         print("Ride booking failed: ${response.message}");
-
-        // --- MODIFICATION ---
-        // Check for the specific "no drivers" message
         if (response.message.toLowerCase().contains('no available drivers')) {
-          // Show the new custom bottom sheet
           Get.bottomSheet(
             NoDriversAvailableWidget(
               message: response.message,
               onSearchAgain: () {
-                Get.back(); // Close the bottom sheet
-                currentState.value =
-                    BookingState.selectRide; // Go back to selection
+                Get.back();
+                currentState.value = BookingState.selectRide;
                 if (!panelController.isPanelOpen) panelController.open();
               },
             ),
@@ -1467,37 +1435,28 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
             isScrollControlled: true,
           );
         } else {
-          // Show the generic error snackbar for other errors
           THelperFunctions.showErrorSnackBar(
             'Booking Failed',
             response.message.isNotEmpty
                 ? response.message
-                : 'Failed to book ride. Please try again.',
+                : 'Failed to book ride.',
           );
           currentState.value = BookingState.selectRide;
           if (!panelController.isPanelOpen) panelController.open();
         }
-        // --- END MODIFICATION ---
       }
     } catch (e) {
       print("Exception during ride booking: $e");
+      String errorMessage = 'An error occurred while booking.';
+      if (e is ApiException) errorMessage = e.message;
 
-      // --- MODIFICATION for catch block ---
-      String errorMessage =
-          'An error occurred while booking. Please try again.';
-      if (e is ApiException) {
-        errorMessage = e.message; // Get the specific message
-      }
-
-      // Check for the "no drivers" message from the exception
       if (errorMessage.toLowerCase().contains('no available drivers')) {
         Get.bottomSheet(
           NoDriversAvailableWidget(
-            message: errorMessage, // Pass the message to the widget
+            message: errorMessage,
             onSearchAgain: () {
-              Get.back(); // Close the bottom sheet
-              currentState.value =
-                  BookingState.selectRide; // Go back to selection
+              Get.back();
+              currentState.value = BookingState.selectRide;
               if (!panelController.isPanelOpen) panelController.open();
             },
           ),
@@ -1505,140 +1464,163 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
           isScrollControlled: true,
         );
       } else {
-        // Show a generic error for anything else
         THelperFunctions.showErrorSnackBar('Booking Failed', errorMessage);
       }
-      // --- END MODIFICATION ---
 
       currentState.value = BookingState.selectRide;
       if (!panelController.isPanelOpen) panelController.open();
     }
   }
 
-  Future<void> restoreRideState(RideStatusData rideData) async {
-    print("Attempting to restore ride state for Ride ID: ${rideData.rideId}");
-    rideId.value = rideData.rideId;
-    pickupName.value = rideData.currentLocationName;
-    destinationName.value = rideData.destinationName;
-    _storage.write('active_ride_id', rideId.value);
-
-    selectedRideType.value = RideType(
-      name: rideData.category,
-      price: rideData.price,
-      eta: '...',
-      icon: _getIconForCategory(rideData.category),
-      seats: _getSeatsForCategory(rideData.category),
+  Future<void> restoreRideState(RiderReconnectData rideData) async {
+    print(
+      "Restoring rider state. Status: ${rideData.status}, ID: ${rideData.tripId}",
     );
 
-    bool locationsFetched = false;
-    try {
-      final pickupSuggestions = await PlacesService.getPlaceSuggestions(
-        pickupName.value,
-      );
-      final destSuggestions = await PlacesService.getPlaceSuggestions(
-        destinationName.value,
-      );
+    rideId.value = rideData.tripId;
+    activeRideChatId.value = rideData.chatId ?? '';
 
-      if (pickupSuggestions.isNotEmpty && destSuggestions.isNotEmpty) {
-        final pDetails = await PlacesService.getPlaceDetails(
-          pickupSuggestions.first.placeId,
-        );
-        final dDetails = await PlacesService.getPlaceDetails(
-          destSuggestions.first.placeId,
-        );
+    // 1. Restore Ride Type
+    selectedRideType.value = RideType(
+      name: rideData.category,
+      price: rideData.price.toInt(),
+      eta: '...',
+      icon: _getIconForCategory(rideData.category),
+      seats: rideData.seats,
+    );
 
-        if (pDetails != null && dDetails != null) {
-          pickupLocation.value = pDetails.location;
-          destinationLocation.value = dDetails.location;
-          pickupAddress.value = pDetails.formattedAddress;
-          destinationAddress.value = dDetails.formattedAddress;
-          pickupController.text = pickupName.value;
-          destinationController.text = destinationName.value;
+    // 2. Restore Locations
+    LatLng? startCoords;
+    LatLng? endCoords;
 
-          if (pDetails.state.isNotEmpty) {
-            pickupState.value = pDetails.state;
-            print("Restored pickup state to: ${pDetails.state}");
-          } else {
-            await _getAndSetStateFromLatLng(
-              pDetails.location,
-              defaultState: "Lagos",
-            );
-          }
+    // --- PICKUP ---
+    if (rideData.pickup.toLowerCase().contains('current location')) {
+      print("Restore: Detected generic pickup name. Using device GPS.");
+      await _locationService.refreshLocation();
+      final pos = _locationService.getLocationForMap();
+      startCoords = LatLng(pos.latitude, pos.longitude);
 
-          initializeStops();
-          stops.add(
-            StopPoint(
-              id: 'destination',
-              type: StopType.destination,
-              location: dDetails.location,
-              name: destinationName.value,
-              address: destinationAddress.value,
-              isEditable: true,
-            ),
-          );
+      pickupName.value = "Current Location";
+      pickupController.text = "Current Location"; // <--- FIX ADDED
 
-          addPickupMarker();
-          addDestinationMarker();
-          await drawRoute();
-          locationsFetched = true;
+      // Try to get a real address for display
+      PlacesService.getAddressFromCoordinates(
+        startCoords.latitude,
+        startCoords.longitude,
+      ).then((addr) {
+        if (addr != null) {
+          pickupAddress.value = addr;
+          // Optional: Update controller if you prefer the address over "Current Location"
+          // pickupController.text = addr;
         }
-      }
-    } catch (e) {
-      print("Could not geocode locations to restore route: $e");
-      THelperFunctions.showErrorSnackBar(
-        'Error',
-        'Could not display route map.',
+      });
+    } else {
+      // Normal address
+      pickupName.value = rideData.pickup;
+      pickupController.text = rideData.pickup; // <--- FIX ADDED
+
+      final pSuggestions = await PlacesService.getPlaceSuggestions(
+        rideData.pickup,
       );
+      if (pSuggestions.isNotEmpty) {
+        final pDetails = await PlacesService.getPlaceDetails(
+          pSuggestions.first.placeId,
+        );
+        startCoords = pDetails?.location;
+        if (pDetails != null) pickupAddress.value = pDetails.formattedAddress;
+      }
     }
 
-    if (rideData.driver != null) {
-      final driverData = rideData.driver!;
-      LatLng driverLoc = pickupLocation.value ?? const LatLng(6.5244, 3.3792);
+    // --- DESTINATION ---
+    destinationName.value = rideData.destination;
+    destinationController.text = rideData.destination; // <--- FIX ADDED
 
+    final dSuggestions = await PlacesService.getPlaceSuggestions(
+      rideData.destination,
+    );
+    if (dSuggestions.isNotEmpty) {
+      final dDetails = await PlacesService.getPlaceDetails(
+        dSuggestions.first.placeId,
+      );
+      endCoords = dDetails?.location;
+      if (dDetails != null)
+        destinationAddress.value = dDetails.formattedAddress;
+    }
+
+    // 3. Apply Coordinates & Draw Route
+    if (startCoords != null && endCoords != null) {
+      pickupLocation.value = startCoords;
+      destinationLocation.value = endCoords;
+
+      initializeStops();
+      stops.add(
+        StopPoint(
+          id: 'destination',
+          type: StopType.destination,
+          location: endCoords,
+          name: destinationName.value,
+          address: destinationAddress.value,
+          isEditable: true,
+        ),
+      );
+
+      addPickupMarker();
+      addDestinationMarker();
+
+      await drawRoute();
+      _ensureMapFitsRoute();
+    }
+
+    // 4. Restore Driver Info
+    if (rideData.driver != null) {
+      final d = rideData.driver!;
       assignedDriver.value = Driver(
-        name: '${driverData.firstName} ${driverData.lastName}',
-        rating: 4.9, // Placeholder
-        carModel:
-            '${driverData.vehicleDetails.make} ${driverData.vehicleDetails.model}',
-        plateNumber: driverData.vehicleDetails.licensePlate,
+        id: d.id,
+        name: d.firstName,
+        rating: 4.9,
+        carModel: '${d.vehicleDetails.make} ${d.vehicleDetails.model}',
+        plateNumber: d.vehicleDetails.licensePlate,
+        phoneNumber: d.phoneNumber ?? '',
         eta: '...',
-        location: driverLoc,
+        location: pickupLocation.value ?? const LatLng(0, 0),
       );
       addDriverMarker();
     }
 
-    print("Restoring state based on API status: ${rideData.status}");
+    // 5. Set Status
     switch (rideData.status.toLowerCase()) {
+      case 'booked':
       case 'accepted':
         currentState.value = BookingState.driverAssigned;
         break;
+
       case 'arrived':
         currentState.value = BookingState.driverArrived;
         break;
+
       case 'on-trip':
+      case 'in_progress':
         currentState.value = BookingState.tripInProgress;
         startTripAnimation();
         break;
+
+      case 'completed':
+        currentState.value = BookingState.tripCompleted;
+        isPaymentCompleted.value = true;
+        break;
+
       case 'pending':
         currentState.value = BookingState.searchingDriver;
         break;
-      case 'completed':
-      case 'cancelled':
+
       default:
-        print(
-          "Ride status (${rideData.status}) indicates ride is not active. Resetting UI.",
-        );
+        print("Unknown status: ${rideData.status}. Resetting.");
         _storage.remove('active_ride_id');
         _resetUIState();
         return;
     }
 
-    if (locationsFetched) {
-      _ensureMapFitsRoute();
-    }
-    panelController.open();
     update();
-    print("Ride state restored to: ${currentState.value}");
   }
 
   IconData _getIconForCategory(String category) {
@@ -1655,6 +1637,12 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     return 4;
   }
 
+  void finishRide() {
+    print("User clicked Done. Finalizing trip and resetting UI.");
+    _resetUIState();
+  }
+
+  // --- MODIFIED addDriverMarker: Use Default Marker Temporarily ---
   void addDriverMarker({double rotation = 0.0}) {
     if (assignedDriver.value != null) {
       markers.removeWhere((marker) => marker.markerId.value == 'driver');
@@ -1662,9 +1650,12 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
         Marker(
           markerId: const MarkerId('driver'),
           position: assignedDriver.value!.location,
-          icon:
-              driverIcon ??
-              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          // --- FIX: Force Default Marker to prevent crash ---
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueAzure,
+          ),
+          // icon: driverIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          // --- END FIX ---
           anchor: const Offset(0.5, 0.5),
           rotation: rotation,
           flat: true,
@@ -1678,6 +1669,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       update();
     }
   }
+  // --- END MODIFICATION ---
 
   void updateDriverMarker({
     required LatLng newPosition,
@@ -1691,7 +1683,12 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
         markers[markerIndex] = markers[markerIndex].copyWith(
           positionParam: newPosition,
           rotationParam: rotation,
-          iconParam: driverIcon ?? markers[markerIndex].icon,
+          // --- FIX: Force Default Marker to prevent crash ---
+          iconParam: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueAzure,
+          ),
+          // iconParam: driverIcon ?? markers[markerIndex].icon,
+          // --- END FIX ---
         );
       } else {
         addDriverMarker(rotation: rotation);
@@ -1815,6 +1812,12 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     }
   }
 
+  void onPaymentSuccess() {
+    print("Payment completed.");
+    isPaymentCompleted.value = true;
+    update();
+  }
+
   void completePayment() {
     print("Payment completed.");
     isPaymentCompleted.value = true;
@@ -1927,7 +1930,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     selectedRideType.value = null;
     if (rideTypes.isEmpty || rideTypes.first.price == 0) {
       print("Prices seem invalid, attempting refetch...");
-      bool pricesFetched = await _updatePricesFromApi();
+      bool pricesFetched = await updatePricesFromApi();
       if (!pricesFetched) {
         print(
           "Failed to fetch prices again, cannot proceed to ride selection.",
@@ -1957,7 +1960,11 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
 
   void handleEmergency() {
     print("Emergency button pressed!");
-    THelperFunctions.showSnackBar('Emergency Action Triggered (Simulation)');
+
+    // Get current trip ID if available
+    final currentTripId = rideId.value.isNotEmpty ? rideId.value : null;
+
+    Get.to(() => EmergencyReportingScreen(tripId: currentTripId));
   }
 
   void _ensureMapFitsRoute() {
@@ -1966,11 +1973,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     });
   }
 
-  // --- ADDED: Handler for 'ride:searching' event ---
-  /// Called by WebSocketService when the server is actively searching for a driver.
-  /// This provides intermediate feedback to the rider.
   void handleRideSearching(Map<String, dynamic> data) {
-    // Ensure we are still in the searching state
     if (currentState.value != BookingState.searchingDriver) {
       print(
         "Received 'ride:searching' event but not in searching state. Ignoring.",
@@ -1983,17 +1986,12 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     final String status = data['status'] ?? 'pending';
 
     if (status == 'pending') {
-      // Update the UI text observables
-      // The 'SearchingDriverWidget' would need to be updated to listen to these.
       searchingStatusText.value = "We're pinging a potential driver...";
       potentialDriverInfo.value = "$driverName is $eta minutes away";
 
       print("Ride Searching: Pinging $driverName ($eta mins)");
-
-      // NOTE: We do NOT set the 'assignedDriver' here.
-      // That only happens in 'handleRideAccepted' when the driver confirms.
     }
-    update(); // Notify listeners
+    update();
   }
 
   void handleRideAccepted(Driver driverDetails, String chatId) {
@@ -2001,14 +1999,21 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       "RideController: Handling ride accepted. Driver: ${driverDetails.name}, ChatID: $chatId",
     );
     if (currentState.value == BookingState.searchingDriver) {
+      searchingStatusText.value = "Finding your driver...";
+      potentialDriverInfo.value = "";
+
       assignedDriver.value = driverDetails;
       activeRideChatId.value = chatId;
+
+      _storage.write('active_ride_id', rideId.value);
+      print("RideController: Stored active_ride_id (${rideId.value})");
+
       currentState.value = BookingState.driverAssigned;
       _previousDriverLocation = driverDetails.location;
       addDriverMarker(rotation: 0.0);
       THelperFunctions.showSuccessSnackBar(
-        'Driver Found!',
-        'Driver ${driverDetails.name} is on the way!',
+        'Success',
+        'Driver Found! ${driverDetails.name} is on the way!',
       );
       panelController.open();
       _ensureMapFitsRoute();
@@ -2037,28 +2042,50 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     _resetUIState();
   }
 
-  /// Handles the 'ride:started' event from WebSocketService
-  void handleRideStarted() {
-    print("RideController: Handling ride started event from WebSocket.");
-    if (currentState.value == BookingState.driverArrived ||
-        currentState.value == BookingState.driverAssigned) {
-      print("RideController: Transitioning to tripInProgress state.");
-      currentState.value = BookingState.tripInProgress;
-      startTripAnimation();
-      update();
+  void handleRideStarted(Map<String, dynamic> data) {
+    print(
+      "RideController: Handling ride started event from WebSocket with data.",
+    );
 
-      THelperFunctions.showSuccessSnackBar(
-        'Trip Started',
-        'Your trip has started!',
-      );
-    } else {
+    if (currentState.value != BookingState.driverArrived &&
+        currentState.value != BookingState.driverAssigned) {
       print(
         "Warning: Received ride:started event in unexpected state: ${currentState.value}. Ignoring.",
       );
+      return;
     }
+
+    if (data['startedAt'] != null) {
+      actualTripStartTime.value = DateTime.tryParse(
+        data['startedAt'].toString(),
+      );
+    }
+    actualTripStartTime.value ??= DateTime.now();
+
+    print("Trip actual start time set to: ${actualTripStartTime.value}");
+
+    if (data['startLocation'] != null &&
+        data['startLocation']['coordinates'] is List &&
+        data['startLocation']['coordinates'].length >= 2) {
+      final coords = data['startLocation']['coordinates'];
+      final lon = (coords[0] as num?)?.toDouble();
+      final lat = (coords[1] as num?)?.toDouble();
+      if (lat != null && lon != null) {
+        final LatLng serverStartLocation = LatLng(lat, lon);
+        print(
+          "Trip start location confirmed by server at: $serverStartLocation",
+        );
+      }
+    }
+
+    print("RideController: Transitioning to tripInProgress state.");
+    currentState.value = BookingState.tripInProgress;
+    startTripAnimation();
+    update();
+
+    THelperFunctions.showSuccessSnackBar('Success', 'Your trip has started!');
   }
 
-  /// Handles the 'ride:locationUpdated' event from WebSocketService
   void updateDriverLocationOnMap(LatLng newLocation) {
     if (assignedDriver.value != null) {
       double bearing = 0.0;
@@ -2091,11 +2118,16 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     }
   }
 
-  /// Handles the 'ride:completed' event from WebSocketService
-  void handleRideCompleted(double finalFare) {
-    print(
-      "RideController: Handling ride completed event. Final Fare: $finalFare",
-    );
+  void handleRideCompleted(Map<String, dynamic> data) {
+    print("RideController: Handling ride completed event. Data: $data");
+
+    final finalFare =
+        (data['finalPrice'] as num?)?.toDouble() ??
+        selectedRideType.value?.price.toDouble() ??
+        0.0;
+
+    final paymentStatus = data['paymentStatus'] as String? ?? 'pending';
+
     if (currentState.value == BookingState.tripInProgress ||
         currentState.value == BookingState.driverArrived ||
         currentState.value == BookingState.driverAssigned) {
@@ -2112,12 +2144,17 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
           seats: selectedRideType.value!.seats,
         );
       }
+
       driverLocationTimer?.cancel();
       currentState.value = BookingState.tripCompleted;
+
+      isPaymentCompleted.value = (paymentStatus.toLowerCase() == 'completed');
+
       THelperFunctions.showSuccessSnackBar(
         'Trip Completed',
-        'You have arrived at your destination! Please complete payment.',
+        'You have arrived at your destination!',
       );
+
       panelController.open();
       update();
     } else {

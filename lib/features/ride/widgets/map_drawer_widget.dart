@@ -1,80 +1,106 @@
+// lib/features/ride/widgets/map_drawer_widget.dart
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sarri_ride/features/communication/controllers/chat_controller.dart';
 import 'package:sarri_ride/features/communication/screens/chat_list_screen.dart';
-import 'package:sarri_ride/features/communication/screens/message_screen.dart';
 import 'package:sarri_ride/features/notifications/screens/notification_screen.dart';
-import 'package:sarri_ride/features/ride/controllers/ride_controller.dart';
-import 'package:sarri_ride/utils/constants/colors.dart'; //
-import 'package:sarri_ride/features/location/services/location_service.dart'; //
-import 'package:sarri_ride/features/profile/screens/profile_screen.dart'; //
-import 'package:sarri_ride/features/ride/screens/history/ride_history_screen.dart'; //
-import 'package:sarri_ride/features/payment/screens/payment_methods_screen.dart'; //
-import 'package:sarri_ride/features/payment/screens/wallet_screen.dart'; //
-import 'package:sarri_ride/features/settings/screens/settings_screen.dart'; //
+import 'package:sarri_ride/features/ride/controllers/drawer_controller.dart';
+import 'package:sarri_ride/utils/constants/colors.dart';
+import 'package:sarri_ride/features/location/services/location_service.dart';
+import 'package:sarri_ride/features/profile/screens/profile_screen.dart';
+import 'package:sarri_ride/features/ride/screens/history/ride_history_screen.dart';
+import 'package:sarri_ride/features/payment/screens/payment_methods_screen.dart';
+import 'package:sarri_ride/features/payment/screens/wallet_screen.dart';
+import 'package:sarri_ride/features/settings/screens/settings_screen.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:sarri_ride/features/settings/controllers/settings_controller.dart'; //
-// --- Import Notification Controller & Badges ---
-import 'package:sarri_ride/features/notifications/controllers/notification_controller.dart'; //
+import 'package:sarri_ride/features/settings/controllers/settings_controller.dart';
+import 'package:sarri_ride/features/notifications/controllers/notification_controller.dart';
 import 'package:badges/badges.dart' as badges;
-import 'package:sarri_ride/utils/helpers/helper_functions.dart'; // For snackbar
 
 class MapDrawerWidget extends StatelessWidget {
   final VoidCallback onRefreshLocation;
-  final VoidCallback
-  onLogout; // This callback might not be needed if SettingsController handles it
+  final VoidCallback onLogout;
 
   const MapDrawerWidget({
     super.key,
     required this.onRefreshLocation,
-    required this.onLogout, // Keep for now, might remove later
+    required this.onLogout,
   });
 
   @override
   Widget build(BuildContext context) {
     // Get controllers
-    final settingsController =
-        Get.find<SettingsController>(); // Use find since it's put elsewhere
-    final notificationController =
-        Get.find<NotificationController>(); // Get notification controller
+    final settingsController = Get.find<SettingsController>();
+    final notificationController = Get.find<NotificationController>();
     final chatController = Get.find<ChatController>();
-    // TODO: Get user info from a UserController or AuthService instead of hardcoding
-    final userName = "John Doe"; // Placeholder
-    final userEmail = "john@example.com"; // Placeholder
+    final drawerController = Get.find<MapDrawerController>();
 
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          // Drawer Header
+          // --- DRAWER HEADER ---
           DrawerHeader(
             decoration: const BoxDecoration(color: TColors.primary),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center, // Center vertically
               children: [
-                const CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Colors.white,
-                  child: Icon(Iconsax.user, size: 30, color: TColors.primary),
+                // 1. FIXED PROFILE PICTURE
+                Obx(() {
+                  final profile = drawerController.fullProfile.value;
+                  final image = profile?.picture;
+
+                  return CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.white,
+                    // Check if we have an image URL
+                    backgroundImage: (image != null && image.isNotEmpty)
+                        ? NetworkImage(image)
+                        : null,
+                    // If no image, show the Icon as a child fallback
+                    child: (image == null || image.isEmpty)
+                        ? const Icon(
+                            Iconsax.user,
+                            size: 30,
+                            color: TColors.primary,
+                          )
+                        : null,
+                  );
+                }),
+                const SizedBox(height: 12),
+
+                // 2. FIXED NAME OVERFLOW
+                Obx(
+                  () => Text(
+                    drawerController.userName.value,
+                    maxLines: 1, // Prevent wrapping
+                    overflow: TextOverflow.ellipsis, // Show "..." if too long
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  userName,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(color: Colors.white),
-                ),
-                Text(
-                  userEmail,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                const SizedBox(height: 4),
+
+                // 3. FIXED EMAIL OVERFLOW
+                Obx(
+                  () => Text(
+                    drawerController.userEmail.value,
+                    maxLines: 1, // Prevent wrapping
+                    overflow: TextOverflow.ellipsis, // Show "..." if too long
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                  ),
                 ),
               ],
             ),
           ),
 
-          // Menu Items
+          // --- MENU ITEMS (Unchanged) ---
           ListTile(
             leading: const Icon(Iconsax.user),
             title: const Text('Profile'),
@@ -108,13 +134,11 @@ class MapDrawerWidget extends StatelessWidget {
             },
           ),
 
-          // --- ADDED MESSAGES ITEM ---
+          // Messages Item
           ListTile(
             leading: Obx(
               () => badges.Badge(
-                // Wrap leading icon/badge logic in Obx
                 position: badges.BadgePosition.topEnd(top: -10, end: -10),
-                // Show badge only if count > 0
                 showBadge: chatController.totalUnreadCount.value > 0,
                 badgeContent: Text(
                   chatController.totalUnreadCount.value.toString(),
@@ -124,23 +148,20 @@ class MapDrawerWidget extends StatelessWidget {
                   badgeColor: TColors.error,
                   padding: EdgeInsets.all(5),
                 ),
-                child: const Icon(Iconsax.message), // Messages Icon
+                child: const Icon(Iconsax.message),
               ),
             ),
             title: const Text('Messages'),
             onTap: () {
-              Navigator.pop(context); // Close drawer
-              Get.to(
-                () => const ChatListScreen(),
-              ); // Navigate to Chat List Screen
+              Navigator.pop(context);
+              Get.to(() => const ChatListScreen());
             },
           ),
 
-          // --- ADDED NOTIFICATION ITEM ---
+          // Notifications Item
           ListTile(
             leading: Obx(
               () => badges.Badge(
-                // Wrap leading icon/badge logic in Obx
                 position: badges.BadgePosition.topEnd(top: -10, end: -10),
                 showBadge: notificationController.unreadCount.value > 0,
                 badgeContent: Text(
@@ -156,18 +177,17 @@ class MapDrawerWidget extends StatelessWidget {
             ),
             title: const Text('Notifications'),
             onTap: () {
-              Get.to(() => const NotificationScreen()); // Navigate here
+              Navigator.pop(context); // Close drawer
+              Get.to(() => const NotificationScreen());
             },
           ),
 
-          // --- END NOTIFICATION ITEM ---
           const Divider(),
 
-          // Location Refresh (as before)
+          // Location Refresh
           GetBuilder<LocationService>(
             builder: (locationService) {
               return ListTile(
-                /* ... */
                 leading: Icon(
                   Icons.my_location,
                   color: locationService.isLocationEnabled
@@ -205,18 +225,11 @@ class MapDrawerWidget extends StatelessWidget {
 
           // Logout
           ListTile(
-            leading: const Icon(
-              Iconsax.logout,
-              color: TColors.error,
-            ), // Add color
-            title: const Text(
-              'Logout',
-              style: TextStyle(color: TColors.error),
-            ), // Add color
+            leading: const Icon(Iconsax.logout, color: TColors.error),
+            title: const Text('Logout', style: TextStyle(color: TColors.error)),
             onTap: () {
-              Navigator.pop(context); // Close the drawer first
-              settingsController
-                  .logout(); // Call logout from SettingsController
+              Navigator.pop(context);
+              settingsController.logout();
             },
           ),
         ],

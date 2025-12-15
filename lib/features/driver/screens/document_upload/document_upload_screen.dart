@@ -8,8 +8,11 @@ import 'package:sarri_ride/utils/constants/sizes.dart';
 class DocumentUploadScreen extends StatelessWidget {
   const DocumentUploadScreen({super.key});
 
+  @override
   Widget build(BuildContext context) {
+    // Use Get.put to make sure controller is created
     final controller = Get.put(DocumentUploadController());
+
     return Scaffold(
       appBar: AppBar(title: const Text('Verify Your Documents')),
       body: SingleChildScrollView(
@@ -24,7 +27,7 @@ class DocumentUploadScreen extends StatelessWidget {
               ),
               const SizedBox(height: TSizes.spaceBtwItems),
               Text(
-                'To get verified, please upload a clear picture of the front and back of your driver\'s license, and a profile photo.',
+                'Please upload clear JPG or PNG images (Max 5MB each).',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: TSizes.spaceBtwSections),
@@ -36,11 +39,10 @@ class DocumentUploadScreen extends StatelessWidget {
               ),
               const SizedBox(height: TSizes.spaceBtwItems),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   Expanded(
                     child: _ImagePickerBox(
-                      label: 'Front Side',
+                      label: 'Front',
                       imageFile: controller.frontSideImage,
                       onTap: () => controller.showImageSourceDialog(
                         controller.frontSideImage,
@@ -50,7 +52,7 @@ class DocumentUploadScreen extends StatelessWidget {
                   const SizedBox(width: TSizes.spaceBtwItems),
                   Expanded(
                     child: _ImagePickerBox(
-                      label: 'Back Side',
+                      label: 'Back',
                       imageFile: controller.backSideImage,
                       onTap: () => controller.showImageSourceDialog(
                         controller.backSideImage,
@@ -61,15 +63,47 @@ class DocumentUploadScreen extends StatelessWidget {
               ),
               const SizedBox(height: TSizes.spaceBtwSections),
 
+              // -- Vehicle Documents --
+              Text(
+                'Vehicle Documents',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: TSizes.spaceBtwItems),
+              Row(
+                children: [
+                  Expanded(
+                    child: _ImagePickerBox(
+                      label: 'Insurance',
+                      imageFile: controller.insuranceCertificate,
+                      onTap: () => controller.showImageSourceDialog(
+                        controller.insuranceCertificate,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: TSizes.spaceBtwItems),
+                  Expanded(
+                    child: _ImagePickerBox(
+                      label: 'Registration',
+                      imageFile: controller.vehicleRegistration,
+                      onTap: () => controller.showImageSourceDialog(
+                        controller.vehicleRegistration,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: TSizes.spaceBtwSections),
+
               // -- Profile Picture --
               Text(
-                'Profile Picture',
+                'Profile Picture (Optional)',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: TSizes.spaceBtwItems),
               Center(
                 child: _ImagePickerBox(
-                  label: 'Profile Photo',
+                  label: 'Photo',
                   imageFile: controller.profilePicture,
                   onTap: () => controller.showImageSourceDialog(
                     controller.profilePicture,
@@ -77,6 +111,8 @@ class DocumentUploadScreen extends StatelessWidget {
                   isCircular: true,
                 ),
               ),
+              // Add extra space at bottom for scrolling past FAB/Button area
+              const SizedBox(height: 100),
             ],
           ),
         ),
@@ -113,16 +149,17 @@ class _ImagePickerBox extends StatelessWidget {
   final Rx<File?> imageFile;
   final bool isCircular;
 
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Obx(() {
         final image = imageFile.value;
         return Container(
-          height: 150,
-          width: isCircular ? 150 : double.infinity,
+          height: 120, // Slightly reduced height to fit more items
+          width: isCircular ? 120 : double.infinity,
           decoration: BoxDecoration(
-            color: Colors.grey.shade200,
+            color: Colors.grey.withOpacity(0.1),
             borderRadius: isCircular
                 ? null
                 : BorderRadius.circular(TSizes.cardRadiusLg),
@@ -141,10 +178,14 @@ class _ImagePickerBox extends StatelessWidget {
                           ? Icons.person_add_alt_1
                           : Icons.add_a_photo_outlined,
                       color: TColors.darkGrey,
-                      size: 40,
+                      size: 30,
                     ),
-                    const SizedBox(height: TSizes.spaceBtwItems / 2),
-                    Text(label, style: Theme.of(context).textTheme.labelMedium),
+                    const SizedBox(height: TSizes.xs),
+                    Text(
+                      label,
+                      style: Theme.of(context).textTheme.labelMedium,
+                      textAlign: TextAlign.center,
+                    ),
                   ],
                 )
               : null,

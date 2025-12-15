@@ -11,7 +11,7 @@ class AboutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('About'),
@@ -31,24 +31,24 @@ class AboutScreen extends StatelessWidget {
           children: [
             // Header Card
             _buildHeader(context, dark),
-            
+
             const SizedBox(height: TSizes.spaceBtwSections),
-            
+
             // App Features
             _buildAppFeatures(context, dark),
-            
+
             const SizedBox(height: TSizes.spaceBtwSections),
-            
+
             // App Information
             _buildAppInformation(context, dark),
-            
+
             const SizedBox(height: TSizes.spaceBtwSections),
-            
+
             // Company Information
             _buildCompanyInformation(context, dark),
-            
+
             const SizedBox(height: TSizes.spaceBtwSections),
-            
+
             // Legal & Policies
             _buildLegalPolicies(context, dark),
           ],
@@ -84,9 +84,9 @@ class AboutScreen extends StatelessWidget {
               size: TSizes.xl + TSizes.lg,
             ),
           ),
-          
+
           const SizedBox(height: TSizes.spaceBtwItems),
-          
+
           Text(
             'RideApp',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -94,9 +94,9 @@ class AboutScreen extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
           ),
-          
+
           const SizedBox(height: TSizes.xs),
-          
+
           Text(
             'Version 1.0.0',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -104,9 +104,9 @@ class AboutScreen extends StatelessWidget {
               fontWeight: FontWeight.w500,
             ),
           ),
-          
+
           const SizedBox(height: TSizes.spaceBtwItems),
-          
+
           Container(
             padding: const EdgeInsets.symmetric(
               horizontal: TSizes.spaceBtwItems,
@@ -175,23 +175,19 @@ class AboutScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                Iconsax.star,
-                color: TColors.primary,
-                size: TSizes.iconMd,
-              ),
+              Icon(Iconsax.star, color: TColors.primary, size: TSizes.iconMd),
               const SizedBox(width: TSizes.spaceBtwItems),
               Text(
                 'What We Offer',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
           ),
-          
+
           const SizedBox(height: TSizes.spaceBtwItems),
-          
+
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -199,7 +195,8 @@ class AboutScreen extends StatelessWidget {
               crossAxisCount: 2,
               crossAxisSpacing: TSizes.spaceBtwItems,
               mainAxisSpacing: TSizes.spaceBtwItems,
-              childAspectRatio: 1.2,
+              // --- FIX 1: Make cards much taller (0.75) ---
+              childAspectRatio: 0.75,
             ),
             itemCount: features.length,
             itemBuilder: (context, index) {
@@ -211,16 +208,18 @@ class AboutScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFeatureCard(FeatureItem feature, BuildContext context, bool dark) {
+  Widget _buildFeatureCard(
+    FeatureItem feature,
+    BuildContext context,
+    bool dark,
+  ) {
     return Container(
-      padding: const EdgeInsets.all(TSizes.md),
+      // --- FIX 2: Reduce padding to give text more room ---
+      padding: const EdgeInsets.all(TSizes.sm),
       decoration: BoxDecoration(
         color: feature.color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
-        border: Border.all(
-          color: feature.color.withOpacity(0.3),
-          width: 1,
-        ),
+        border: Border.all(color: feature.color.withOpacity(0.3), width: 1),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -237,27 +236,33 @@ class AboutScreen extends StatelessWidget {
               size: TSizes.iconMd,
             ),
           ),
-          
-          const SizedBox(height: TSizes.spaceBtwItems),
-          
+
+          // --- FIX 3: Reduce spacing between icon and title ---
+          const SizedBox(height: TSizes.sm),
+
           Text(
             feature.title,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
             textAlign: TextAlign.center,
-          ),
-          
-          const SizedBox(height: TSizes.xs),
-          
-          Text(
-            feature.description,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: dark ? TColors.lightGrey : TColors.darkGrey,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
+          ),
+
+          const SizedBox(height: TSizes.xs),
+
+          Expanded(
+            child: Text(
+              feature.description,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: dark ? TColors.lightGrey : TColors.darkGrey,
+              ),
+              textAlign: TextAlign.center,
+              // Allow 3 lines now that card is taller
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
@@ -291,15 +296,15 @@ class AboutScreen extends StatelessWidget {
               const SizedBox(width: TSizes.spaceBtwItems),
               Text(
                 'App Information',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
           ),
-          
+
           const SizedBox(height: TSizes.spaceBtwItems),
-          
+
           _buildInfoRow('Version', '1.0.0 (Build 100)', context),
           _buildInfoRow('Release Date', 'December 2024', context),
           _buildInfoRow('Size', '45.2 MB', context),
@@ -338,24 +343,24 @@ class AboutScreen extends StatelessWidget {
               const SizedBox(width: TSizes.spaceBtwItems),
               Text(
                 'Company Information',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
           ),
-          
+
           const SizedBox(height: TSizes.spaceBtwItems),
-          
+
           _buildInfoRow('Company', 'RideApp Technologies Ltd.', context),
           _buildInfoRow('Founded', '2024', context),
           _buildInfoRow('Headquarters', 'Lagos, Nigeria', context),
           _buildInfoRow('Website', 'www.rideapp.ng', context),
           _buildInfoRow('Email', 'support@rideapp.ng', context),
           _buildInfoRow('Phone', '+234 800 RIDE APP', context),
-          
+
           const SizedBox(height: TSizes.spaceBtwItems),
-          
+
           Container(
             padding: const EdgeInsets.all(TSizes.md),
             decoration: BoxDecoration(
@@ -414,15 +419,15 @@ class AboutScreen extends StatelessWidget {
               const SizedBox(width: TSizes.spaceBtwItems),
               Text(
                 'Legal & Policies',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
           ),
-          
+
           const SizedBox(height: TSizes.spaceBtwItems),
-          
+
           _buildPolicyItem(
             'Terms of Service',
             'Review our terms and conditions',
@@ -430,7 +435,7 @@ class AboutScreen extends StatelessWidget {
             () => Get.toNamed('/terms'),
             context,
           ),
-          
+
           _buildPolicyItem(
             'Privacy Policy',
             'Learn how we protect your data',
@@ -438,25 +443,29 @@ class AboutScreen extends StatelessWidget {
             () => Get.toNamed('/privacy-policy'),
             context,
           ),
-          
+
           _buildPolicyItem(
             'Community Guidelines',
             'Our community standards and rules',
             Iconsax.people,
-            () => THelperFunctions.showSnackBar('Community guidelines coming soon!'),
+            () => THelperFunctions.showSnackBar(
+              'Community guidelines coming soon!',
+            ),
             context,
           ),
-          
+
           _buildPolicyItem(
             'Open Source Licenses',
             'Third-party libraries and licenses',
             Iconsax.code,
-            () => THelperFunctions.showSnackBar('Open source licenses coming soon!'),
+            () => THelperFunctions.showSnackBar(
+              'Open source licenses coming soon!',
+            ),
             context,
           ),
-          
+
           const SizedBox(height: TSizes.spaceBtwItems),
-          
+
           Center(
             child: Text(
               '© 2024 RideApp Technologies Ltd.\nAll rights reserved.',
@@ -473,7 +482,7 @@ class AboutScreen extends StatelessWidget {
 
   Widget _buildInfoRow(String label, String value, BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: TSizes.spaceBtwItems),
       child: Row(
@@ -491,9 +500,9 @@ class AboutScreen extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -509,7 +518,7 @@ class AboutScreen extends StatelessWidget {
     BuildContext context,
   ) {
     final dark = THelperFunctions.isDarkMode(context);
-    
+
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Container(
@@ -518,17 +527,13 @@ class AboutScreen extends StatelessWidget {
           color: TColors.primary.withOpacity(0.1),
           borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
         ),
-        child: Icon(
-          icon,
-          color: TColors.primary,
-          size: TSizes.iconMd,
-        ),
+        child: Icon(icon, color: TColors.primary, size: TSizes.iconMd),
       ),
       title: Text(
         title,
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          fontWeight: FontWeight.w600,
-        ),
+        style: Theme.of(
+          context,
+        ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
       ),
       subtitle: Text(
         subtitle,
@@ -558,4 +563,4 @@ class FeatureItem {
     required this.description,
     required this.color,
   });
-} 
+}

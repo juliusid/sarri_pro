@@ -19,11 +19,11 @@ class _WalletScreenState extends State<WalletScreen> {
   @override
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
-    
+
     return Scaffold(
       backgroundColor: dark ? TColors.dark : TColors.lightGrey,
       appBar: AppBar(
-        title: const Text('My Wallet'),
+        title: const Text('Sarri Points'),
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
@@ -36,7 +36,8 @@ class _WalletScreenState extends State<WalletScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: () => setState(() => isBalanceVisible = !isBalanceVisible),
+            onPressed: () =>
+                setState(() => isBalanceVisible = !isBalanceVisible),
             icon: Icon(
               isBalanceVisible ? Iconsax.eye_slash : Iconsax.eye,
               color: dark ? TColors.light : TColors.dark,
@@ -48,7 +49,7 @@ class _WalletScreenState extends State<WalletScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Wallet Balance Header
+            // --- 1. ORIGINAL HEADER DESIGN (Preserved) ---
             Container(
               width: double.infinity,
               margin: const EdgeInsets.all(TSizes.defaultSpace),
@@ -77,10 +78,12 @@ class _WalletScreenState extends State<WalletScreen> {
                         padding: const EdgeInsets.all(TSizes.md),
                         decoration: BoxDecoration(
                           color: TColors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
+                          borderRadius: BorderRadius.circular(
+                            TSizes.cardRadiusMd,
+                          ),
                         ),
                         child: Icon(
-                          Iconsax.wallet_3,
+                          Iconsax.star, // Changed to Star for Points
                           color: TColors.white,
                           size: TSizes.iconLg,
                         ),
@@ -91,19 +94,23 @@ class _WalletScreenState extends State<WalletScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Wallet Balance',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                color: TColors.white.withOpacity(0.8),
-                                fontWeight: FontWeight.w500,
-                              ),
+                              'Available Points', // Updated Label
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    color: TColors.white.withOpacity(0.8),
+                                    fontWeight: FontWeight.w500,
+                                  ),
                             ),
                             const SizedBox(height: TSizes.xs),
                             Text(
-                              isBalanceVisible ? '₦25,480.50' : '₦****.**',
-                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                color: TColors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              isBalanceVisible
+                                  ? '2,450 pts'
+                                  : '**** pts', // Updated Value
+                              style: Theme.of(context).textTheme.headlineMedium
+                                  ?.copyWith(
+                                    color: TColors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                             ),
                           ],
                         ),
@@ -111,31 +118,31 @@ class _WalletScreenState extends State<WalletScreen> {
                     ],
                   ),
                   const SizedBox(height: TSizes.spaceBtwSections),
-                  
-                  // Quick Actions
+
+                  // Quick Actions (Inside Header, as per original design)
                   Row(
                     children: [
                       Expanded(
                         child: _buildQuickAction(
-                          icon: Iconsax.add,
-                          label: 'Top Up',
-                          onTap: () => _topUpWallet(),
+                          icon: Iconsax.add_circle,
+                          label: 'Earn',
+                          onTap: () => _earnPoints(),
                         ),
                       ),
                       const SizedBox(width: TSizes.spaceBtwItems),
                       Expanded(
                         child: _buildQuickAction(
-                          icon: Iconsax.arrow_up_3,
-                          label: 'Send',
-                          onTap: () => _sendMoney(),
+                          icon: Iconsax.gift,
+                          label: 'Redeem',
+                          onTap: () => _redeemPoints(),
                         ),
                       ),
                       const SizedBox(width: TSizes.spaceBtwItems),
                       Expanded(
                         child: _buildQuickAction(
-                          icon: Iconsax.arrow_down,
-                          label: 'Withdraw',
-                          onTap: () => _withdrawMoney(),
+                          icon: Iconsax.export_3,
+                          label: 'Transfer',
+                          onTap: () => _transferPoints(),
                         ),
                       ),
                     ],
@@ -143,18 +150,22 @@ class _WalletScreenState extends State<WalletScreen> {
                 ],
               ),
             ),
-            
+
+            // --- 2. NEW UI FOR BODY (Stats & History) ---
+
             // Stats Cards
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: TSizes.defaultSpace),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: TSizes.defaultSpace,
+              ),
               child: Row(
                 children: [
                   Expanded(
                     child: _buildStatCard(
-                      title: 'Total Spent',
-                      value: '₦45,200',
-                      icon: Iconsax.card_send,
-                      color: TColors.error,
+                      title: 'Redeemed',
+                      value: '1,200 pts',
+                      icon: Iconsax.ticket_expired,
+                      color: TColors.warning,
                       dark: dark,
                       context: context,
                     ),
@@ -162,9 +173,9 @@ class _WalletScreenState extends State<WalletScreen> {
                   const SizedBox(width: TSizes.spaceBtwItems),
                   Expanded(
                     child: _buildStatCard(
-                      title: 'Total Earned',
-                      value: '₦2,150',
-                      icon: Iconsax.card_receive,
+                      title: 'Lifetime Earned',
+                      value: '3,650 pts',
+                      icon: Iconsax.award,
                       color: TColors.success,
                       dark: dark,
                       context: context,
@@ -173,19 +184,21 @@ class _WalletScreenState extends State<WalletScreen> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: TSizes.spaceBtwSections),
-            
-            // Transaction History
+
+            // Points History List
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: TSizes.defaultSpace),
+              margin: const EdgeInsets.symmetric(
+                horizontal: TSizes.defaultSpace,
+              ),
               padding: const EdgeInsets.all(TSizes.defaultSpace),
               decoration: BoxDecoration(
                 color: dark ? TColors.dark : TColors.white,
                 borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(dark ? 0.3 : 0.1),
+                    color: Colors.black.withOpacity(dark ? 0.3 : 0.05),
                     blurRadius: TSizes.md,
                     offset: const Offset(0, TSizes.sm),
                   ),
@@ -198,114 +211,83 @@ class _WalletScreenState extends State<WalletScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Transaction History',
+                        'Points History',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: dark ? TColors.white : TColors.black,
                         ),
                       ),
-                      DropdownButton<String>(
-                        value: selectedPeriod,
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedPeriod = newValue!;
-                          });
-                        },
-                        items: <String>['This Week', 'This Month', 'Last Month', 'All Time']
-                            .map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                        underline: Container(),
-                        icon: Icon(
-                          Iconsax.arrow_down_1,
-                          color: dark ? TColors.lightGrey : TColors.darkGrey,
-                          size: TSizes.iconSm,
-                        ),
+                      // Simple filter text instead of dropdown for cleaner look
+                      Text(
+                        'Recent',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: dark ? TColors.lightGrey : TColors.darkGrey,
+                          color: TColors.primary,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: TSizes.spaceBtwItems),
-                  
-                  // Transactions list
-                  ...List.generate(_transactions.length, (index) {
-                    final transaction = _transactions[index];
-                    final isLast = index == _transactions.length - 1;
-                    return _buildTransactionCard(transaction, dark, context, isLast);
-                  }),
+
+                  // Transactions list (Demo Data)
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _transactions.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final transaction = _transactions[index];
+                      return _buildTransactionCard(transaction, dark, context);
+                    },
+                  ),
                 ],
               ),
             ),
-            
+
             const SizedBox(height: TSizes.spaceBtwSections),
-            
-            // Wallet Settings
+
+            // Rewards Info Section
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: TSizes.defaultSpace),
+              margin: const EdgeInsets.symmetric(
+                horizontal: TSizes.defaultSpace,
+              ),
               padding: const EdgeInsets.all(TSizes.defaultSpace),
               decoration: BoxDecoration(
                 color: dark ? TColors.dark : TColors.white,
                 borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(dark ? 0.3 : 0.1),
-                    blurRadius: TSizes.md,
-                    offset: const Offset(0, TSizes.sm),
-                  ),
-                ],
+                border: Border.all(color: TColors.grey.withOpacity(0.2)),
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Wallet Settings',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: dark ? TColors.white : TColors.black,
-                    ),
-                  ),
-                  const SizedBox(height: TSizes.spaceBtwItems),
-                  
                   _buildSettingsOption(
-                    icon: Iconsax.security_card,
-                    title: 'Security Settings',
-                    subtitle: 'Manage PIN and security options',
-                    onTap: () => _securitySettings(),
+                    icon: Iconsax.info_circle,
+                    title: 'How it works',
+                    subtitle: 'Learn how to earn points',
+                    onTap: () => _showAboutPoints(),
                     dark: dark,
                     context: context,
                   ),
+                  const Divider(),
                   _buildSettingsOption(
-                    icon: Iconsax.bank,
-                    title: 'Link Bank Account',
-                    subtitle: 'Connect your bank for easy transfers',
-                    onTap: () => _linkBankAccount(),
+                    icon: Iconsax.gift,
+                    title: 'Rewards Catalog',
+                    subtitle: 'View available rewards',
+                    onTap: () => _showRewards(),
                     dark: dark,
                     context: context,
-                  ),
-                  _buildSettingsOption(
-                    icon: Iconsax.document_download,
-                    title: 'Download Statement',
-                    subtitle: 'Get your transaction history',
-                    onTap: () => _downloadStatement(),
-                    dark: dark,
-                    context: context,
-                    isLast: true,
                   ),
                 ],
               ),
             ),
-            
+
             const SizedBox(height: TSizes.spaceBtwSections),
           ],
         ),
       ),
     );
   }
+
+  // --- WIDGET HELPERS ---
 
   Widget _buildQuickAction({
     required IconData icon,
@@ -316,22 +298,21 @@ class _WalletScreenState extends State<WalletScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
       child: Container(
-        padding: const EdgeInsets.all(TSizes.defaultSpace),
+        padding: const EdgeInsets.symmetric(
+          vertical: TSizes.md,
+          horizontal: TSizes.sm,
+        ),
         decoration: BoxDecoration(
           color: TColors.white.withOpacity(0.2),
           borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
         ),
         child: Column(
           children: [
-            Icon(
-              icon,
-              color: TColors.white,
-              size: TSizes.iconLg,
-            ),
-            const SizedBox(height: TSizes.xs),
+            Icon(icon, color: TColors.white, size: 24),
+            const SizedBox(height: 8),
             Text(
               label,
-              style: TextStyle(
+              style: const TextStyle(
                 color: TColors.white,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
@@ -354,44 +335,27 @@ class _WalletScreenState extends State<WalletScreen> {
     return Container(
       padding: const EdgeInsets.all(TSizes.defaultSpace),
       decoration: BoxDecoration(
-        color: dark ? TColors.dark : TColors.white,
+        color: dark ? TColors.darkerGrey : TColors.white,
         borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(dark ? 0.3 : 0.1),
-            blurRadius: TSizes.md,
-            offset: const Offset(0, TSizes.sm),
-          ),
-        ],
+        border: Border.all(color: TColors.grey.withOpacity(0.1)),
       ),
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(TSizes.sm),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: TSizes.iconLg,
-            ),
-          ),
-          const SizedBox(height: TSizes.spaceBtwItems),
+          Icon(icon, color: color, size: 28),
+          const SizedBox(height: 12),
           Text(
             value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
               color: dark ? TColors.white : TColors.black,
             ),
           ),
-          const SizedBox(height: TSizes.xs),
+          const SizedBox(height: 4),
           Text(
             title,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: dark ? TColors.lightGrey : TColors.darkGrey,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: TColors.darkGrey),
             textAlign: TextAlign.center,
           ),
         ],
@@ -399,83 +363,53 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _buildTransactionCard(WalletTransaction transaction, bool dark, BuildContext context, bool isLast) {
+  Widget _buildTransactionCard(
+    WalletTransaction transaction,
+    bool dark,
+    BuildContext context,
+  ) {
     final isCredit = transaction.type == 'credit';
     final color = isCredit ? TColors.success : TColors.error;
-    
-    return Container(
-      margin: EdgeInsets.only(bottom: isLast ? 0 : TSizes.spaceBtwItems),
-      padding: const EdgeInsets.all(TSizes.defaultSpace),
-      decoration: BoxDecoration(
-        color: dark ? TColors.darkerGrey : TColors.lightGrey,
-        borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(TSizes.sm),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
-            ),
-            child: Icon(
-              transaction.icon,
-              color: color,
-              size: TSizes.iconMd,
-            ),
+
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            shape: BoxShape.circle,
           ),
-          const SizedBox(width: TSizes.spaceBtwItems),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  transaction.title,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: dark ? TColors.white : TColors.black,
-                  ),
-                ),
-                const SizedBox(height: TSizes.xs),
-                Text(
-                  '${transaction.date} • ${transaction.time}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: dark ? TColors.lightGrey : TColors.darkGrey,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          child: Icon(transaction.icon, color: color, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${isCredit ? '+' : '-'}₦${transaction.amount}',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: color,
+                transaction.title,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: dark ? TColors.white : TColors.black,
                 ),
               ),
-              const SizedBox(height: TSizes.xs),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: TSizes.sm, vertical: 2),
-                decoration: BoxDecoration(
-                  color: _getStatusColor(transaction.status).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
-                ),
-                child: Text(
-                  transaction.status,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: _getStatusColor(transaction.status),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 10,
-                  ),
-                ),
+              Text(
+                '${transaction.date} • ${transaction.time}',
+                style: Theme.of(
+                  context,
+                ).textTheme.labelMedium?.copyWith(color: TColors.darkGrey),
               ),
             ],
           ),
-        ],
-      ),
+        ),
+        Text(
+          '${isCredit ? '+' : '-'}${transaction.amount} pts',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 
@@ -486,84 +420,44 @@ class _WalletScreenState extends State<WalletScreen> {
     required VoidCallback onTap,
     required bool dark,
     required BuildContext context,
-    bool isLast = false,
   }) {
-    return Container(
-      margin: EdgeInsets.only(bottom: isLast ? 0 : TSizes.spaceBtwItems),
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Container(
-          padding: const EdgeInsets.all(TSizes.sm),
-          decoration: BoxDecoration(
-            color: TColors.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(TSizes.borderRadiusMd),
-          ),
-          child: Icon(
-            icon,
-            color: TColors.primary,
-            size: TSizes.iconMd,
-          ),
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: TColors.primary.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
         ),
-        title: Text(
-          title,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: dark ? TColors.white : TColors.black,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: dark ? TColors.lightGrey : TColors.darkGrey,
-          ),
-        ),
-        trailing: Icon(
-          Iconsax.arrow_right_3,
-          color: dark ? TColors.lightGrey : TColors.darkGrey,
-          size: TSizes.iconMd,
-        ),
-        onTap: onTap,
+        child: Icon(icon, color: TColors.primary, size: 20),
       ),
+      title: Text(
+        title,
+        style: Theme.of(
+          context,
+        ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(subtitle, style: Theme.of(context).textTheme.labelMedium),
+      trailing: const Icon(
+        Icons.arrow_forward_ios,
+        size: 14,
+        color: TColors.darkGrey,
+      ),
+      onTap: onTap,
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'Completed':
-        return TColors.success;
-      case 'Pending':
-        return TColors.warning;
-      case 'Failed':
-        return TColors.error;
-      default:
-        return TColors.info;
-    }
-  }
-
-  // Action methods
-  void _topUpWallet() {
-    THelperFunctions.showSnackBar('Top up wallet feature coming soon');
-  }
-
-  void _sendMoney() {
-    THelperFunctions.showSnackBar('Send money feature coming soon');
-  }
-
-  void _withdrawMoney() {
-    THelperFunctions.showSnackBar('Withdraw money feature coming soon');
-  }
-
-  void _securitySettings() {
-    THelperFunctions.showSnackBar('Security settings feature coming soon');
-  }
-
-  void _linkBankAccount() {
-    THelperFunctions.showSnackBar('Link bank account feature coming soon');
-  }
-
-  void _downloadStatement() {
-    THelperFunctions.showSnackBar('Download statement feature coming soon');
-  }
+  // Action Placeholders
+  void _earnPoints() =>
+      THelperFunctions.showSnackBar('Earn points feature coming soon');
+  void _redeemPoints() =>
+      THelperFunctions.showSnackBar('Redeem points feature coming soon');
+  void _transferPoints() =>
+      THelperFunctions.showSnackBar('Transfer points feature coming soon');
+  void _showAboutPoints() =>
+      THelperFunctions.showSnackBar('Info page coming soon');
+  void _showRewards() =>
+      THelperFunctions.showSnackBar('Rewards catalog coming soon');
 }
 
 class WalletTransaction {
@@ -586,60 +480,33 @@ class WalletTransaction {
   });
 }
 
-// Mock transactions
+// Demo Data
 final List<WalletTransaction> _transactions = [
   WalletTransaction(
-    title: 'Top Up from Bank',
+    title: 'Ride Completed',
     date: 'Today',
     time: '2:30 PM',
-    amount: '5,000',
+    amount: '50',
     type: 'credit',
-    status: 'Completed',
-    icon: Iconsax.card_receive,
-  ),
-  WalletTransaction(
-    title: 'Ride Payment',
-    date: 'Today',
-    time: '10:15 AM',
-    amount: '3,200',
-    type: 'debit',
     status: 'Completed',
     icon: Iconsax.car,
   ),
   WalletTransaction(
-    title: 'Cashback Reward',
+    title: 'Promo Reward',
     date: 'Yesterday',
-    time: '8:45 PM',
-    amount: '150',
+    time: '10:15 AM',
+    amount: '200',
     type: 'credit',
     status: 'Completed',
     icon: Iconsax.gift,
   ),
   WalletTransaction(
-    title: 'Ride Payment',
-    date: 'Yesterday',
-    time: '6:20 PM',
-    amount: '2,800',
-    type: 'debit',
-    status: 'Completed',
-    icon: Iconsax.car,
-  ),
-  WalletTransaction(
-    title: 'Withdrawal',
+    title: 'Discount Used',
     date: 'Dec 15',
-    time: '3:10 PM',
-    amount: '10,000',
+    time: '8:45 PM',
+    amount: '500',
     type: 'debit',
-    status: 'Pending',
-    icon: Iconsax.card_send,
-  ),
-  WalletTransaction(
-    title: 'Referral Bonus',
-    date: 'Dec 14',
-    time: '11:30 AM',
-    amount: '2,000',
-    type: 'credit',
     status: 'Completed',
-    icon: Iconsax.people,
+    icon: Iconsax.ticket,
   ),
-]; 
+];

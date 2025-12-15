@@ -1,35 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import '../models/saved_place.dart';
-import '../../location/services/places_service.dart';
-import '../../../utils/helpers/helper_functions.dart';
+import 'package:sarri_ride/features/settings/models/saved_place.dart';
+import 'package:sarri_ride/features/settings/services/saved_places_service.dart';
+import 'package:sarri_ride/features/location/services/places_service.dart';
+import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
 class SavedPlacesController extends GetxController {
-  static const _storageKey = 'saved_places';
+  final SavedPlacesService _service = Get.put(SavedPlacesService());
+
   final RxList<SavedPlace> savedPlaces = <SavedPlace>[].obs;
   final RxList<PlaceSuggestion> placeSuggestions = <PlaceSuggestion>[].obs;
   final RxBool isSearching = false.obs;
+  final RxBool isLoading = false.obs;
   final RxBool isLoadingPlaceDetails = false.obs;
-  
-  // Text controllers for the add place form
+
   final TextEditingController labelController = TextEditingController();
   final TextEditingController addressController = TextEditingController();
-  
-  // Selected place details
   final Rx<PlaceDetails?> selectedPlace = Rx<PlaceDetails?>(null);
+
+  // Backend allowed labels
+  final List<String> _allowedLabels = [
+    'home',
+    'work',
+    'gym',
+    'airport',
+    'school',
+    'mall',
+    'other',
+  ];
 
   @override
   void onInit() {
     super.onInit();
-    _initializeAsync();
-  }
-  
-  Future<void> _initializeAsync() async {
-    // Wait for next frame to ensure GetStorage is ready
-    await Future.delayed(Duration.zero);
-    _loadPlaces();
+    fetchSavedPlaces();
   }
 
   @override
@@ -39,167 +43,171 @@ class SavedPlacesController extends GetxController {
     super.onClose();
   }
 
-  void _loadPlaces() {
+  Future<void> fetchSavedPlaces() async {
+    isLoading.value = true;
     try {
-      final storage = GetStorage();
-      final data = storage.read<List<dynamic>>(_storageKey) ?? [];
-      savedPlaces.value = data.map((e) => SavedPlace.fromJson(Map<String, dynamic>.from(e))).toList();
-    } catch (e) {
-      print('Error loading saved places: $e');
-      savedPlaces.value = [];
+      final places = await _service.getAllPlaces();
+      savedPlaces.assignAll(places);
+    } finally {
+      isLoading.value = false;
     }
   }
 
-  void _persist() {
-    final jsonList = savedPlaces.map((e) => e.toJson()).toList();
-    GetStorage().write(_storageKey, jsonList);
-  }
-
-  // Search for places using Google Places autocomplete
   Future<void> searchPlaces(String query) async {
     if (query.length < 3) {
       placeSuggestions.clear();
       return;
     }
-
     isSearching.value = true;
-    
     try {
       final suggestions = await PlacesService.getPlaceSuggestions(query);
       placeSuggestions.assignAll(suggestions);
     } catch (e) {
-      THelperFunctions.showSnackBar('Error searching places: $e');
       placeSuggestions.clear();
     } finally {
       isSearching.value = false;
     }
   }
 
-  // Get place details with coordinates
   Future<void> selectPlace(PlaceSuggestion suggestion) async {
     isLoadingPlaceDetails.value = true;
-    
     try {
       final details = await PlacesService.getPlaceDetails(suggestion.placeId);
       if (details != null) {
         selectedPlace.value = details;
         addressController.text = details.formattedAddress;
-        
-        // Auto-fill label if it's empty
-        if (labelController.text.isEmpty) {
-          labelController.text = details.name.isNotEmpty ? details.name : suggestion.mainText;
-        }
-      } else {
-        THelperFunctions.showSnackBar('Could not get place details');
       }
-    } catch (e) {
-      THelperFunctions.showSnackBar('Error getting place details: $e');
     } finally {
       isLoadingPlaceDetails.value = false;
     }
   }
 
-  // Add a new saved place
-  void addPlace() {
-    final label = labelController.text.trim();
+  Future<void> addPlace() async {
+    final labelInput = labelController.text.trim();
     final address = addressController.text.trim();
     final placeDetails = selectedPlace.value;
-    
-    if (label.isEmpty) {
-      THelperFunctions.showSnackBar('Please enter a label for this place');
+
+    if (labelInput.isEmpty) {
+      THelperFunctions.showSnackBar('Please enter a label');
       return;
     }
-    
+
     if (address.isEmpty || placeDetails == null) {
       THelperFunctions.showSnackBar('Please select a valid address');
       return;
     }
-    
-    // Check if place with same label already exists
-    if (savedPlaces.any((place) => place.label.toLowerCase() == label.toLowerCase())) {
-      THelperFunctions.showSnackBar('A place with this label already exists');
-      return;
+
+    // --- LABEL LOGIC ---
+    String apiLabel = labelInput.toLowerCase();
+    String? customName;
+
+    if (!_allowedLabels.contains(apiLabel)) {
+      // If user typed something custom (e.g. "Mom's House"),
+      // send label="other" and customName="Mom's House"
+      customName = labelInput;
+      apiLabel = 'other';
     }
-    
-    final newPlace = SavedPlace(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      label: label,
+
+    isLoading.value = true;
+
+    String city = '';
+    String state = '';
+    String country = 'Nigeria';
+
+    // Extract address components
+    for (var component in placeDetails.addressComponents) {
+      final types = List<String>.from(component['types'] ?? []);
+      if (types.contains('locality')) city = component['long_name'];
+      if (types.contains('administrative_area_level_1'))
+        state = component['long_name'];
+      if (types.contains('country')) country = component['long_name'];
+    }
+
+    final success = await _service.savePlace(
+      label: apiLabel,
       address: address,
       lat: placeDetails.location.latitude,
       lng: placeDetails.location.longitude,
+      city: city,
+      state: state,
+      country: country,
+      customName: customName,
     );
-    
-    savedPlaces.add(newPlace);
-    _persist();
-    
-    // Clear form
-    _clearForm();
-    
-    THelperFunctions.showSnackBar('Place saved successfully!');
-  }
 
-  // Update an existing saved place
-  void updatePlace(String id) {
-    final label = labelController.text.trim();
-    final address = addressController.text.trim();
-    final placeDetails = selectedPlace.value;
-    
-    if (label.isEmpty) {
-      THelperFunctions.showSnackBar('Please enter a label for this place');
-      return;
-    }
-    
-    if (address.isEmpty || placeDetails == null) {
-      THelperFunctions.showSnackBar('Please select a valid address');
-      return;
-    }
-    
-    final index = savedPlaces.indexWhere((place) => place.id == id);
-    if (index != -1) {
-      // Check if another place with same label exists (excluding current place)
-      if (savedPlaces.any((place) => 
-          place.id != id && place.label.toLowerCase() == label.toLowerCase())) {
-        THelperFunctions.showSnackBar('A place with this label already exists');
-        return;
-      }
-      
-      final updatedPlace = SavedPlace(
-        id: id,
-        label: label,
-        address: address,
-        lat: placeDetails.location.latitude,
-        lng: placeDetails.location.longitude,
-      );
-      
-      savedPlaces[index] = updatedPlace;
-      _persist();
-      
-      // Clear form
+    isLoading.value = false;
+
+    if (success) {
+      // Don't show snackbar here, letting UI handle it if needed,
+      // BUT since your UI code calls this and then shows success,
+      // ensure we return true/void correctly.
+      // The UI code you showed earlier handles the snackbar after await.
       _clearForm();
-      
-      THelperFunctions.showSnackBar('Place updated successfully!');
+      await fetchSavedPlaces(); // Refresh list
+    } else {
+      // If service returns false, we should throw or show error
+      THelperFunctions.showErrorSnackBar('Error', 'Failed to save place.');
+      throw Exception('Save failed'); // Stop UI from showing success
     }
   }
 
-  // Delete a saved place
-  void deletePlace(String id) {
-    savedPlaces.removeWhere((p) => p.id == id);
-    _persist();
-    THelperFunctions.showSnackBar('Place deleted successfully');
+  Future<void> updatePlace(String id) async {
+    final labelInput = labelController.text.trim();
+    final placeDetails = selectedPlace.value;
+
+    Map<String, dynamic> updateData = {};
+
+    if (placeDetails != null) {
+      updateData['address'] = placeDetails.formattedAddress;
+      updateData['coordinates'] = [
+        placeDetails.location.longitude,
+        placeDetails.location.latitude,
+      ];
+    }
+
+    String apiLabel = labelInput.toLowerCase();
+    if (!_allowedLabels.contains(apiLabel)) {
+      updateData['label'] = 'other';
+      updateData['customName'] = labelInput;
+    } else {
+      updateData['label'] = apiLabel;
+    }
+
+    isLoading.value = true;
+    final success = await _service.updatePlace(id, updateData);
+    isLoading.value = false;
+
+    if (success) {
+      _clearForm();
+      await fetchSavedPlaces();
+    } else {
+      THelperFunctions.showErrorSnackBar('Error', 'Failed to update place.');
+      throw Exception('Update failed');
+    }
   }
 
-  // Load place data for editing
+  Future<void> deletePlace(String id) async {
+    final success = await _service.deletePlace(id);
+    if (success) {
+      savedPlaces.removeWhere((p) => p.id == id);
+      THelperFunctions.showSnackBar('Place deleted.');
+    } else {
+      THelperFunctions.showErrorSnackBar('Error', 'Failed to delete place.');
+    }
+  }
+
   void loadPlaceForEditing(SavedPlace place) {
-    labelController.text = place.label;
+    labelController.text = place.label == 'other'
+        ? place.displayName
+        : place.label.capitalizeFirst!;
     addressController.text = place.address;
+
     selectedPlace.value = PlaceDetails(
-      name: place.label,
+      name: place.displayName,
       formattedAddress: place.address,
       location: LatLng(place.lat, place.lng),
     );
   }
 
-  // Clear the form
   void _clearForm() {
     labelController.clear();
     addressController.clear();
@@ -207,25 +215,8 @@ class SavedPlacesController extends GetxController {
     placeSuggestions.clear();
   }
 
-  // Clear search results
   void clearSearch() {
     placeSuggestions.clear();
     isSearching.value = false;
   }
-
-  // Get saved place by coordinates (useful for reverse lookup)
-  SavedPlace? getPlaceByCoordinates(double lat, double lng, {double tolerance = 0.001}) {
-    return savedPlaces.firstWhereOrNull((place) => 
-        (place.lat - lat).abs() < tolerance && 
-        (place.lng - lng).abs() < tolerance);
-  }
-
-  // Get saved places by label (useful for quick access)
-  List<SavedPlace> searchSavedPlaces(String query) {
-    if (query.isEmpty) return savedPlaces.toList();
-    
-    return savedPlaces.where((place) => 
-        place.label.toLowerCase().contains(query.toLowerCase()) ||
-        place.address.toLowerCase().contains(query.toLowerCase())).toList();
-  }
-} 
+}

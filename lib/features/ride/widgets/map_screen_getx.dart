@@ -53,6 +53,13 @@ class MapScreenGetX extends StatelessWidget {
     final notificationController =
         Get.find<NotificationController>(); // Get instance
     final dark = THelperFunctions.isDarkMode(context);
+    // --- : Open panel after frame renders if state is active ---
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (rideController.currentState.value != BookingState.initial &&
+          rideController.panelController.isAttached) {
+        rideController.panelController.open();
+      }
+    });
     return Scaffold(
       drawer: MapDrawerWidget(
         //
@@ -273,28 +280,11 @@ class MapScreenGetX extends StatelessWidget {
 
         case BookingState.tripCompleted:
           return TripCompletedWidget(
-            //
             selectedRideType: controller.selectedRideType.value,
             isPaymentCompleted: controller.isPaymentCompleted.value,
-            onPayWithWallet: () => PaymentDialogs.showWalletPayment(
-              //
-              Get.context!,
-              selectedRideType: controller.selectedRideType.value,
-              onConfirm: controller.completePayment,
-            ),
-            onPayWithCard: () => PaymentDialogs.showCardPayment(
-              //
-              Get.context!,
-              selectedRideType: controller.selectedRideType.value,
-              onConfirm: controller.completePayment,
-            ),
-            onPayWithCash: () => PaymentDialogs.showCashPayment(
-              //
-              Get.context!,
-              selectedRideType: controller.selectedRideType.value,
-              onConfirm: controller.completePayment,
-            ),
-            onDone: controller.cancelRide,
+            tripId: controller.rideId.value, // <-- PASS THE tripId
+            onDone: controller.finishRide,
+            // We no longer pass the payment callbacks
           );
 
         case BookingState.packageBooking:

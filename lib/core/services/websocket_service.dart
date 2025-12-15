@@ -5,8 +5,12 @@ import 'dart:convert';
 import 'dart:math'; // For jitter
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:sarri_ride/features/authentication/models/auth_model.dart';
+import 'package:sarri_ride/features/communication/controllers/call_controller.dart';
 import 'package:sarri_ride/features/communication/controllers/chat_controller.dart';
 import 'package:sarri_ride/features/notifications/controllers/notification_controller.dart';
+import 'package:sarri_ride/features/ride/models/ride_model.dart';
+import 'package:sarri_ride/features/ride/services/ride_service.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -17,6 +21,7 @@ import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/ride/controllers/ride_controller.dart';
 import 'package:sarri_ride/features/driver/controllers/trip_management_controller.dart';
 import 'package:sarri_ride/features/authentication/screens/login/login_screen_getx.dart';
+
 import 'package:sarri_ride/features/driver/controllers/trip_management_controller.dart'
     show TripRequest;
 import 'package:sarri_ride/features/ride/widgets/driver_info_card.dart'
@@ -37,6 +42,13 @@ class WebSocketService extends GetxService {
   // --- Listener Lists ---
   final List<Function(dynamic)> _chatMessageListeners = [];
   final List<Function(dynamic)> _sentConfirmationListeners = [];
+  final List<Function(dynamic)> _cashPaymentPendingListeners = [];
+  final List<Function(dynamic)> _paymentConfirmedListeners = [];
+  final List<Function(dynamic)> _walletUpdateListeners = [];
+  final List<Function(dynamic)> _paymentProcessedListeners = [];
+  // --- Listener Lists for Emergency ---
+  final List<Function(dynamic)> _emergencyMessageListeners = [];
+  final List<Function(dynamic)> _emergencyTypingListeners = [];
 
   @override
   void onInit() {
@@ -277,12 +289,34 @@ class WebSocketService extends GetxService {
     // emit('leaveChatRoom', chatId);
   }
 
+  void updateDriverAvailability(String status) {
+    final payload = {'availabilityStatus': status};
+
+    print("WebSocket: Emitting updateAvailability -> $payload");
+
+    emitWithAck(
+      'updateAvailability',
+      payload,
+      ack: (response) {
+        if (response is Map && response['status'] == 'success') {
+          print('Availability update confirmed by server: $status');
+        } else {
+          print('Availability update failed: ${response?['message']}');
+          // Optional: revert UI state if failed?
+        }
+      },
+    );
+  }
+
   // --- MODIFIED updateDriverLocation METHOD ---
   void updateDriverLocation({
     required double latitude,
     required double longitude,
     required String availabilityStatus,
     required String state, // Make state required
+    String? tripId,
+    double? heading,
+    double? speed,
   }) {
     // Payload must match the documentation
     final payload = {
@@ -290,6 +324,10 @@ class WebSocketService extends GetxService {
       'longitude': longitude,
       'availabilityStatus': availabilityStatus,
       'state': state, // Add the state field
+      if (tripId != null) 'tripId': tripId,
+      if (heading != null) 'heading': heading,
+      if (speed != null) 'speed': speed,
+      'category': 'luxury',
     };
 
     // Use emitWithAck to get the server response
@@ -309,7 +347,88 @@ class WebSocketService extends GetxService {
       },
     );
   }
+
+  // --- Emitters for Emergency Room ---
+  void joinEmergencyRoom(String emergencyId) {
+    print("Joining emergency room: emergency:$emergencyId");
+    // Backend expects: socket.emit('emergency:join', { id: emergencyId })
+    emitWithAck(
+      'emergency:join',
+      {'id': emergencyId},
+      ack: (response) {
+        print("Joined emergency room response: $response");
+      },
+    );
+  }
+
+  void leaveEmergencyRoom(String emergencyId) {
+    // If backend supports explicit leave
+    // emit('emergency:leave', {'id': emergencyId});
+    print("Leaving emergency room: $emergencyId (Local logic)");
+  }
+
   // --- END MODIFIED updateDriverLocation METHOD ---
+
+  void _handleIncomingChatMessage(dynamic data) {
+    try {
+      // 1. Notify ChatController for global unread count
+      if (Get.isRegistered<ChatController>()) {
+        final chatController = ChatController.instance;
+        chatController.handleIncomingMessage(data);
+      }
+
+      // 2. Notify any active screens listening to specific chats
+      // (e.g., if the user is currently looking at a chat screen)
+      for (var listener in List.from(_chatMessageListeners)) {
+        try {
+          listener(data);
+        } catch (e) {
+          print("WS Error in chat listener: $e");
+        }
+      }
+    } catch (e) {
+      print("WS Error handling chat message: $e");
+    }
+  }
+
+  // --- 2. ADD NEW REGISTRATION METHODS ---
+  void registerCashPaymentPendingListener(Function(dynamic) listener) {
+    _cashPaymentPendingListeners.add(listener);
+    print(
+      "WebSocketService: Registered cash_payment:pending listener. Count: ${_cashPaymentPendingListeners.length}",
+    );
+  }
+
+  void unregisterCashPaymentPendingListener(Function(dynamic) listener) {
+    _cashPaymentPendingListeners.remove(listener);
+  }
+
+  void registerPaymentConfirmedListener(Function(dynamic) listener) {
+    _paymentConfirmedListeners.add(listener);
+    print(
+      "WebSocketService: Registered payment:confirmed listener. Count: ${_paymentConfirmedListeners.length}",
+    );
+  }
+
+  void unregisterPaymentConfirmedListener(Function(dynamic) listener) {
+    _paymentConfirmedListeners.remove(listener);
+  }
+
+  void registerWalletUpdateListener(Function(dynamic) listener) {
+    _walletUpdateListeners.add(listener);
+  }
+
+  void unregisterWalletUpdateListener(Function(dynamic) listener) {
+    _walletUpdateListeners.remove(listener);
+  }
+
+  void registerPaymentProcessedListener(Function(dynamic) listener) {
+    _paymentProcessedListeners.add(listener);
+  }
+
+  void unregisterPaymentProcessedListener(Function(dynamic) listener) {
+    _paymentProcessedListeners.remove(listener);
+  }
 
   // --- Listener Registration Methods ---
   void registerChatListener(Function(dynamic) listener) {
@@ -338,6 +457,22 @@ class WebSocketService extends GetxService {
     print(
       "WebSocketService: Unregistered sent confirmation listener. Count: ${_sentConfirmationListeners.length}",
     );
+  }
+
+  void registerEmergencyMessageListener(Function(dynamic) listener) {
+    _emergencyMessageListeners.add(listener);
+  }
+
+  void unregisterEmergencyMessageListener(Function(dynamic) listener) {
+    _emergencyMessageListeners.remove(listener);
+  }
+
+  void registerEmergencyTypingListener(Function(dynamic) listener) {
+    _emergencyTypingListeners.add(listener);
+  }
+
+  void unregisterEmergencyTypingListener(Function(dynamic) listener) {
+    _emergencyTypingListeners.remove(listener);
   }
 
   // --- Setup for All Event Listeners ---
@@ -412,6 +547,116 @@ class WebSocketService extends GetxService {
       }
     });
 
+    // 1. Handle Authentication Errors (Server -> Client)
+    _listen('auth_error', (data) {
+      print('[WebSocket Received] auth_error -> $data');
+      // Payload example: { "message": "Authentication required", "code": "AUTH_REQUIRED" }
+
+      String message = "Authentication error";
+      if (data is Map) {
+        message = data['message'] ?? "Session expired";
+      }
+
+      // Handle logout logic
+      _handleAuthError();
+      // Note: _handleAuthError already disconnects and redirects to login
+    });
+
+    // 2. Handle Generic Errors (Server -> Client)
+    _listen('error', (data) {
+      print('[WebSocket Received] error -> $data');
+      // Payload example: { "message": "Invalid payload", "details": { ... } }
+
+      String title = "Error";
+      String message = "An unexpected error occurred";
+
+      if (data is Map) {
+        message = data['message'] ?? message;
+        if (data['code'] != null) {
+          title = "Error (${data['code']})";
+        }
+      } else if (data is String) {
+        message = data;
+      }
+
+      // Show error to user so they aren't left wondering why nothing happened
+      THelperFunctions.showErrorSnackBar(title, message);
+    });
+
+    _listen('trip:auto_reconnected', (data) async {
+      print('[WS Rcvd] trip:auto_reconnected -> $data');
+
+      if (data is! Map<String, dynamic>) return;
+
+      final tripId = data['tripId'];
+      if (tripId == null) return;
+
+      // Check if we are already handling this trip to avoid loops
+      bool isRiderActive = false;
+      if (Get.isRegistered<RideController>()) {
+        isRiderActive = Get.find<RideController>().rideId.value == tripId;
+      }
+
+      bool isDriverActive = false;
+      if (Get.isRegistered<TripManagementController>()) {
+        final driverController = Get.find<TripManagementController>();
+        isDriverActive = driverController.activeTrip.value?.id == tripId;
+      }
+
+      // If UI is already showing this trip, do nothing
+      if (isRiderActive || isDriverActive) {
+        print(
+          "WS: Already restored trip $tripId. Ignoring auto-reconnect event.",
+        );
+        return;
+      }
+
+      print(
+        "WS: Detected active trip $tripId from socket. Forcing UI restore...",
+      );
+
+      // Determine User Role to call the right controller
+      String userRole = 'client'; // Default
+      if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
+        userRole = Get.find<ClientData>(tag: 'currentUser').role;
+      }
+
+      // Fetch full details from API because socket payload is too small (missing driver info, path, etc)
+      // We reuse the RideService logic meant for Splash Screen
+      try {
+        final rideService = RideService.instance;
+        final response = await rideService.reconnectToTrip(tripId, userRole);
+
+        if (response.status == 'success' && response.data != null) {
+          if (userRole == 'client') {
+            final rideData = RiderReconnectData.fromJson(response.data!);
+            final rideController = Get.put(RideController());
+            await rideController.restoreRideState(rideData);
+            THelperFunctions.showSuccessSnackBar(
+              'Synced',
+              'Trip restored from server.',
+            );
+          } else if (userRole == 'driver') {
+            final driverData = DriverReconnectData.fromJson(response.data!);
+            final tripController = Get.put(TripManagementController());
+            await tripController.restoreDriverRideState(driverData);
+            THelperFunctions.showSuccessSnackBar(
+              'Synced',
+              'Trip restored from server.',
+            );
+          }
+        }
+      } catch (e) {
+        print("WS: Error auto-restoring trip from socket event: $e");
+      }
+    });
+
+    _listen('trip:peer_reconnected', (data) {
+      print('[WS Rcvd] trip:peer_reconnected -> $data');
+      final userType = data['userType'] ?? 'The other party';
+      THelperFunctions.showSnackBar('$userType has reconnected.');
+    });
+
     _listen('chat:newMessage', (data) {
       print('[WS Rcvd] chat:newMessage -> $data');
       try {
@@ -432,6 +677,12 @@ class WebSocketService extends GetxService {
           "WS Error finding/calling ChatController for chat:newMessage : $e",
         );
       }
+    });
+
+    _listen('chat:directMessage', (data) {
+      print('[WS Rcvd] chat:directMessage -> $data');
+      // Reuse the same handler since the payload structure is identical
+      _handleIncomingChatMessage(data);
     });
 
     _listen('chat:sent', (data) {
@@ -592,29 +843,37 @@ class WebSocketService extends GetxService {
     // Client Ride Events
     _listen('ride:accepted', (data) {
       print('[WS Rcvd] ride:accepted -> $data');
-      if (data is Map<String, dynamic> &&
-          data['driverId'] != null &&
-          data['tripId'] != null) {
+      if (data is Map<String, dynamic>) {
         try {
           final rideController = Get.find<RideController>();
 
-          // --- MODIFICATION: Parse the nested 'driver' object ---
           final driverData = data['driver'] as Map<String, dynamic>? ?? {};
           final vehicleData =
               driverData['vehicleDetails'] as Map<String, dynamic>? ?? {};
 
-          // Use driverData for name, vehicle, etc.
           final String driverName =
               driverData['name'] ?? data['driverName'] ?? 'Driver';
+          final String driverPhone =
+              driverData['phoneNumber'] ?? data['driverPhone'] ?? '';
           final String carModel = vehicleData['make'] ?? 'Vehicle';
           final String plateNumber = vehicleData['licensePlate'] ?? 'N/A';
-          final double driverRating =
-              (driverData['rating'] as num?)?.toDouble() ??
-              4.5; // Assuming rating might be in 'driver' obj
-          final String eta =
-              data['eta'] ?? '...'; // ETA is still at root in example
+          final String eta = data['eta'] ?? '...';
 
-          // Get driver location (fallback to pickup)
+          // --- FIX: Safe Rating Parsing ---
+          double driverRating = 4.5;
+          final rawRating = driverData['rating'];
+
+          if (rawRating is num) {
+            driverRating = rawRating.toDouble();
+          } else if (rawRating is Map) {
+            // If rating is an object { average: null, ... }
+            final avg = rawRating['average'];
+            if (avg is num) {
+              driverRating = avg.toDouble();
+            }
+          }
+          // --------------------------------
+
           LatLng driverLoc =
               rideController.pickupLocation.value ?? const LatLng(6.52, 3.37);
           if (data['driverLocation'] is Map) {
@@ -626,31 +885,23 @@ class WebSocketService extends GetxService {
               driverLoc = LatLng(lat, lng);
             }
           }
-          // --- END MODIFICATION ---
 
           final driverDetails = Driver(
+            id: data['driverId'] ?? '',
             name: driverName,
             rating: driverRating,
             carModel: carModel,
             plateNumber: plateNumber,
+            phoneNumber: driverPhone,
             eta: eta,
             location: driverLoc,
           );
 
-          // Get chatId from the root
           final chatId = data['chatId'] as String? ?? '';
-          if (chatId.isEmpty) {
-            print("WS Warning: ride:accepted missing chatId.");
-          }
-
           rideController.handleRideAccepted(driverDetails, chatId);
         } catch (e) {
-          print(
-            "WS Error handling ride:accepted : $e. Controller might not be ready or data invalid.",
-          );
+          print("WS Error handling ride:accepted : $e");
         }
-      } else {
-        print("WS: Invalid data format for ride:accepted");
       }
     });
 
@@ -690,7 +941,7 @@ class WebSocketService extends GetxService {
       if (data is Map<String, dynamic>) {
         try {
           final rideController = Get.find<RideController>();
-          rideController.handleRideStarted();
+          rideController.handleRideStarted(data); // <-- PASS THE DATA
         } catch (e) {
           print("WS Error handling ride:started : $e");
         }
@@ -698,21 +949,35 @@ class WebSocketService extends GetxService {
         print("WS: Invalid data format for ride:started");
       }
     });
+    _listen('driver:location:live', (data) {
+      // --- DEBUG LOGGING ---
+      print('[WS Rcvd] driver:location:live -> $data');
 
-    _listen('ride:locationUpdated', (data) {
-      // print('[WS Rcvd] ride:locationUpdated -> $data'); // Verbose
       if (data is Map<String, dynamic> &&
-          data['latitude'] is num &&
-          data['longitude'] is num) {
+          data['latitude'] != null &&
+          data['longitude'] != null) {
         try {
-          final rideController = Get.find<RideController>();
+          // Parse coordinates safely
           final lat = (data['latitude'] as num).toDouble();
           final lng = (data['longitude'] as num).toDouble();
-          rideController.updateDriverLocationOnMap(LatLng(lat, lng));
+
+          // Log for debugging
+          print("Updating Map Marker to: $lat, $lng");
+
+          // Find controller and update
+          if (Get.isRegistered<RideController>()) {
+            Get.find<RideController>().updateDriverLocationOnMap(
+              LatLng(lat, lng),
+            );
+          } else {
+            print("RideController not found! Cannot update map.");
+          }
         } catch (e) {
-          // Silently fail if ride controller isn't registered
+          print("Error updating driver location: $e");
         }
-      } // Ignore invalid data silently
+      } else {
+        print("Invalid data format for driver:location:live");
+      }
     });
 
     _listen('ride:completed', (data) {
@@ -720,11 +985,8 @@ class WebSocketService extends GetxService {
       if (data is Map<String, dynamic>) {
         try {
           final rideController = Get.find<RideController>();
-          final finalFare =
-              (data['finalFare'] as num?)?.toDouble() ??
-              rideController.selectedRideType.value?.price.toDouble() ??
-              0.0;
-          rideController.handleRideCompleted(finalFare);
+          // Pass the entire data map to the controller
+          rideController.handleRideCompleted(data);
         } catch (e) {
           print("WS Error handling ride:completed : $e");
         }
@@ -732,6 +994,108 @@ class WebSocketService extends GetxService {
         print("WS: Invalid data format for ride:completed");
       }
     });
+
+    _listen('cash_payment:pending', (data) {
+      print('[WS Rcvd] cash_payment:pending -> $data');
+      // This event is primarily for the DRIVER
+      for (var listener in List.from(_cashPaymentPendingListeners)) {
+        try {
+          listener(data);
+        } catch (e) {
+          print("WS Error in cash_payment:pending listener: $e");
+        }
+      }
+    });
+
+    _listen('payment:confirmed', (data) {
+      print('[WS Rcvd] payment:confirmed -> $data');
+      // This event is for BOTH rider and driver
+      for (var listener in List.from(_paymentConfirmedListeners)) {
+        try {
+          listener(data);
+        } catch (e) {
+          print("WS Error in payment:confirmed listener: $e");
+        }
+      }
+    });
+
+    // Event: wallet:update
+    // Triggered when balance changes (trip earning, withdrawal, etc.)
+    _listen('wallet:update', (data) {
+      print('[WS Rcvd] wallet:update -> $data');
+      for (var listener in List.from(_walletUpdateListeners)) {
+        try {
+          listener(data);
+        } catch (e) {
+          print("WS Error in wallet:update listener: $e");
+        }
+      }
+    });
+
+    // Event: payment:processed
+    // Triggered when a payout/transfer is confirmed by Paystack
+    _listen('payment:processed', (data) {
+      print('[WS Rcvd] payment:processed -> $data');
+      for (var listener in List.from(_paymentProcessedListeners)) {
+        try {
+          listener(data);
+        } catch (e) {
+          print("WS Error in payment:processed listener: $e");
+        }
+      }
+    });
+
+    // --- CALL EVENTS ---
+    _listen('call:incoming', (data) {
+      print('[WS] Incoming call: $data');
+      if (Get.isRegistered<CallController>()) {
+        Get.find<CallController>().handleIncomingCall(data);
+      }
+    });
+
+    _listen('call:answered', (data) {
+      print('[WS] Call answered: $data');
+      if (Get.isRegistered<CallController>()) {
+        Get.find<CallController>().handleCallAccepted(data);
+      }
+    });
+
+    _listen('call:rejected', (data) {
+      print('[WS] Call rejected: $data');
+      if (Get.isRegistered<CallController>()) {
+        Get.find<CallController>().handleCallRejected(data);
+      }
+    });
+
+    _listen('call:ended', (data) {
+      print('[WS] Call ended: $data');
+      if (Get.isRegistered<CallController>()) {
+        Get.find<CallController>().handleCallEnded(data);
+      }
+    });
+    // --- Emergency Events ---
+    _listen('emergency:newMessage', (data) {
+      print('[WS Rcvd] emergency:newMessage -> $data');
+      for (var listener in List.from(_emergencyMessageListeners)) {
+        try {
+          listener(data);
+        } catch (e) {
+          print(e);
+        }
+      }
+    });
+
+    _listen('emergency:typing', (data) {
+      // print('[WS Rcvd] emergency:typing');
+      for (var listener in List.from(_emergencyTypingListeners)) {
+        try {
+          listener(data);
+        } catch (e) {
+          print(e);
+        }
+      }
+    });
+    // --- END MODIFIED ---
     // --- End App-Specific Listeners ---
 
     print("WebSocket event listeners set up.");

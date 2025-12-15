@@ -4,35 +4,43 @@ import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
 class Driver {
+  final String id;
   final String name;
   final double rating;
   final String carModel;
   final String plateNumber;
+  final String phoneNumber;
   final String eta;
   final LatLng location;
 
   Driver({
+    required this.id,
     required this.name,
     required this.rating,
     required this.carModel,
     required this.plateNumber,
+    required this.phoneNumber,
     required this.eta,
     required this.location,
   });
 
   Driver copyWith({
+    String? id,
     String? name,
     double? rating,
     String? carModel,
     String? plateNumber,
+    String? phoneNumber,
     String? eta,
     LatLng? location,
   }) {
     return Driver(
+      id: id ?? this.id,
       name: name ?? this.name,
       rating: rating ?? this.rating,
       carModel: carModel ?? this.carModel,
       plateNumber: plateNumber ?? this.plateNumber,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
       eta: eta ?? this.eta,
       location: location ?? this.location,
     );
@@ -56,7 +64,7 @@ class DriverInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -78,8 +86,8 @@ class DriverInfoCard extends StatelessWidget {
                 radius: isCompact ? 20 : 30,
                 backgroundColor: TColors.primary,
                 child: Icon(
-                  Icons.person, 
-                  color: Colors.white, 
+                  Icons.person,
+                  color: Colors.white,
                   size: isCompact ? 20 : 30,
                 ),
               ),
@@ -91,7 +99,7 @@ class DriverInfoCard extends StatelessWidget {
                     Text(
                       driver.name,
                       style: TextStyle(
-                        fontSize: isCompact ? 16 : 18, 
+                        fontSize: isCompact ? 16 : 18,
                         fontWeight: FontWeight.bold,
                         color: dark ? TColors.white : TColors.black,
                       ),
@@ -125,8 +133,10 @@ class DriverInfoCard extends StatelessWidget {
               ),
             ],
           ),
-          
-          if (onCallPressed != null && onMessagePressed != null && !isCompact) ...[
+
+          if (onCallPressed != null &&
+              onMessagePressed != null &&
+              !isCompact) ...[
             const SizedBox(height: 20),
             Row(
               children: [
@@ -180,7 +190,11 @@ class DriverInfoCard extends StatelessWidget {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.message, color: Colors.white, size: 20),
+                              Icon(
+                                Icons.message,
+                                color: Colors.white,
+                                size: 20,
+                              ),
                               SizedBox(width: 8),
                               Text(
                                 'Message',
@@ -204,4 +218,4 @@ class DriverInfoCard extends StatelessWidget {
       ),
     );
   }
-} 
+}

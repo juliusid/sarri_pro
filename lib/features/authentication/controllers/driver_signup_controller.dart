@@ -1,5 +1,3 @@
-// lib/features/authentication/controllers/driver_signup_controller.dart
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -9,7 +7,7 @@ import 'package:sarri_ride/features/authentication/services/auth_service.dart';
 import 'package:sarri_ride/utils/formatters/formatter.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
-enum DriverSignupStep { email, otp, details }
+enum DriverSignupStep { email, otp, phone, phoneOtp, details }
 
 class DriverSignupController extends GetxController {
   static DriverSignupController get instance => Get.find();
@@ -26,15 +24,23 @@ class DriverSignupController extends GetxController {
   final otpController = TextEditingController();
   final otpFormKey = GlobalKey<FormState>();
 
-  // Step 3: Details Form
+  // Step 3: Phone (This stores the verified number)
+  final phoneNumberController = TextEditingController();
+  final phoneFormKey = GlobalKey<FormState>();
+
+  // Step 4: Phone OTP
+  final phoneOtpController = TextEditingController();
+  final phoneOtpFormKey = GlobalKey<FormState>();
+
+  // Step 5: Details Form
   final detailsFormKey = GlobalKey<FormState>();
   // --- Personal Info
   final firstNameController = TextEditingController();
   final lastNameController = TextEditingController();
   final passwordController = TextEditingController();
-  final phoneNumberController = TextEditingController();
+  // NOTE: phoneNumberController is NOT here, we reuse the one from Step 3
   final dobController = TextEditingController();
-  final genderController = TextEditingController(); // Or use a RxString
+  final genderController = TextEditingController();
   // --- License Info
   final licenseNumberController = TextEditingController();
   final licenseIssueDateController = TextEditingController();
@@ -64,11 +70,11 @@ class DriverSignupController extends GetxController {
     pageController.dispose();
     emailController.dispose();
     otpController.dispose();
-    // Dispose all other controllers...
+    phoneNumberController.dispose();
+    phoneOtpController.dispose();
     firstNameController.dispose();
     lastNameController.dispose();
     passwordController.dispose();
-    phoneNumberController.dispose();
     dobController.dispose();
     genderController.dispose();
     licenseNumberController.dispose();
@@ -110,41 +116,58 @@ class DriverSignupController extends GetxController {
         curve: Curves.ease,
       );
     } else {
-      Get.back(); // Go back from the first step
+      Get.back();
     }
   }
 
   // --- API Calls ---
 
-  // Step 1: Verify Email
   Future<void> sendVerificationEmail() async {
     if (!emailFormKey.currentState!.validate()) return;
     isLoading.value = true;
     try {
       final result = await AuthService.instance.sendRegistrationOtp(
         emailController.text.trim(),
-        'driver', // Specify the role
+        'driver',
       );
       if (result.success) {
-        // --- CORRECTED ---
         THelperFunctions.showSuccessSnackBar(
           'Success',
           result.message ?? 'OTP sent successfully!',
         );
-        nextStep();
+        nextStep(); // Normal flow: Go to OTP screen
       } else {
-        // --- CORRECTED ---
-        THelperFunctions.showErrorSnackBar(
-          'Error',
-          result.error ?? 'Failed to send OTP.',
-        );
+        // --- FIX START: Handle "Email already verified" ---
+        if (result.error != null &&
+            result.error!.toString().toLowerCase().contains(
+              'email already verified',
+            )) {
+          THelperFunctions.showSuccessSnackBar(
+            'Welcome Back',
+            'Email already verified. Resuming registration...',
+          );
+
+          // Skip Email OTP (index 1) and jump to Phone Number (index 2)
+          currentStep.value = DriverSignupStep.phone;
+          pageController.animateToPage(
+            DriverSignupStep.phone.index,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.ease,
+          );
+        } else {
+          // Normal Error
+          THelperFunctions.showErrorSnackBar(
+            'Error',
+            result.error ?? 'Failed to send OTP.',
+          );
+        }
+        // --- FIX END ---
       }
     } finally {
       isLoading.value = false;
     }
   }
 
-  // Step 2: Verify OTP
   Future<void> verifyOtp() async {
     if (!otpFormKey.currentState!.validate()) return;
     isLoading.value = true;
@@ -152,17 +175,15 @@ class DriverSignupController extends GetxController {
       final result = await AuthService.instance.verifyRegistrationOtp(
         emailController.text.trim(),
         otpController.text.trim(),
-        'driver', // Specify the role
+        'driver',
       );
       if (result.success) {
-        // --- CORRECTED ---
         THelperFunctions.showSuccessSnackBar(
           'Success',
           result.message ?? 'Email verified!',
         );
-        nextStep();
+        nextStep(); // Moves to Phone Number step
       } else {
-        // --- CORRECTED ---
         THelperFunctions.showErrorSnackBar(
           'Error',
           result.error ?? 'Invalid OTP.',
@@ -173,12 +194,72 @@ class DriverSignupController extends GetxController {
     }
   }
 
-  // Step 3: Register Driver Details
+  // --- PHONE VERIFICATION LOGIC ---
+
+  String get formattedPhoneNumber {
+    return TFormatter.formatNigeriaPhoneNumber(
+      phoneNumberController.text.trim(),
+    );
+  }
+
+  // Step 3: Send Phone OTP
+  Future<void> sendPhoneVerificationOtp() async {
+    if (!phoneFormKey.currentState!.validate()) return;
+    isLoading.value = true;
+    try {
+      final result = await AuthService.instance.sendPhoneOtp(
+        formattedPhoneNumber,
+        'driver',
+      );
+      if (result.success) {
+        THelperFunctions.showSuccessSnackBar(
+          'Success',
+          result.message ?? 'OTP sent to phone!',
+        );
+        nextStep(); // Moves to Phone OTP step
+      } else {
+        THelperFunctions.showErrorSnackBar(
+          'Error',
+          result.error ?? 'Failed to send Phone OTP.',
+        );
+      }
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // Step 4: Verify Phone OTP
+  Future<void> verifyPhoneOtp() async {
+    if (!phoneOtpFormKey.currentState!.validate()) return;
+    isLoading.value = true;
+    try {
+      final result = await AuthService.instance.verifyPhoneOtp(
+        formattedPhoneNumber,
+        phoneOtpController.text.trim(),
+        'driver',
+      );
+      if (result.success) {
+        THelperFunctions.showSuccessSnackBar(
+          'Success',
+          result.message ?? 'Phone verified!',
+        );
+        nextStep(); // Moves to Details Form
+      } else {
+        THelperFunctions.showErrorSnackBar(
+          'Error',
+          result.error ?? 'Invalid Phone OTP.',
+        );
+      }
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // Step 5: Final Registration
   Future<void> registerDriverDetails() async {
     if (!detailsFormKey.currentState!.validate()) return;
     isLoading.value = true;
     try {
-      // --- FIX: Ensure required permanentAddress fields are included ---
       String finalPermanentState = permanentStateController.text.trim().isEmpty
           ? currentStateController.text.trim()
           : permanentStateController.text.trim();
@@ -186,45 +267,43 @@ class DriverSignupController extends GetxController {
       String finalPermanentCity = permanentCityController.text.trim().isEmpty
           ? currentCityController.text.trim()
           : permanentCityController.text.trim();
-      // --- END FIX ---
-      final formattedPhoneNumber = TFormatter.formatNigeriaPhoneNumber(
-        phoneNumberController.text.trim(),
+
+      final formattedEmergencyContact = TFormatter.formatNigeriaPhoneNumber(
+        emergencyContactController.text.trim(),
       );
 
-      final formattedemergencyContactNumber =
-          TFormatter.formatNigeriaPhoneNumber(
-            emergencyContactController.text.trim(),
-          );
+      // We use 'formattedPhoneNumber' here which grabs the text from
+      // the phoneNumberController used in Step 3
 
-      // Create the request object from controllers
       final request = DriverRegistrationRequest(
         email: emailController.text.trim(),
         FirstName: firstNameController.text.trim(),
         LastName: lastNameController.text.trim(),
         password: passwordController.text.trim(),
-        phoneNumber: formattedPhoneNumber,
-        DateOfBirth: dobController.text.trim(), // Ensure format is YYYY-MM-DD
+        phoneNumber:
+            formattedPhoneNumber, // <-- USING VERIFIED NUMBER FROM STEP 3
+        DateOfBirth: dobController.text.trim(),
         Gender: genderController.text.trim().toLowerCase(),
         licenseNumber: licenseNumberController.text.trim(),
         drivingLicense: DrivingLicense(
-          issueDate: licenseIssueDateController.text.trim(), // YYYY-MM-DD
-          expiryDate: licenseExpiryDateController.text.trim(), // YYYY-MM-DD
+          issueDate: licenseIssueDateController.text.trim(),
+          expiryDate: licenseExpiryDateController.text.trim(),
         ),
         currentAddress: Address(
           address: currentAddressController.text.trim(),
           state: currentStateController.text.trim(),
           city: currentCityController.text.trim(),
           country: 'Nigeria',
-          postalCode: '100001', // Placeholder
+          postalCode: '100001',
         ),
         permanentAddress: Address(
           address: permanentAddressController.text.trim(),
           state: finalPermanentState,
           city: finalPermanentCity,
           country: 'Nigeria',
-          postalCode: '100001', // Placeholder
+          postalCode: '100001',
         ),
-        emergencyContactNumber: formattedemergencyContactNumber,
+        emergencyContactNumber: formattedEmergencyContact,
         bankDetails: BankDetails(
           bankAccountNumber: bankAccountNumberController.text.trim(),
           bankName: bankNameController.text.trim(),
@@ -239,28 +318,24 @@ class DriverSignupController extends GetxController {
         seat: int.tryParse(vehicleSeatController.text.trim()) ?? 4,
       );
 
-      print('Sending Driver Registration Request:');
-      print(json.encode(request.toJson()));
+      print('Sending Driver Registration Request...');
+      // print(json.encode(request.toJson()));
 
       final result = await AuthService.instance.registerDriver(request);
 
       if (result.success) {
-        // --- CORRECTED ---
         THelperFunctions.showSuccessSnackBar(
           'Success',
           result.message ?? 'Registration successful! Please login.',
         );
-        // Navigate to login screen after successful registration
         Get.offAll(() => const LoginScreenGetX());
       } else {
-        // --- CORRECTED ---
         THelperFunctions.showErrorSnackBar(
           'Registration Failed',
           result.error ?? 'Registration failed.',
         );
       }
     } catch (e) {
-      // --- CORRECTED ---
       THelperFunctions.showErrorSnackBar("An error occurred", e.toString());
     } finally {
       isLoading.value = false;

@@ -77,7 +77,7 @@ class THelperFunctions {
       colorText: TColors.white,
       backgroundColor: TColors.error.withOpacity(0.9), //
       snackPosition: SnackPosition.TOP,
-      duration: const Duration(seconds: 3),
+      duration: const Duration(seconds: 10),
       margin: const EdgeInsets.all(15),
       icon: const Icon(Iconsax.warning_2, color: TColors.white),
     );

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:sarri_ride/features/driver/controllers/driver_dashboard_controller.dart';
+import 'package:sarri_ride/features/driver/controllers/driver_wallet_controller.dart';
+import 'package:sarri_ride/features/driver/screens/driver_trips_screen.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
@@ -11,7 +14,8 @@ class DriverEarningsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.find<DriverDashboardController>();
+    // --- 2. PUT THE NEW CONTROLLER ---
+    final controller = Get.put(DriverWalletController());
     final dark = THelperFunctions.isDarkMode(context);
 
     return Scaffold(
@@ -33,7 +37,7 @@ class DriverEarningsScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Earnings Period Selector
-            _buildPeriodSelector(context, dark),
+            _buildPeriodSelector(context, dark, controller),
 
             const SizedBox(height: TSizes.spaceBtwSections),
 
@@ -42,25 +46,32 @@ class DriverEarningsScreen extends StatelessWidget {
 
             const SizedBox(height: TSizes.spaceBtwSections),
 
-            // Earnings Breakdown
+            // Earnings Breakdown (from stats)
             _buildEarningsBreakdown(context, controller, dark),
 
             const SizedBox(height: TSizes.spaceBtwSections),
 
-            // Performance Metrics
+            // Performance Metrics (from stats)
             _buildPerformanceMetrics(context, controller, dark),
 
             const SizedBox(height: TSizes.spaceBtwSections),
 
-            // Recent Trips Summary
-            _buildRecentTripsSection(context, controller, dark),
+            // Recent Transactions
+            _buildRecentTransactionsSection(context, controller, dark),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPeriodSelector(BuildContext context, bool dark) {
+  // --- 3. UPDATE PERIOD SELECTOR TO CALL CONTROLLER ---
+  Widget _buildPeriodSelector(
+    BuildContext context,
+    bool dark,
+    DriverWalletController controller,
+  ) {
+    // We'll need to make this stateful or add RxString to controller
+    // For now, let's just make it call the controller
     return Container(
       padding: const EdgeInsets.all(TSizes.xs),
       decoration: BoxDecoration(
@@ -69,41 +80,72 @@ class DriverEarningsScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _buildPeriodTab('Today', true, dark),
-          _buildPeriodTab('Week', false, dark),
-          _buildPeriodTab('Month', false, dark),
-          _buildPeriodTab('All Time', false, dark),
+          _buildPeriodTab(
+            'Today',
+            false,
+            dark,
+            () => controller.fetchWalletStatistics('today'),
+          ),
+          _buildPeriodTab(
+            'Week',
+            false,
+            dark,
+            () => controller.fetchWalletStatistics('week'),
+          ),
+          _buildPeriodTab(
+            'Month',
+            true,
+            dark,
+            () => controller.fetchWalletStatistics('month'),
+          ),
+          _buildPeriodTab(
+            'All Time',
+            false,
+            dark,
+            () => controller.fetchWalletStatistics('all'),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildPeriodTab(String title, bool isSelected, bool dark) {
+  Widget _buildPeriodTab(
+    String title,
+    bool isSelected,
+    bool dark,
+    VoidCallback onTap,
+  ) {
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: TSizes.sm + TSizes.xs),
-        decoration: BoxDecoration(
-          color: isSelected ? TColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(TSizes.borderRadiusLg),
-        ),
-        child: Text(
-          title,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: isSelected
-                ? TColors.white
-                : (dark ? TColors.light : TColors.dark),
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-            fontSize: TSizes.fontSizeSm,
+      child: GestureDetector(
+        // Use GestureDetector to get onTap
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: TSizes.sm + TSizes.xs),
+          decoration: BoxDecoration(
+            color: isSelected ? TColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(TSizes.borderRadiusLg),
+          ),
+          child: Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isSelected
+                  ? TColors.white
+                  : (dark ? TColors.light : TColors.dark),
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              fontSize: TSizes.fontSizeSm,
+            ),
           ),
         ),
       ),
     );
   }
+  // --- END 3 ---
 
+  // --- 4. UPDATE EARNINGS CARD ---
   Widget _buildTotalEarningsCard(
     BuildContext context,
-    DriverDashboardController controller,
+    DriverWalletController controller,
     bool dark,
   ) {
     return Obx(
@@ -111,6 +153,7 @@ class DriverEarningsScreen extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(TSizes.defaultSpace),
         decoration: BoxDecoration(
+          // ... (decoration is unchanged)
           gradient: LinearGradient(
             colors: [TColors.success, TColors.success.withOpacity(0.8)],
             begin: Alignment.topLeft,
@@ -125,163 +168,186 @@ class DriverEarningsScreen extends StatelessWidget {
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(TSizes.sm + TSizes.xs),
-                  decoration: BoxDecoration(
-                    color: TColors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(
-                      TSizes.borderRadiusSm + TSizes.sm,
+        child: controller.isLoadingStats.value
+            ? const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    // ... (icon is unchanged)
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(TSizes.sm + TSizes.xs),
+                        decoration: BoxDecoration(
+                          color: TColors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(
+                            TSizes.borderRadiusSm + TSizes.sm,
+                          ),
+                        ),
+                        child: Icon(
+                          Iconsax.wallet_3,
+                          color: TColors.white,
+                          size: TSizes.iconLg,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${(controller.walletStats['period'] as String?)?.capitalizeFirst ?? '...'} Earnings',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: TColors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: TSizes.spaceBtwItems),
+                  Text(
+                    // Use formatted string from API or format it
+                    controller
+                            .walletStats['statistics']?['trip_earning']?['total']
+                            ?.toStringAsFixed(2) ??
+                        '₦0.00',
+                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                      color: TColors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 36,
                     ),
                   ),
-                  child: Icon(
-                    Iconsax.wallet_3,
-                    color: TColors.white,
-                    size: TSizes.iconLg,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  'Today\'s Earnings',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: TColors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: TSizes.spaceBtwItems),
-            Text(
-              controller.formattedTodayEarnings,
-              style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                color: TColors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 36,
-              ),
-            ),
-            const SizedBox(height: TSizes.spaceBtwItems / 2),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: TSizes.sm,
-                    vertical: TSizes.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: TColors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(TSizes.md + TSizes.sm),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                  const SizedBox(height: TSizes.spaceBtwItems / 2),
+                  Row(
                     children: [
-                      Icon(
-                        Icons.trending_up,
-                        color: TColors.white,
-                        size: TSizes.iconSm,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: TSizes.sm,
+                          vertical: TSizes.xs,
+                        ),
+                        decoration: BoxDecoration(
+                          color: TColors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(
+                            TSizes.md + TSizes.sm,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.trending_up,
+                              color: TColors.white,
+                              size: TSizes.iconSm,
+                            ),
+                            const SizedBox(width: TSizes.xs),
+                            Text(
+                              '+12.5%',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: TColors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(width: TSizes.xs),
+                      const SizedBox(width: TSizes.sm),
                       Text(
-                        '+12.5%',
+                        'vs yesterday',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: TColors.white,
-                          fontWeight: FontWeight.w600,
+                          color: TColors.white.withOpacity(0.7),
                         ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(width: TSizes.sm),
-                Text(
-                  'vs yesterday',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: TColors.white.withOpacity(0.7),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+                ],
+              ),
       ),
     );
   }
 
+  // --- 5. UPDATE BREAKDOWN CARD ---
   Widget _buildEarningsBreakdown(
     BuildContext context,
-    DriverDashboardController controller,
+    DriverWalletController controller,
     bool dark,
   ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Earnings Breakdown',
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+    return Obx(
+      () => Container(
+        padding: const EdgeInsets.all(TSizes.defaultSpace),
+        decoration: BoxDecoration(
+          color: dark ? TColors.cardBackgroundDark : TColors.cardBackground,
+          borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
+          boxShadow: [
+            BoxShadow(
+              color: TColors.black.withOpacity(dark ? 0.3 : 0.1),
+              blurRadius: TSizes.sm,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        const SizedBox(height: TSizes.spaceBtwItems),
-        Container(
-          padding: const EdgeInsets.all(TSizes.defaultSpace),
-          decoration: BoxDecoration(
-            color: dark ? TColors.cardBackgroundDark : TColors.cardBackground,
-            borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
-            boxShadow: [
-              BoxShadow(
-                color: TColors.black.withOpacity(dark ? 0.3 : 0.1),
-                blurRadius: TSizes.sm,
-                offset: const Offset(0, 2),
+        child: controller.isLoadingStats.value
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Earnings Breakdown (by Type)',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: TSizes.spaceBtwItems),
+
+                  // This is an example. You'd loop over controller.walletStats['statistics']
+                  _buildBreakdownItem(
+                    'Trip Earnings',
+                    (controller.walletStats['statistics']?['trip_earning']?['total'] ??
+                            0.0)
+                        .toStringAsFixed(2),
+                    '${(controller.walletStats['statistics']?['trip_earning']?['count'] ?? 0)} trips',
+                    TColors.primary,
+                    context,
+                  ),
+                  Divider(
+                    height: TSizes.spaceBtwItems * 2,
+                    color: dark ? TColors.darkGrey : TColors.grey,
+                  ),
+                  _buildBreakdownItem(
+                    'Bonuses',
+                    (controller.walletStats['statistics']?['bonus']?['total'] ??
+                            0.0)
+                        .toStringAsFixed(2),
+                    '${(controller.walletStats['statistics']?['bonus']?['count'] ?? 0)} bonuses',
+                    TColors.success,
+                    context,
+                  ),
+                  Divider(
+                    height: TSizes.spaceBtwItems * 2,
+                    color: dark ? TColors.darkGrey : TColors.grey,
+                  ),
+                  _buildBreakdownItem(
+                    'Withdrawals',
+                    (controller.walletStats['statistics']?['withdrawal']?['total'] ??
+                            0.0)
+                        .toStringAsFixed(2),
+                    '${(controller.walletStats['statistics']?['withdrawal']?['count'] ?? 0)} withdrawals',
+                    TColors.warning,
+                    context,
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Column(
-            children: [
-              _buildBreakdownItem(
-                'Ride Earnings',
-                '₦25,200',
-                '88.4%',
-                TColors.primary,
-                context,
-              ),
-              Divider(
-                height: TSizes.spaceBtwItems * 2,
-                color: dark ? TColors.darkGrey : TColors.grey,
-              ),
-              _buildBreakdownItem(
-                'Tips',
-                '₦2,100',
-                '7.4%',
-                TColors.success,
-                context,
-              ),
-              Divider(
-                height: TSizes.spaceBtwItems * 2,
-                color: dark ? TColors.darkGrey : TColors.grey,
-              ),
-              _buildBreakdownItem(
-                'Bonuses',
-                '₦1,200',
-                '4.2%',
-                TColors.warning,
-                context,
-              ),
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
 
   Widget _buildBreakdownItem(
     String title,
     String amount,
-    String percentage,
+    String percentage, // We'll reuse this as 'count'
     Color color,
     BuildContext context,
   ) {
+    // ... (widget is unchanged, but 'percentage' is now 'count')
     return Row(
       children: [
         Container(
@@ -302,13 +368,13 @@ class DriverEarningsScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              amount,
+              "₦$amount", // Add currency
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             Text(
-              percentage,
+              percentage, // This is now the 'count'
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: color,
                 fontWeight: FontWeight.w600,
@@ -320,77 +386,59 @@ class DriverEarningsScreen extends StatelessWidget {
     );
   }
 
+  // --- 6. UPDATE PERFORMANCE METRICS ---
   Widget _buildPerformanceMetrics(
     BuildContext context,
-    DriverDashboardController controller,
+    DriverWalletController controller,
     bool dark,
   ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Performance Metrics',
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: TSizes.spaceBtwItems),
-        Row(
-          children: [
-            Expanded(
-              child: _buildMetricCard(
-                'Trips',
-                controller.todayTripsCount.value.toString(),
-                Iconsax.route_square,
-                TColors.info,
-                context,
-                dark,
+    return Obx(
+      () => Container(
+        child: controller.isLoadingStats.value
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Performance Metrics',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: TSizes.spaceBtwItems),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildMetricCard(
+                          'Total Trips',
+                          (controller.walletStats['totalTrips'] ?? 0)
+                              .toString(),
+                          Iconsax.route_square,
+                          TColors.info,
+                          context,
+                          dark,
+                        ),
+                      ),
+                      const SizedBox(width: TSizes.spaceBtwItems),
+                      Expanded(
+                        child: _buildMetricCard(
+                          'Total Earnings',
+                          (controller.walletStats['totalEarnings'] ?? 0.0)
+                              .toStringAsFixed(0),
+                          Iconsax.money_2,
+                          TColors.primary,
+                          context,
+                          dark,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: TSizes.spaceBtwItems),
-            Expanded(
-              child: _buildMetricCard(
-                'Hours',
-                '${controller.todayHours.value.toStringAsFixed(1)}h',
-                Iconsax.clock,
-                TColors.warning,
-                context,
-                dark,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: TSizes.spaceBtwItems),
-        Row(
-          children: [
-            Expanded(
-              child: Obx(
-                () => _buildMetricCard(
-                  'Rating',
-                  controller.averageRating.value.toStringAsFixed(1),
-                  Iconsax.star1,
-                  TColors.success,
-                  context,
-                  dark,
-                ),
-              ),
-            ),
-            const SizedBox(width: TSizes.spaceBtwItems),
-            Expanded(
-              child: _buildMetricCard(
-                'Avg/Trip',
-                '₦3,562',
-                Iconsax.money_2,
-                TColors.primary,
-                context,
-                dark,
-              ),
-            ),
-          ],
-        ),
-      ],
+      ),
     );
   }
+  // --- END 6 ---
 
   Widget _buildMetricCard(
     String title,
@@ -400,6 +448,7 @@ class DriverEarningsScreen extends StatelessWidget {
     BuildContext context,
     bool dark,
   ) {
+    // ... (widget is unchanged)
     return Container(
       padding: const EdgeInsets.all(TSizes.defaultSpace),
       decoration: BoxDecoration(
@@ -426,7 +475,9 @@ class DriverEarningsScreen extends StatelessWidget {
           ),
           const SizedBox(height: TSizes.spaceBtwItems),
           Text(
-            value,
+            title.contains('Earnings')
+                ? '₦$value'
+                : value, // Add currency if earnings
             style: Theme.of(
               context,
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
@@ -443,9 +494,10 @@ class DriverEarningsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRecentTripsSection(
+  // --- 7. REPLACE RECENT TRIPS WITH TRANSACTIONS ---
+  Widget _buildRecentTransactionsSection(
     BuildContext context,
-    DriverDashboardController controller,
+    DriverWalletController controller,
     bool dark,
   ) {
     return Column(
@@ -455,13 +507,15 @@ class DriverEarningsScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Recent Trips',
+              'Recent Transactions',
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             TextButton(
-              onPressed: () => controller.navigateToTrips(),
+              onPressed: () => Get.to(
+                () => const DriverTripsScreen(),
+              ), // Link to full history
               child: Text(
                 'View All',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -473,28 +527,67 @@ class DriverEarningsScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: TSizes.spaceBtwItems),
-        Obx(
-          () => ListView.separated(
+        Obx(() {
+          if (controller.isLoadingTransactions.value &&
+              controller.transactions.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (controller.transactions.isEmpty) {
+            return const Center(child: Text("No transactions found."));
+          }
+
+          return ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: controller.recentTrips.length.clamp(0, 3),
+            itemCount: controller.transactions.length.clamp(0, 5), // Show max 5
             separatorBuilder: (context, index) =>
                 const SizedBox(height: TSizes.spaceBtwItems),
             itemBuilder: (context, index) {
-              final trip = controller.recentTrips[index];
-              return _buildTripCard(trip, context, dark);
+              final tx = controller.transactions[index];
+              return _buildTransactionCard(tx, context, dark);
             },
-          ),
-        ),
+          );
+        }),
       ],
     );
   }
 
-  Widget _buildTripCard(
-    Map<String, dynamic> trip,
+  Widget _buildTransactionCard(
+    WalletTransaction tx,
     BuildContext context,
     bool dark,
   ) {
+    // Determine color and icon based on type
+    Color color;
+    IconData icon;
+    bool isCredit = false;
+
+    switch (tx.type) {
+      case 'trip_earning':
+        color = TColors.success;
+        icon = Iconsax.money_recive;
+        isCredit = true;
+        break;
+      case 'withdrawal':
+        color = TColors.error;
+        icon = Iconsax.money_send;
+        isCredit = false;
+        break;
+      case 'cash_payment': // This is a debit (commission owed)
+        color = TColors.warning;
+        icon = Iconsax.wallet_minus;
+        isCredit = false;
+        break;
+      case 'debt_settlement':
+        color = TColors.info;
+        icon = Iconsax.wallet_add;
+        isCredit = true;
+        break;
+      default:
+        color = TColors.darkGrey;
+        icon = Iconsax.wallet;
+    }
+
     return Container(
       padding: const EdgeInsets.all(TSizes.defaultSpace),
       decoration: BoxDecoration(
@@ -516,14 +609,10 @@ class DriverEarningsScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(TSizes.sm),
                 decoration: BoxDecoration(
-                  color: TColors.success.withOpacity(0.1),
+                  color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(TSizes.borderRadiusMd),
                 ),
-                child: Icon(
-                  Iconsax.location,
-                  color: TColors.success,
-                  size: TSizes.iconSm,
-                ),
+                child: Icon(icon, color: color, size: TSizes.iconSm),
               ),
               const SizedBox(width: TSizes.spaceBtwItems),
               Expanded(
@@ -531,7 +620,7 @@ class DriverEarningsScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      trip['from'] ?? 'Unknown location',
+                      tx.description,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -540,7 +629,7 @@ class DriverEarningsScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'to ${trip['to'] ?? 'Unknown destination'}',
+                      _formatTxDate(tx.date),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: dark ? TColors.lightGrey : TColors.darkGrey,
                       ),
@@ -551,39 +640,11 @@ class DriverEarningsScreen extends StatelessWidget {
                 ),
               ),
               Text(
-                '₦${trip['earnings']?.toStringAsFixed(0) ?? '0'}',
+                '${isCredit ? '+' : '-'}₦${tx.amount.toStringAsFixed(0)}',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: TColors.success,
+                  color: color,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: TSizes.spaceBtwItems),
-          Row(
-            children: [
-              Icon(
-                Iconsax.clock,
-                size: TSizes.fontSizeSm,
-                color: dark ? TColors.lightGrey : TColors.darkGrey,
-              ),
-              const SizedBox(width: TSizes.xs),
-              Text(
-                _formatTripTime(trip['date']),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: dark ? TColors.lightGrey : TColors.darkGrey,
-                ),
-              ),
-              const Spacer(),
-              Row(
-                children: List.generate(5, (starIndex) {
-                  final rating = trip['rating'] ?? 0.0;
-                  return Icon(
-                    starIndex < rating ? Icons.star : Icons.star_border,
-                    size: TSizes.fontSizeSm,
-                    color: TColors.warning,
-                  );
-                }),
               ),
             ],
           ),
@@ -592,20 +653,8 @@ class DriverEarningsScreen extends StatelessWidget {
     );
   }
 
-  String _formatTripTime(DateTime? date) {
+  String _formatTxDate(DateTime? date) {
     if (date == null) return 'Unknown time';
-
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m ago';
-    } else {
-      return 'Just now';
-    }
+    return DateFormat('dd MMM yyyy, h:mm a').format(date);
   }
 }

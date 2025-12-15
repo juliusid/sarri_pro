@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart'; //
+import 'package:sarri_ride/common/widgets/loading_button.dart';
 // --- Local Imports ---
 import 'package:sarri_ride/features/driver/controllers/driver_dashboard_controller.dart'; //
 import 'package:sarri_ride/features/driver/controllers/trip_management_controller.dart'; //
@@ -412,176 +413,92 @@ class DriverDashboardScreen extends StatelessWidget {
 
   // --- UPDATED STATUS CARD WIDGET ---
   Widget _buildStatusCard(
-    //
-    BuildContext context, //
-    DriverDashboardController controller, //
-    bool dark, //
+    BuildContext context,
+    DriverDashboardController controller,
+    bool dark,
   ) {
     return Obx(
-      //
       () => Container(
-        //
-        width: double.infinity, //
-        padding: const EdgeInsets.all(TSizes.defaultSpace), //
+        width: double.infinity,
+        padding: const EdgeInsets.all(TSizes.defaultSpace),
         decoration: BoxDecoration(
-          //
-          color: dark ? TColors.cardBackgroundDark : TColors.cardBackground, //
-          borderRadius: BorderRadius.circular(TSizes.cardRadiusLg), //
+          color: dark ? TColors.cardBackgroundDark : TColors.cardBackground,
+          borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
           boxShadow: [
-            //
             BoxShadow(
-              //
-              color: TColors.black.withOpacity(dark ? 0.3 : 0.1), //
-              blurRadius: TSizes.sm, //
-              offset: const Offset(0, 2), //
+              color: TColors.black.withOpacity(dark ? 0.3 : 0.1),
+              blurRadius: TSizes.sm,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         child: Column(
-          //
           children: [
             // Status Indicator Row
             Row(
-              //
               children: [
                 Container(
-                  //
-                  width: TSizes.sm + TSizes.xs, //
-                  height: TSizes.sm + TSizes.xs, //
+                  width: TSizes.sm + TSizes.xs,
+                  height: TSizes.sm + TSizes.xs,
                   decoration: BoxDecoration(
-                    //
-                    color: controller
-                        .statusColor, // Uses getter that checks isOnBreak
-                    shape: BoxShape.circle, //
+                    color: controller.statusColor,
+                    shape: BoxShape.circle,
                   ),
                 ),
-                const SizedBox(width: TSizes.spaceBtwItems), //
+                const SizedBox(width: TSizes.spaceBtwItems),
                 Expanded(
-                  //
                   child: Text(
-                    //
-                    controller.statusText, // Uses getter that checks isOnBreak
+                    controller.statusText,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      //
-                      fontWeight: FontWeight.w600, //
+                      fontWeight: FontWeight.w600,
                     ),
-                    overflow: TextOverflow.ellipsis, //
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: TSizes.spaceBtwItems), //
+            const SizedBox(height: TSizes.spaceBtwItems),
             // Action Button(s)
-            controller
-                    .isOnBreak
-                    .value // Check if driver is on break
+            controller.isOnBreak.value
                 ? // Show End Break Button
-                  SizedBox(
-                    //
-                    width: double.infinity, //
-                    child: ElevatedButton.icon(
-                      //
-                      icon: Icon(Iconsax.play, color: TColors.white), //
-                      label: Text(
-                        //
-                        'End Break', //
-                        style: TextStyle(
-                          color: TColors.white,
-                          fontWeight: FontWeight.bold,
-                        ), //
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        //
-                        backgroundColor: TColors.warning, //
-                        padding: const EdgeInsets.symmetric(
-                          vertical: TSizes.md,
-                        ), //
-                        shape: RoundedRectangleBorder(
-                          //
-                          borderRadius: BorderRadius.circular(
-                            TSizes.buttonRadius,
-                          ), //
-                        ),
-                      ),
-                      onPressed: () => controller.endBreak(), //
-                    ),
+                  LoadingElevatedButton(
+                    isLoading: controller.isLoadingStatus.value,
+                    text: 'End Break',
+                    icon: Iconsax.play,
+                    onPressed: () => controller.endBreak(),
+                    backgroundColor: TColors.warning,
+                    foregroundColor: TColors.white,
                   )
                 : // Show Go Online/Offline and Take Break Buttons
                   Row(
-                    //
                     children: [
                       Expanded(
-                        //
-                        child: ElevatedButton(
-                          //
-                          onPressed: controller.toggleDriverStatus, //
-                          style: ElevatedButton.styleFrom(
-                            //
-                            backgroundColor:
-                                controller
-                                    .isOnline
-                                    .value //
-                                ? TColors
-                                      .error //
-                                : TColors.success, //
-                            foregroundColor: TColors.white, //
-                            padding: const EdgeInsets.symmetric(
-                              vertical: TSizes.md,
-                            ), //
-                            shape: RoundedRectangleBorder(
-                              //
-                              borderRadius: BorderRadius.circular(
-                                TSizes.buttonRadius,
-                              ), //
-                            ),
-                          ),
-                          child: Text(
-                            //
-                            controller.isOnline.value
-                                ? 'Go Offline'
-                                : 'Go Online', //
-                            style: const TextStyle(
-                              //
-                              fontSize: TSizes.fontSizeMd, //
-                              fontWeight: FontWeight.w600, //
-                            ),
-                          ),
+                        child: LoadingElevatedButton(
+                          isLoading: controller.isLoadingStatus.value,
+                          text: controller.isOnline.value
+                              ? 'Go Offline'
+                              : 'Go Online',
+                          loadingText: controller.isOnline.value
+                              ? 'Going Offline...'
+                              : 'Going Online...',
+                          backgroundColor: controller.isOnline.value
+                              ? TColors.error
+                              : TColors.success,
+                          foregroundColor: TColors.white,
+                          onPressed: controller.toggleDriverStatus,
                         ),
                       ),
                       // Show Take Break button only if driver is online and NOT on a trip
                       if (controller.isOnline.value &&
                           !controller.hasActiveTrip) ...[
-                        //
-                        const SizedBox(width: TSizes.spaceBtwItems), //
-                        OutlinedButton(
-                          //
+                        const SizedBox(width: TSizes.spaceBtwItems),
+                        LoadingOutlinedButton(
+                          isLoading: controller.isLoadingStatus.value,
+                          text: 'Break',
+                          icon: Iconsax.coffee,
+                          foregroundColor: TColors.secondary,
                           onPressed: () =>
-                              _showBreakDurationDialog(context, controller), //
-                          style: OutlinedButton.styleFrom(
-                            //
-                            foregroundColor: TColors.secondary, //
-                            side: BorderSide(color: TColors.secondary), //
-                            padding: const EdgeInsets.symmetric(
-                              vertical: TSizes.md,
-                              horizontal: TSizes.sm,
-                            ), //
-                            shape: RoundedRectangleBorder(
-                              //
-                              borderRadius: BorderRadius.circular(
-                                TSizes.buttonRadius,
-                              ), //
-                            ),
-                          ),
-                          child: const Row(
-                            //
-                            mainAxisSize: MainAxisSize.min, //
-                            children: [
-                              //
-                              Icon(Iconsax.coffee, size: 18), //
-                              SizedBox(width: TSizes.xs), //
-                              Text('Break'), //
-                            ],
-                          ),
+                              _showBreakDurationDialog(context, controller),
                         ),
                       ],
                     ],

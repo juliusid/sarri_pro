@@ -8,11 +8,11 @@ class User {
   final String lastName;
   final String? phoneNumber;
   final UserType userType;
-  final DateTime? createdAt; // Made nullable for flexibility
-  final DateTime? updatedAt; // Made nullable for flexibility
-  final RiderProfile? riderProfile; // For rider users
-  final DriverProfile? driverProfile; // For driver users
-  final String? picture; // Added picture field
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final RiderProfile? riderProfile;
+  final DriverProfile? driverProfile;
+  final String? picture;
 
   User({
     required this.id,
@@ -34,30 +34,28 @@ class User {
   factory User.fromDriverProfileJson(Map<String, dynamic> json) {
     DriverProfile? profile;
     try {
-      profile = DriverProfile.fromJson(
-        json,
-      ); // Use DriverProfile.fromJson directly
+      profile = DriverProfile.fromJson(json);
     } catch (e) {
       print(
         "Error parsing DriverProfile part in User.fromDriverProfileJson: $e",
       );
-      profile = null; // Set profile to null if parsing fails
+      profile = null;
     }
 
     return User(
       id: json['_id'] ?? '',
       email: json['email'] ?? '',
-      firstName: json['FirstName'] ?? '', // Use FirstName from profile
-      lastName: json['LastName'] ?? '', // Use LastName from profile
+      firstName: json['FirstName'] ?? '',
+      lastName: json['LastName'] ?? '',
       phoneNumber: json['phoneNumber'],
-      userType: UserType.driver, // Explicitly set as driver
+      userType: UserType.driver,
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'])
           : null,
       updatedAt: json['updatedAt'] != null
           ? DateTime.tryParse(json['updatedAt'])
           : null,
-      riderProfile: null, // Driver won't have a rider profile
+      riderProfile: null,
       driverProfile: profile,
       picture: json['picture'],
     );
@@ -151,7 +149,7 @@ class RiderProfile {
 }
 
 class DriverProfile {
-  final String userId; // Corresponds to _id in the root of profile data
+  final String userId;
   final DrivingLicenseModel drivingLicense;
   final AddressModel currentAddress;
   final AddressModel permanentAddress;
@@ -160,16 +158,16 @@ class DriverProfile {
   final LocationModel location;
   final bool isVerified;
   final bool adminVerified;
-  final String availabilityStatus; // e.g., "unavailable"
-  final String
-  status; // e.g., "pending", "active" (Matches accountStatus in getStatus)
+  final String availabilityStatus;
+  final String status;
   final DateTime? lastLocationUpdate;
   final DateTime? dateOfBirth;
   final String? gender;
   final String? emergencyContactNumber;
   final String? licenseNumber;
   final int? seat;
-  // Stats - These might come from a different endpoint or be calculated
+
+  // Stats
   final double rating;
   final int totalTrips;
   final double totalEarnings;
@@ -194,7 +192,6 @@ class DriverProfile {
     this.emergencyContactNumber,
     this.licenseNumber,
     this.seat,
-    // Default stats - should be updated from actual data source if possible
     this.rating = 4.5,
     this.totalTrips = 0,
     this.totalEarnings = 0.0,
@@ -203,12 +200,11 @@ class DriverProfile {
   });
 
   factory DriverProfile.fromJson(Map<String, dynamic> json) {
-    // Helper to safely parse LatLng from coordinates array [longitude, latitude]
+    // Helper to safely parse LatLng
     LatLng? parseLatLng(dynamic locData) {
       if (locData != null &&
           locData['coordinates'] is List &&
           locData['coordinates'].length >= 2) {
-        // API response has [longitude, latitude]
         final coords = locData['coordinates'];
         final lon = (coords[0] as num?)?.toDouble();
         final lat = (coords[1] as num?)?.toDouble();
@@ -219,6 +215,20 @@ class DriverProfile {
       return null;
     }
 
+    // --- FIX: Safe Rating Parsing ---
+    double parsedRating = 4.5;
+    final rawRating = json['rating'];
+    if (rawRating is num) {
+      parsedRating = rawRating.toDouble();
+    } else if (rawRating is Map) {
+      final avg = rawRating['average'];
+      if (avg is num) parsedRating = avg.toDouble();
+    }
+
+    // --- FIX: Safe Stats Parsing ---
+    int parsedTrips = (json['totalTrips'] as num?)?.toInt() ?? 0;
+    double parsedEarnings = (json['totalEarnings'] as num?)?.toDouble() ?? 0.0;
+
     return DriverProfile(
       userId: json['_id'] ?? '',
       drivingLicense: DrivingLicenseModel.fromJson(
@@ -228,13 +238,11 @@ class DriverProfile {
       permanentAddress: AddressModel.fromJson(json['permanentAddress'] ?? {}),
       bankDetails: BankDetailsModel.fromJson(json['bankDetails'] ?? {}),
       vehicleDetails: Vehicle.fromJson(json['vehicleDetails'] ?? {}),
-      location: LocationModel.fromJson(
-        json['location'] ?? {},
-      ), // Includes coordinates
+      location: LocationModel.fromJson(json['location'] ?? {}),
       isVerified: json['isVerified'] ?? false,
       adminVerified: json['adminVerified'] ?? false,
       availabilityStatus: json['availabilityStatus'] ?? 'unavailable',
-      status: json['status'] ?? 'pending', // Corresponds to accountStatus
+      status: json['status'] ?? 'pending',
       lastLocationUpdate: json['lastLocationUpdate'] != null
           ? DateTime.tryParse(json['lastLocationUpdate'])
           : null,
@@ -245,38 +253,35 @@ class DriverProfile {
       emergencyContactNumber: json['emergencyContactNumber'],
       licenseNumber: json['licenseNumber'],
       seat: (json['seat'] as num?)?.toInt(),
-      // Stats might need separate fetching/updating
-      rating:
-          (json['rating'] as num?)?.toDouble() ?? 4.5, // Example if included
-      totalTrips:
-          (json['totalTrips'] as num?)?.toInt() ?? 0, // Example if included
-      totalEarnings:
-          (json['totalEarnings'] as num?)?.toDouble() ??
-          0.0, // Example if included
+
+      // Use the safely parsed values
+      rating: parsedRating,
+      totalTrips: parsedTrips,
+      totalEarnings: parsedEarnings,
+      acceptanceRate: (json['acceptanceRate'] as num?)?.toDouble() ?? 100.0,
+      cancellationRate: (json['cancellationRate'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
-  // Add copyWith if needed for state management updates
   DriverProfile copyWith({
     LatLng? currentLocation,
     String? availabilityStatus,
     bool? isOnBreak,
+    BankDetailsModel? bankDetails,
   }) {
     return DriverProfile(
       userId: userId,
       drivingLicense: drivingLicense,
       currentAddress: currentAddress,
       permanentAddress: permanentAddress,
-      bankDetails: bankDetails,
+      bankDetails: bankDetails ?? this.bankDetails,
       vehicleDetails: vehicleDetails,
-      location: location.copyWith(
-        coordinates: currentLocation,
-      ), // Update location within the model
+      location: location.copyWith(coordinates: currentLocation),
       isVerified: isVerified,
       adminVerified: adminVerified,
       availabilityStatus: availabilityStatus ?? this.availabilityStatus,
       status: status,
-      lastLocationUpdate: DateTime.now(), // Update timestamp
+      lastLocationUpdate: DateTime.now(),
       dateOfBirth: dateOfBirth,
       gender: gender,
       emergencyContactNumber: emergencyContactNumber,
@@ -378,6 +383,18 @@ class BankDetailsModel {
       bankAccountName: json['bankAccountName'],
     );
   }
+
+  BankDetailsModel copyWith({
+    String? bankAccountNumber,
+    String? bankName,
+    String? bankAccountName,
+  }) {
+    return BankDetailsModel(
+      bankAccountNumber: bankAccountNumber ?? this.bankAccountNumber,
+      bankName: bankName ?? this.bankName,
+      bankAccountName: bankAccountName ?? this.bankAccountName,
+    );
+  }
 }
 
 class LocationModel {
@@ -390,7 +407,6 @@ class LocationModel {
   factory LocationModel.fromJson(Map<String, dynamic> json) {
     LatLng? coords;
     if (json['coordinates'] is List && json['coordinates'].length >= 2) {
-      // API response has [longitude, latitude]
       final lon = (json['coordinates'][0] as num?)?.toDouble();
       final lat = (json['coordinates'][1] as num?)?.toDouble();
       if (lat != null && lon != null) {
@@ -404,7 +420,6 @@ class LocationModel {
     );
   }
 
-  // Add copyWith for updating coordinates
   LocationModel copyWith({LatLng? coordinates}) {
     return LocationModel(
       type: type,
@@ -418,56 +433,43 @@ class Vehicle {
   final String? make;
   final String? model;
   final int? year;
-  final String? plateNumber; // Mapped from licensePlate in profile response
-  final String? color; // Added
-  final VehicleType type; // Added
-  final int seats; // Added (mapped from 'seat' in root of profile)
+  final String? plateNumber;
+  final String? color;
+  final VehicleType type;
+  final int seats;
 
   Vehicle({
     this.make,
     this.model,
     this.year,
     this.plateNumber,
-    this.color = 'Unknown', // Default if not provided
-    this.type = VehicleType.sedan, // Default
-    this.seats = 4, // Default
+    this.color = 'Unknown',
+    this.type = VehicleType.sedan,
+    this.seats = 4,
   });
 
   String get displayName => '${year ?? ''} ${make ?? ''} ${model ?? ''}'.trim();
 
   factory Vehicle.fromJson(Map<String, dynamic> json) {
-    // Determine vehicle type based on make/model or a dedicated field if available
-    VehicleType determinedType = VehicleType.sedan; // Default
-    // Example logic (adapt as needed):
-    // if (json['type'] != null) {
-    //    determinedType = VehicleType.values.firstWhere((e) => e.toString().split('.').last == json['type'], orElse: () => VehicleType.sedan);
-    // } else if (json['model']?.toLowerCase().contains('suv')) {
-    //    determinedType = VehicleType.suv;
-    // }
-
+    VehicleType determinedType = VehicleType.sedan;
     return Vehicle(
       make: json['make'],
       model: json['model'],
       year: (json['year'] as num?)?.toInt(),
-      plateNumber: json['licensePlate'], // Map from licensePlate
-      color: json['color'] ?? 'Unknown', // Add color if available in JSON
+      plateNumber: json['licensePlate'],
+      color: json['color'] ?? 'Unknown',
       type: determinedType,
-      // Seats might be at the root level in the profile response
-      // It will be added when creating DriverProfile
-      seats:
-          (json['seats'] as num?)?.toInt() ??
-          4, // Default if not in vehicleDetails
+      seats: (json['seats'] as num?)?.toInt() ?? 4,
     );
   }
 
-  // Add toJson if needed for sending data back
   Map<String, dynamic> toJson() => {
     'make': make,
     'model': model,
     'year': year,
-    'licensePlate': plateNumber, // Map back to licensePlate
+    'licensePlate': plateNumber,
     'color': color,
-    'type': type.toString().split('.').last, // Store enum name string
+    'type': type.toString().split('.').last,
     'seats': seats,
   };
 }

@@ -33,7 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
-    
+
     return Scaffold(
       backgroundColor: dark ? TColors.dark : TColors.lightGrey,
       appBar: AppBar(
@@ -81,7 +81,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         padding: const EdgeInsets.all(TSizes.md),
                         decoration: BoxDecoration(
                           color: TColors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
+                          borderRadius: BorderRadius.circular(
+                            TSizes.cardRadiusMd,
+                          ),
                         ),
                         child: Icon(
                           Iconsax.setting_2,
@@ -96,17 +98,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           children: [
                             Text(
                               'App Settings',
-                              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                color: TColors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(
+                                    color: TColors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                             ),
                             const SizedBox(height: TSizes.xs),
                             Text(
                               'Manage your preferences and account settings',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: TColors.white.withOpacity(0.8),
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: TColors.white.withOpacity(0.8),
+                                  ),
                             ),
                           ],
                         ),
@@ -116,10 +120,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
-            
+
             // Account Settings Section
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: TSizes.defaultSpace),
+              margin: const EdgeInsets.symmetric(
+                horizontal: TSizes.defaultSpace,
+              ),
               padding: const EdgeInsets.all(TSizes.defaultSpace),
               decoration: BoxDecoration(
                 color: dark ? TColors.dark : TColors.white,
@@ -161,12 +167,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: TSizes.spaceBtwSections),
-            
+
             // App Preferences Section
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: TSizes.defaultSpace),
+              margin: const EdgeInsets.symmetric(
+                horizontal: TSizes.defaultSpace,
+              ),
               padding: const EdgeInsets.all(TSizes.defaultSpace),
               decoration: BoxDecoration(
                 color: dark ? TColors.dark : TColors.white,
@@ -184,30 +192,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   _buildSectionHeader('App Preferences', dark),
                   const SizedBox(height: TSizes.spaceBtwItems),
-                  _buildSwitchSettingItem(
-                    icon: Iconsax.notification,
-                    title: 'Push Notifications',
-                    subtitle: 'Receive ride updates and offers',
-                    value: _notificationsEnabled,
-                    onChanged: (value) {
-                      setState(() {
-                        _notificationsEnabled = value;
-                      });
-                    },
-                    dark: dark,
-                  ),
-                  _buildSwitchSettingItem(
-                    icon: Iconsax.location,
-                    title: 'Location Services',
-                    subtitle: 'Allow app to access your location',
-                    value: _locationEnabled,
-                    onChanged: (value) {
-                      setState(() {
-                        _locationEnabled = value;
-                      });
-                    },
-                    dark: dark,
-                  ),
+                  // _buildSwitchSettingItem(
+                  //   icon: Iconsax.notification,
+                  //   title: 'Push Notifications',
+                  //   subtitle: 'Receive ride updates and offers',
+                  //   value: _notificationsEnabled,
+                  //   onChanged: (value) {
+                  //     setState(() {
+                  //       _notificationsEnabled = value;
+                  //     });
+                  //   },
+                  //   dark: dark,
+                  // ),
+                  // _buildSwitchSettingItem(
+                  //   icon: Iconsax.location,
+                  //   title: 'Location Services',
+                  //   subtitle: 'Allow app to access your location',
+                  //   value: _locationEnabled,
+                  //   onChanged: (value) {
+                  //     setState(() {
+                  //       _locationEnabled = value;
+                  //     });
+                  //   },
+                  //   dark: dark,
+                  // ),
                   _buildSettingItem(
                     icon: Iconsax.moon,
                     title: 'Appearance',
@@ -235,12 +243,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: TSizes.spaceBtwSections),
-            
+
             // Ride Settings Section
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: TSizes.defaultSpace),
+              margin: const EdgeInsets.symmetric(
+                horizontal: TSizes.defaultSpace,
+              ),
               padding: const EdgeInsets.all(TSizes.defaultSpace),
               decoration: BoxDecoration(
                 color: dark ? TColors.dark : TColors.white,
@@ -287,12 +297,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: TSizes.spaceBtwSections),
-            
+
             // Support & Legal Section
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: TSizes.defaultSpace),
+              margin: const EdgeInsets.symmetric(
+                horizontal: TSizes.defaultSpace,
+              ),
               padding: const EdgeInsets.all(TSizes.defaultSpace),
               decoration: BoxDecoration(
                 color: dark ? TColors.dark : TColors.white,
@@ -341,12 +353,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: TSizes.spaceBtwSections),
-            
+
             // Logout Button
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: TSizes.defaultSpace),
+              margin: const EdgeInsets.symmetric(
+                horizontal: TSizes.defaultSpace,
+              ),
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -364,7 +378,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: TSizes.spaceBtwSections),
           ],
         ),
@@ -372,10 +386,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-   void _logout() {
+  void _logout() {
     // Instantiate controller
     final controller = Get.put(SettingsController());
-  
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -427,11 +441,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: TColors.primary.withOpacity(0.1),
             borderRadius: BorderRadius.circular(TSizes.borderRadiusMd),
           ),
-          child: Icon(
-            icon,
-            color: TColors.primary,
-            size: TSizes.iconMd,
-          ),
+          child: Icon(icon, color: TColors.primary, size: TSizes.iconMd),
         ),
         title: Text(
           title,
@@ -474,11 +484,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: TColors.primary.withOpacity(0.1),
             borderRadius: BorderRadius.circular(TSizes.borderRadiusMd),
           ),
-          child: Icon(
-            icon,
-            color: TColors.primary,
-            size: TSizes.iconMd,
-          ),
+          child: Icon(icon, color: TColors.primary, size: TSizes.iconMd),
         ),
         title: Text(
           title,
@@ -513,7 +519,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           padding: const EdgeInsets.all(TSizes.defaultSpace),
           decoration: BoxDecoration(
             color: dark ? TColors.dark : TColors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(TSizes.cardRadiusLg)),
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(TSizes.cardRadiusLg),
+            ),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -525,22 +533,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: TSizes.spaceBtwItems),
-              ...[
-                'English',
-                'Français',
-                'Español',
-                'Deutsch',
-              ].map((language) => ListTile(
-                title: Text(language),
-                trailing: _selectedLanguage == language ? Icon(Iconsax.tick_circle, color: TColors.primary) : null,
-                onTap: () {
-                  setState(() {
-                    _selectedLanguage = language;
-                  });
-                  Navigator.pop(context);
-                  THelperFunctions.showSnackBar('Language changed to $language');
-                },
-              )).toList(),
+              ...['English']
+                  .map(
+                    (language) => ListTile(
+                      title: Text(language),
+                      trailing: _selectedLanguage == language
+                          ? Icon(Iconsax.tick_circle, color: TColors.primary)
+                          : null,
+                      onTap: () {
+                        setState(() {
+                          _selectedLanguage = language;
+                        });
+                        Navigator.pop(context);
+                        THelperFunctions.showSnackBar(
+                          'Language changed to $language',
+                        );
+                      },
+                    ),
+                  )
+                  .toList(),
             ],
           ),
         );
@@ -548,7 +559,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-    
   void _showThemeModeBottomSheet() {
     final themeController = Get.find<ThemeController>();
     final dark = THelperFunctions.isDarkMode(context);
@@ -560,22 +570,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(TSizes.defaultSpace),
         decoration: BoxDecoration(
           color: dark ? TColors.dark : TColors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(TSizes.cardRadiusLg)),
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(TSizes.cardRadiusLg),
+          ),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               'Choose Theme',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: TSizes.spaceBtwItems),
             ListTile(
               leading: Icon(Iconsax.sun_1, color: TColors.primary),
               title: const Text('Light Mode'),
-              trailing: themeController.themeMode.value == ThemeMode.light ? Icon(Iconsax.tick_circle, color: TColors.primary) : null,
+              trailing: themeController.themeMode.value == ThemeMode.light
+                  ? Icon(Iconsax.tick_circle, color: TColors.primary)
+                  : null,
               onTap: () {
                 themeController.setThemeMode(ThemeMode.light);
                 Navigator.pop(context);
@@ -584,7 +598,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ListTile(
               leading: Icon(Iconsax.moon, color: TColors.primary),
               title: const Text('Dark Mode'),
-              trailing: themeController.themeMode.value == ThemeMode.dark ? Icon(Iconsax.tick_circle, color: TColors.primary) : null,
+              trailing: themeController.themeMode.value == ThemeMode.dark
+                  ? Icon(Iconsax.tick_circle, color: TColors.primary)
+                  : null,
               onTap: () {
                 themeController.setThemeMode(ThemeMode.dark);
                 Navigator.pop(context);
@@ -593,7 +609,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ListTile(
               leading: Icon(Iconsax.mobile, color: TColors.primary),
               title: const Text('System Default'),
-              trailing: themeController.themeMode.value == ThemeMode.system ? Icon(Iconsax.tick_circle, color: TColors.primary) : null,
+              trailing: themeController.themeMode.value == ThemeMode.system
+                  ? Icon(Iconsax.tick_circle, color: TColors.primary)
+                  : null,
               onTap: () {
                 themeController.setThemeMode(ThemeMode.system);
                 Navigator.pop(context);

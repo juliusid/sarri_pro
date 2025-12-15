@@ -78,18 +78,37 @@ class RiderSignupController extends GetxController {
         'client',
       );
       if (result.success) {
-        // --- CORRECTED ---
         THelperFunctions.showSuccessSnackBar(
           'Success',
           result.message ?? 'OTP sent successfully!',
         );
-        nextStep();
+        nextStep(); // Normal flow: Go to OTP screen
       } else {
-        // --- CORRECTED ---
-        THelperFunctions.showErrorSnackBar(
-          'Error',
-          result.error ?? 'Failed to send OTP.',
-        );
+        // --- FIX START: Handle "Email already verified" ---
+        if (result.error != null &&
+            result.error!.toString().toLowerCase().contains(
+              'email already verified',
+            )) {
+          THelperFunctions.showSuccessSnackBar(
+            'Welcome Back',
+            'Email already verified. Resuming account creation...',
+          );
+
+          // Skip the OTP step (index 1) and jump straight to Details (index 2)
+          currentStep.value = RiderSignupStep.details;
+          pageController.animateToPage(
+            RiderSignupStep.details.index,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.ease,
+          );
+        } else {
+          // Normal Error
+          THelperFunctions.showErrorSnackBar(
+            'Error',
+            result.error ?? 'Failed to send OTP.',
+          );
+        }
+        // --- FIX END ---
       }
     } finally {
       isLoading.value = false;
