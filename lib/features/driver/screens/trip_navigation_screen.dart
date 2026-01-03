@@ -3,12 +3,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:sarri_ride/features/driver/controllers/trip_management_controller.dart'; //
-import 'package:sarri_ride/utils/constants/colors.dart'; //
-import 'package:sarri_ride/utils/constants/sizes.dart'; //
-import 'package:sarri_ride/utils/constants/enums.dart'; //
-import 'package:sarri_ride/utils/helpers/helper_functions.dart'; //
-import 'package:iconsax/iconsax.dart'; //
+import 'package:sarri_ride/features/driver/controllers/trip_management_controller.dart';
+import 'package:sarri_ride/utils/constants/colors.dart';
+import 'package:sarri_ride/utils/constants/sizes.dart';
+import 'package:sarri_ride/utils/constants/enums.dart';
+import 'package:sarri_ride/utils/helpers/helper_functions.dart';
+import 'package:iconsax/iconsax.dart';
 
 class TripNavigationScreen extends StatelessWidget {
   const TripNavigationScreen({super.key});
@@ -37,7 +37,7 @@ class TripNavigationScreen extends StatelessWidget {
             // Bottom trip controls
             _buildBottomTripControls(context, controller, dark),
 
-            // Floating action buttons
+            // Floating action buttons (Includes Google Maps Launch)
             _buildFloatingActionButtons(context, controller, dark),
           ],
         );
@@ -46,7 +46,6 @@ class TripNavigationScreen extends StatelessWidget {
   }
 
   Widget _buildNoActiveTripScreen(BuildContext context, bool dark) {
-    // ... (as before, no changes) ...
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(TSizes.defaultSpace),
@@ -133,11 +132,9 @@ class TripNavigationScreen extends StatelessWidget {
   }
 
   Widget _buildMap(TripManagementController controller) {
-    // 1. Listen to the theme change
     final dark = THelperFunctions.isDarkMode(Get.context!);
 
     return Obx(() {
-      // 2. If the controller and map are ready, update the style immediately
       if (controller.mapController != null) {
         controller.mapController!.setMapStyle(dark ? _darkMapStyle : null);
       }
@@ -145,7 +142,6 @@ class TripNavigationScreen extends StatelessWidget {
       return GoogleMap(
         onMapCreated: (GoogleMapController mapController) {
           controller.mapController = mapController;
-          // 3. Set initial style
           if (dark) {
             mapController.setMapStyle(_darkMapStyle);
           }
@@ -163,13 +159,11 @@ class TripNavigationScreen extends StatelessWidget {
         mapToolbarEnabled: false,
         trafficEnabled: true,
         buildingsEnabled: true,
-        // 4. Also bind the style property directly for good measure
         style: dark ? _darkMapStyle : null,
       );
     });
   }
 
-  // Add this style definition if it's missing in this file (it was in the rider map)
   static const String _darkMapStyle = '''
     [
       { "elementType": "geometry", "stylers": [ { "color": "#242f3e" } ] },
@@ -198,7 +192,6 @@ class TripNavigationScreen extends StatelessWidget {
     TripManagementController controller,
     bool dark,
   ) {
-    // ... (as before, no changes) ...
     return Positioned(
       top: 0,
       left: 0,
@@ -306,7 +299,6 @@ class TripNavigationScreen extends StatelessWidget {
     TripManagementController controller,
     bool dark,
   ) {
-    // ... (as before, no changes) ...
     return Positioned(
       bottom: 0,
       left: 0,
@@ -348,7 +340,6 @@ class TripNavigationScreen extends StatelessWidget {
   }
 
   Widget _buildRiderInfo(BuildContext context, ActiveTrip trip, bool dark) {
-    // ... (as before, no changes) ...
     return Row(
       children: [
         CircleAvatar(
@@ -412,11 +403,9 @@ class TripNavigationScreen extends StatelessWidget {
   ) {
     return Obx(() {
       switch (controller.tripStatus.value) {
-        // 1. Driving To Pickup
         case TripStatus.drivingToPickup:
           return Row(
             children: [
-              // Cancel (Small)
               Expanded(
                 flex: 1,
                 child: OutlinedButton(
@@ -432,8 +421,6 @@ class TripNavigationScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-
-              // Message (Medium)
               Expanded(
                 flex: 2,
                 child: OutlinedButton.icon(
@@ -450,8 +437,6 @@ class TripNavigationScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-
-              // Call (Medium)
               Expanded(
                 flex: 2,
                 child: ElevatedButton.icon(
@@ -473,11 +458,9 @@ class TripNavigationScreen extends StatelessWidget {
             ],
           );
 
-        // 2. Trip In Progress
         case TripStatus.tripInProgress:
           return Row(
             children: [
-              // Emergency (Small)
               Expanded(
                 flex: 1,
                 child: OutlinedButton(
@@ -493,8 +476,6 @@ class TripNavigationScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-
-              // Message (Medium)
               Expanded(
                 flex: 2,
                 child: OutlinedButton.icon(
@@ -511,8 +492,6 @@ class TripNavigationScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-
-              // Call (Medium)
               Expanded(
                 flex: 2,
                 child: ElevatedButton.icon(
@@ -556,49 +535,11 @@ class TripNavigationScreen extends StatelessWidget {
             ),
           );
 
-        case TripStatus.tripInProgress:
-          return Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => controller.requestEmergencyAssistance(),
-                  icon: Icon(Iconsax.warning_2, color: TColors.error),
-                  label: Text(
-                    'Emergency',
-                    style: TextStyle(color: TColors.error),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: TSizes.md),
-                    side: BorderSide(color: TColors.error),
-                  ),
-                ),
-              ),
-              const SizedBox(width: TSizes.spaceBtwItems),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton.icon(
-                  onPressed: () => controller.contactRider(),
-                  icon: Icon(Iconsax.call, color: TColors.white),
-                  label: Text(
-                    'Call Rider',
-                    style: TextStyle(color: TColors.white),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: TColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: TSizes.md),
-                  ),
-                ),
-              ),
-            ],
-          );
-
-        // --- ADDED CASE for Arrived at Destination ---
         case TripStatus.arrivedAtDestination:
           return SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () =>
-                  controller.completeTripManual(), // Call the complete method
+              onPressed: () => controller.completeTripManual(),
               icon: Icon(Iconsax.tick_circle, color: TColors.white),
               label: Text(
                 'Complete Trip',
@@ -615,7 +556,6 @@ class TripNavigationScreen extends StatelessWidget {
               ),
             ),
           );
-        // --- END ADDED CASE ---
 
         case TripStatus.completed:
           return SizedBox(
@@ -640,48 +580,32 @@ class TripNavigationScreen extends StatelessWidget {
           );
 
         default:
-          // Covers 'accepted', 'none', 'cancelled'
           return const SizedBox.shrink();
       }
     });
   }
 
+  // --- FIXED: ADDED GOOGLE MAPS BUTTON HERE ---
   Widget _buildFloatingActionButtons(
     BuildContext context,
     TripManagementController controller,
     bool dark,
   ) {
-    // ... (as before, no changes) ...
     return Positioned(
       right: TSizes.defaultSpace,
       top: MediaQuery.of(context).size.height * 0.4,
       child: Column(
         children: [
-          // to be removed later
-
-          // --- SIMULATION BUTTON (DEV ONLY) ---
-          // Obx(
-          //   () => FloatingActionButton(
-          //     heroTag: 'simulate_trip',
-          //     mini: true,
-          //     backgroundColor: controller.isSimulating.value
-          //         ? Colors.red
-          //         : Colors.green,
-          //     onPressed: () {
-          //       if (controller.isSimulating.value) {
-          //         controller.stopSimulation();
-          //       } else {
-          //         controller.startSimulation();
-          //       }
-          //     },
-          //     child: Icon(
-          //       controller.isSimulating.value ? Icons.stop : Icons.play_arrow,
-          //       color: Colors.white,
-          //     ),
-          //   ),
-          // ),
+          // 1. Google Maps External Navigation Button
+          FloatingActionButton(
+            heroTag: 'google_maps_nav',
+            onPressed: () => controller.launchMapNavigation(),
+            backgroundColor: TColors.primary,
+            child: const Icon(Icons.map_outlined, color: Colors.white),
+          ),
           const SizedBox(height: TSizes.spaceBtwItems),
-          // remove above
+
+          // 2. Center Location Button
           FloatingActionButton(
             heroTag: 'center_location',
             onPressed: () => _centerMapOnDriver(controller),
@@ -691,6 +615,8 @@ class TripNavigationScreen extends StatelessWidget {
             child: Icon(Iconsax.location, color: TColors.primary),
           ),
           const SizedBox(height: TSizes.spaceBtwItems),
+
+          // 3. Navigation Info Button
           FloatingActionButton(
             heroTag: 'navigation_info',
             onPressed: () => _showNavigationInfo(context, controller, dark),
@@ -711,7 +637,6 @@ class TripNavigationScreen extends StatelessWidget {
     Color color,
     BuildContext context,
   ) {
-    // ... (as before, no changes) ...
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: TSizes.sm,
@@ -727,7 +652,6 @@ class TripNavigationScreen extends StatelessWidget {
           Icon(icon, color: color, size: TSizes.iconSm),
           const SizedBox(width: TSizes.xs),
           Flexible(
-            // Added Flexible
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -737,7 +661,7 @@ class TripNavigationScreen extends StatelessWidget {
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                  overflow: TextOverflow.ellipsis, // Prevent overflow
+                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   label,
@@ -755,7 +679,6 @@ class TripNavigationScreen extends StatelessWidget {
 
   // Helper methods
   Color _getStatusColor(TripStatus status) {
-    // ... (as before, no changes) ...
     switch (status) {
       case TripStatus.drivingToPickup:
         return TColors.warning;
@@ -764,7 +687,7 @@ class TripNavigationScreen extends StatelessWidget {
       case TripStatus.tripInProgress:
         return TColors.success;
       case TripStatus.arrivedAtDestination:
-        return TColors.success; // Added
+        return TColors.success;
       case TripStatus.completed:
         return TColors.success;
       default:
@@ -773,7 +696,6 @@ class TripNavigationScreen extends StatelessWidget {
   }
 
   IconData _getNavigationIcon(TripStatus status) {
-    // ... (as before, no changes) ...
     switch (status) {
       case TripStatus.drivingToPickup:
         return Iconsax.location;
@@ -782,7 +704,7 @@ class TripNavigationScreen extends StatelessWidget {
       case TripStatus.tripInProgress:
         return Iconsax.route_square;
       case TripStatus.arrivedAtDestination:
-        return Iconsax.flag; // Added
+        return Iconsax.flag;
       case TripStatus.completed:
         return Iconsax.tick_circle;
       default:
@@ -791,8 +713,6 @@ class TripNavigationScreen extends StatelessWidget {
   }
 
   String _getStatusText(TripStatus status) {
-    // ... (as before, no changes) ...
-    // This now matches the getter in TripManagementController
     switch (status) {
       case TripStatus.drivingToPickup:
         return 'Driving to Pickup';
@@ -801,7 +721,7 @@ class TripNavigationScreen extends StatelessWidget {
       case TripStatus.tripInProgress:
         return 'Trip in Progress';
       case TripStatus.arrivedAtDestination:
-        return 'Arrived at Destination'; // Added
+        return 'Arrived at Destination';
       case TripStatus.completed:
         return 'Trip Completed';
       default:
@@ -810,7 +730,6 @@ class TripNavigationScreen extends StatelessWidget {
   }
 
   void _centerMapOnDriver(TripManagementController controller) {
-    // ... (as before, no changes) ...
     if (controller.driverLocation.value != null &&
         controller.mapController != null) {
       controller.mapController!.animateCamera(
@@ -824,7 +743,6 @@ class TripNavigationScreen extends StatelessWidget {
     TripManagementController controller,
     bool dark,
   ) {
-    // ... (as before, no changes) ...
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -846,10 +764,7 @@ class TripNavigationScreen extends StatelessWidget {
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: TSizes.spaceBtwItems),
-            // Add navigation details here
-            Text(
-              controller.navigationInstruction.value,
-            ), // Show current instruction
+            Text(controller.navigationInstruction.value),
             const SizedBox(height: TSizes.spaceBtwItems),
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
@@ -865,7 +780,6 @@ class TripNavigationScreen extends StatelessWidget {
     BuildContext context,
     TripManagementController controller,
   ) {
-    // ... (as before, no changes) ...
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -882,7 +796,7 @@ class TripNavigationScreen extends StatelessWidget {
             onPressed: () {
               Navigator.pop(context);
               controller.cancelTrip('Driver cancelled');
-              Get.back(); // Go back from navigation screen
+              Get.back();
             },
             child: Text('Yes, Cancel', style: TextStyle(color: TColors.error)),
           ),
