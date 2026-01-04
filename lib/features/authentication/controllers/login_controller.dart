@@ -74,11 +74,8 @@ class LoginController extends GetxController {
         );
         print("GOOGLE LOGIN SUCCESS! FULL DATA:");
         print(jsonEncode(loginResult.client!.toJson()));
-        // -------------------------------
 
-        print(
-          "LOGIN_CONTROLLER: Google login successful via backend. Storing user data...",
-        );
+        // -------------------------------
 
         if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
           Get.delete<ClientData>(tag: 'currentUser', force: true);
@@ -131,13 +128,19 @@ class LoginController extends GetxController {
         }
 
         if (loginResult.client!.role == "client") {
+          // --- FIXED: Uncommented Phone Number Verification Logic ---
+
           // Check if profile exists and phone number is missing OR not verified
           if (profile == null || profile.phoneNumberVerified == false) {
             print(
               "LOGIN_CONTROLLER: Phone number missing or not verified. Forcing verification.",
             );
-            // Get.offAll(() => const PhoneNumberScreen());
-            Get.offAll(() => const MapScreenGetX());
+
+            // 1. Uncommented verification screen
+            Get.offAll(() => const PhoneNumberScreen());
+
+            // 2. Removed bypass to MapScreen
+            // Get.offAll(() => const MapScreenGetX());
 
             THelperFunctions.showSnackBar(
               'Please verify your phone number to continue.',
@@ -201,7 +204,6 @@ class LoginController extends GetxController {
     try {
       // --- CONFIGURE GOOGLE SIGN IN ---
       final googleSignIn = GoogleSignIn(
-        // Use the "Web" Client ID here as serverClientId to get a valid ID token for backend
         serverClientId:
             '189458277367-bnqmk6rsrtnh7no8u05vltkmsch4n6ig.apps.googleusercontent.com',
       );
@@ -267,14 +269,19 @@ class LoginController extends GetxController {
             // CHECK FOR PHONE NUMBER
             final profile = drawerController.fullProfile.value;
 
+            // --- FIXED: Uncommented Phone Number Verification Logic for Google ---
+
             // Check if profile exists and phone number is missing OR not verified
             if (profile != null && profile.phoneNumberVerified == false) {
               print(
                 "LOGIN_CONTROLLER: Phone number missing. Forcing verification.",
               );
-              // Get.offAll(() => const PhoneNumberScreen());
-              // Redirect to map for now as requested in prev steps, user can verify later
-              Get.offAll(() => const MapScreenGetX());
+
+              // 1. Uncommented verification screen
+              Get.offAll(() => const PhoneNumberScreen());
+
+              // 2. Removed bypass to MapScreen
+              // Get.offAll(() => const MapScreenGetX());
 
               THelperFunctions.showSnackBar(
                 'Please verify your phone number to continue.',

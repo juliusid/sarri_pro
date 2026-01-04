@@ -337,9 +337,9 @@ class WebSocketService extends GetxService {
       ack: (response) {
         if (response is Map && response['status'] == 'success') {
           // Success, location updated.
-          // print(
-          //   "Location update acknowledged by server.${response}",
-          // ); // Can be too noisy
+          print(
+            "Location update acknowledged by server.${response}",
+          ); // Can be too noisy
         } else {
           // Handle failure
           print('Location update failed: ${response?['message']}');
@@ -963,6 +963,7 @@ class WebSocketService extends GetxService {
 
           // Log for debugging
           print("Updating Map Marker to: $lat, $lng");
+          print("Location update acknowledged by server.${data}");
 
           // Find controller and update
           if (Get.isRegistered<RideController>()) {

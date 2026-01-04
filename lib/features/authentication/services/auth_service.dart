@@ -50,11 +50,19 @@ class AuthService extends GetxService {
     }
   }
 
-  Future<AuthResult> sendPhoneOtp(String phoneNumber, String userType) async {
+  Future<AuthResult> sendPhoneOtp(
+    String phoneNumber,
+    String userType,
+    String email,
+  ) async {
     try {
       final response = await _httpService.post(
         ApiConfig.sendPhoneOtpEndpoint,
-        body: {'phoneNumber': phoneNumber, 'userType': userType},
+        body: {
+          'phoneNumber': phoneNumber,
+          'userType': userType,
+          'email': email,
+        },
       );
       final responseData = _httpService.handleResponse(response);
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -79,11 +87,17 @@ class AuthService extends GetxService {
     String phoneNumber,
     String code,
     String userType,
+    String email,
   ) async {
     try {
       final response = await _httpService.post(
         ApiConfig.verifyPhoneOtpEndpoint,
-        body: {'phoneNumber': phoneNumber, 'code': code, 'userType': userType},
+        body: {
+          'phoneNumber': phoneNumber,
+          'code': code,
+          'userType': userType,
+          'email': email,
+        },
       );
       final responseData = _httpService.handleResponse(response);
       if (responseData['status'] == 'success') {

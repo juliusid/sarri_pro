@@ -17,11 +17,16 @@ class PhoneVerificationController extends GetxController {
   final otpFormKey = GlobalKey<FormState>();
   final isLoading = false.obs;
 
-  // This controller is only used for CLIENTS post-login
   final String _userType = "client";
 
+  // --- NEW: Helper to get the logged-in user's email ---
+  String get userEmail {
+    final drawerController = Get.find<MapDrawerController>();
+    // Access the email from the fullProfile model
+    return drawerController.fullProfile.value?.email ?? '';
+  }
+
   String get formattedPhoneNumber {
-    // Format the number to +234...
     return TFormatter.formatNigeriaPhoneNumber(
       phoneNumberController.text.trim(),
     );
@@ -38,11 +43,22 @@ class PhoneVerificationController extends GetxController {
   Future<void> sendOtp() async {
     if (!formKey.currentState!.validate()) return;
 
+    // Safety Check: Ensure email is present before calling API
+    if (userEmail.isEmpty) {
+      THelperFunctions.showErrorSnackBar(
+        'Error',
+        'User email not found. Please log in again.',
+      );
+      return;
+    }
+
     isLoading.value = true;
     try {
+      // --- UPDATED: Passing phone number and user type ---
       final result = await AuthService.instance.sendPhoneOtp(
         formattedPhoneNumber,
         _userType,
+        userEmail, // --- NEW: Pass user email ---
       );
 
       if (result.success) {
@@ -68,6 +84,7 @@ class PhoneVerificationController extends GetxController {
   Future<void> resendOtp() async {
     isLoading.value = true;
     try {
+      // --- UPDATED: Passing phone number and user type ---
       final result = await AuthService.instance.resendPhoneOtp(
         formattedPhoneNumber,
         _userType,
@@ -97,10 +114,12 @@ class PhoneVerificationController extends GetxController {
 
     isLoading.value = true;
     try {
+      // --- UPDATED: Verifying the OTP ---
       final result = await AuthService.instance.verifyPhoneOtp(
         formattedPhoneNumber,
         otpController.text.trim(),
         _userType,
+        userEmail,
       );
 
       if (result.success) {
@@ -109,9 +128,7 @@ class PhoneVerificationController extends GetxController {
           result.message ?? 'Phone number verified!',
         );
 
-        // Refresh the main profile data to get the new 'phoneNumberVerified' status
         await Get.find<MapDrawerController>().refreshUserData();
-
         Get.offAll(() => const MapScreenGetX());
       } else {
         THelperFunctions.showErrorSnackBar(

@@ -210,6 +210,7 @@ class DriverSignupController extends GetxController {
       final result = await AuthService.instance.sendPhoneOtp(
         formattedPhoneNumber,
         'driver',
+        emailController.text.trim(),
       );
       if (result.success) {
         THelperFunctions.showSuccessSnackBar(
@@ -237,6 +238,7 @@ class DriverSignupController extends GetxController {
         formattedPhoneNumber,
         phoneOtpController.text.trim(),
         'driver',
+        emailController.text.trim(),
       );
       if (result.success) {
         THelperFunctions.showSuccessSnackBar(

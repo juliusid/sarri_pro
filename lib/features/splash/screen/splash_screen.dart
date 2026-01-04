@@ -5,6 +5,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:sarri_ride/core/services/websocket_service.dart';
 import 'package:sarri_ride/features/authentication/models/auth_model.dart';
 import 'package:sarri_ride/features/authentication/screens/login/login_screen_getx.dart';
+import 'package:sarri_ride/features/authentication/screens/phone_verification/phone_number_screen.dart';
 // import 'package:sarri_ride/features/authentication/screens/phone_verification/phone_number_screen.dart';
 import 'package:sarri_ride/features/authentication/services/auth_service.dart';
 import 'package:sarri_ride/features/onboarding/screen/onboarding_screen.dart';
@@ -175,7 +176,7 @@ class _SplashScreenState extends State<SplashScreen>
           print(
             "SPLASH: Phone number missing or not verified. Forcing verification.",
           );
-          Get.offAll(() => const MapScreenGetX());
+          Get.offAll(() => const PhoneNumberScreen());
           THelperFunctions.showSnackBar(
             'Please verify your phone number to continue.',
           );

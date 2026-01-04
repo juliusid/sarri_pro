@@ -3,11 +3,15 @@ class ApiConfig {
   // Base URLs for different environments
   static const String apiKey = "the_sarriride_2025@development_Backend";
   static const String _devBaseUrl =
-      'https://sarriride.onrender.com'; // Replace with your dev API URL
+      // 'https://sarriride.onrender.com'; // Replace with your dev API URL
+      'https://oyster-app-kfpml.ondigitalocean.app'; // Development API URL
   static const String _stagingBaseUrl =
-      'https://sarriride.onrender.com'; // Replace with your staging API URL
+      // 'https://sarriride.onrender.com'; // Replace with your staging API URL
+      'https://oyster-app-kfpml.ondigitalocean.app'; // Development API URL
+
   static const String _prodBaseUrl =
-      'https://sarriride.onrender.com'; // Replace with your production API URL
+      // 'https://sarriride.onrender.com'; // Replace with your production API URL
+      'https://oyster-app-kfpml.ondigitalocean.app'; // Development API URL
 
   // Timeouts
   static const Duration _connectionTimeout = Duration(seconds: 30);

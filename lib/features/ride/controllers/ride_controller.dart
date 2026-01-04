@@ -218,20 +218,17 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
   @override
   void onInit() {
     super.onInit();
-    rideTypes.assignAll(_defaultRideTypes);
+    // CHANGE: Clear ride types initially to force server calculation later
+    rideTypes.clear();
+
     driverAnimationController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     );
 
-    // 1. Initialize map logic
     initializeMap();
     initializeStops();
-
-    // 2. Auto-Reconnect if app was killed during a trip
     _checkCurrentRideStatus();
-
-    // 3. Listeners
     _webSocketService.registerPaymentConfirmedListener(_handlePaymentConfirmed);
   }
 
@@ -298,21 +295,44 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     super.onClose();
   }
 
-  void initializeMap() {
+  Future<void> initializeMap() async {
     final position = _locationService.getLocationForMap();
     final currentLatLng = LatLng(position.latitude, position.longitude);
 
     pickupLocation.value = currentLatLng;
-    pickupName.value = _locationService.isLocationEnabled
-        ? 'Current Location'
-        : 'Default Location';
-    pickupAddress.value = _locationService.isLocationEnabled
-        ? 'Your current location'
-        : 'Lagos, Nigeria (Default)';
-    pickupController.text = pickupName.value;
+
+    // Set placeholder
+    pickupName.value = 'Fetching address...';
+    pickupController.text = 'Fetching address...';
+
+    // Force resolve the address immediately
+    await _resolveAddressForPickup(currentLatLng);
 
     _getAndSetStateFromLatLng(currentLatLng, defaultState: "Lagos");
     addPickupMarker();
+  }
+
+  // --- ADD THIS NEW FUNCTION IMMEDIATELY AFTER initializeMap ---
+  Future<void> _resolveAddressForPickup(LatLng location) async {
+    try {
+      final address = await PlacesService.getAddressFromCoordinates(
+        location.latitude,
+        location.longitude,
+      );
+
+      if (address != null && address.isNotEmpty) {
+        pickupName.value = address;
+        pickupAddress.value = address;
+        pickupController.text = address;
+      } else {
+        pickupName.value = 'Current Location';
+        pickupAddress.value = 'Unknown Location';
+        pickupController.text = 'Current Location';
+      }
+    } catch (e) {
+      pickupName.value = 'Current Location';
+      pickupController.text = 'Current Location';
+    }
   }
 
   void _handlePaymentConfirmed(dynamic data) {
@@ -369,25 +389,29 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     markers.removeWhere((marker) => marker.markerId.value == 'pickup');
 
     if (pickupLocation.value != null) {
-      bool isIdleAtCurrentLocation =
-          pickupName.value.toLowerCase().contains('current location') &&
-          destinationLocation.value == null;
+      // FIX: Simplify logic. If no destination is selected, we are likely
+      // just browsing/idle at our current location.
+      bool isIdleMode = destinationLocation.value == null;
 
       BitmapDescriptor iconToUse;
       String titleText;
       Offset anchor;
 
-      if (isIdleAtCurrentLocation) {
+      if (isIdleMode) {
+        // Show Current Location Icon (Blue Dot/Halo)
         iconToUse =
             _markerService.currentLocationIcon ??
             BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue);
         titleText = "You are here";
+        // Center anchor for current location dot
         anchor = const Offset(0.5, 0.5);
       } else {
+        // Show Pickup Pin (Green Pole) because we are setting up a ride
         iconToUse =
             _markerService.pickupIcon ??
             BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
         titleText = '📍 ${pickupName.value}';
+        // Bottom anchor for pin so it stands on the point
         anchor = const Offset(0.5, 1.0);
       }
 
@@ -588,7 +612,85 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     final distancePrice = distanceKm * 150.0;
     final timePrice = durationMinutes * 20.0;
     totalPrice.value = basePrice.value + distancePrice + timePrice;
-    _updateRideTypesWithCalculatedPrice();
+
+    // CHANGE: Trigger server API call immediately instead of local math
+    _updatePricesFromApi();
+  }
+
+  // Helper for internal use
+  Future<bool> _updatePricesFromApi() async {
+    // FIX: Add null check to prevent crash
+    if (pickupLocation.value == null || destinationLocation.value == null) {
+      return false;
+    }
+
+    // Clear list to show loading state or prevent old prices
+    rideTypes.clear();
+    update();
+
+    THelperFunctions.showSnackBar('Calculating fares from server...');
+
+    try {
+      // Use ! safely because we checked for null above
+      final priceResponse = await _rideService.calculatePrice(
+        pickupLocation.value!,
+        destinationLocation.value!,
+      );
+
+      if (priceResponse.status == 'success' && priceResponse.data != null) {
+        final prices = priceResponse.data!.prices;
+        final newRideTypes = <RideType>[];
+        final estimatedEtaMinutes = (totalDuration.value / 60).round() + 5;
+
+        if (prices.luxury != null) {
+          newRideTypes.add(
+            RideType(
+              name: 'Luxury',
+              price: prices.luxury!.price,
+              eta: '${estimatedEtaMinutes + 2} min',
+              icon: Icons.directions_car,
+              seats: prices.luxury!.seats,
+            ),
+          );
+        }
+        if (prices.comfort != null) {
+          newRideTypes.add(
+            RideType(
+              name: 'Comfort',
+              price: prices.comfort!.price,
+              eta: '$estimatedEtaMinutes min',
+              icon: Icons.car_rental,
+              seats: prices.comfort!.seats,
+            ),
+          );
+        }
+        if (prices.xl != null) {
+          newRideTypes.add(
+            RideType(
+              name: 'XL',
+              price: prices.xl!.price,
+              eta: '${estimatedEtaMinutes + 5} min',
+              icon: Icons.airport_shuttle,
+              seats: prices.xl!.seats,
+            ),
+          );
+        }
+
+        if (newRideTypes.isEmpty) {
+          // Handle empty case
+          return false;
+        } else {
+          rideTypes.assignAll(newRideTypes);
+          return true;
+        }
+      } else {
+        return false;
+      }
+    } catch (e) {
+      return false;
+    } finally {
+      update();
+    }
   }
 
   void _updateRideTypesWithCalculatedPrice() {
@@ -1297,6 +1399,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
   }
 
   // --- RESTORE RIDE STATE ---
+  // --- REPLACE restoreRideState WITH THIS ---
   Future<void> restoreRideState(RiderReconnectData rideData) async {
     rideId.value = rideData.tripId;
     activeRideChatId.value = rideData.chatId ?? '';
@@ -1318,7 +1421,6 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       final pos = _locationService.getLocationForMap();
       startCoords = LatLng(pos.latitude, pos.longitude);
       pickupName.value = "Current Location";
-      // Try reverse geocode if needed
     } else {
       pickupName.value = rideData.pickup;
       final pSuggestions = await PlacesService.getPlaceSuggestions(
