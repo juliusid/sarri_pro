@@ -171,6 +171,12 @@ class PaymentController extends GetxController {
         body: requestBody,
       );
 
+      print(
+        "PAYMENT CONTROLLER: Response received from initiateTripPayment endpoint.",
+      );
+      print("PAYMENT CONTROLLER: Response body: $response");
+      print(requestBody);
+
       final responseData = _httpService.handleResponse(response);
 
       if (responseData['status'] == 'success') {

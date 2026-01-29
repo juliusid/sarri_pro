@@ -6,6 +6,7 @@ import 'package:sarri_ride/core/services/websocket_service.dart';
 import 'package:sarri_ride/features/authentication/models/auth_model.dart';
 import 'package:sarri_ride/features/authentication/screens/login/login_screen_getx.dart';
 import 'package:sarri_ride/features/authentication/screens/phone_verification/phone_number_screen.dart';
+import 'package:sarri_ride/features/authentication/screens/user_type_selection/user_type_selection_screen.dart';
 // import 'package:sarri_ride/features/authentication/screens/phone_verification/phone_number_screen.dart';
 import 'package:sarri_ride/features/authentication/services/auth_service.dart';
 import 'package:sarri_ride/features/onboarding/screen/onboarding_screen.dart';
@@ -177,6 +178,7 @@ class _SplashScreenState extends State<SplashScreen>
             "SPLASH: Phone number missing or not verified. Forcing verification.",
           );
           Get.offAll(() => const PhoneNumberScreen());
+          // Get.offAll(() => const MapScreenGetX());
           THelperFunctions.showSnackBar(
             'Please verify your phone number to continue.',
           );
@@ -189,10 +191,22 @@ class _SplashScreenState extends State<SplashScreen>
           Get.offAll(() => const MapScreenGetX());
         }
       } else {
-        print(
-          "SplashScreen: User not authenticated, redirecting to Onboarding...",
-        );
-        Get.offAll(() => const OnBoardingScreen());
+        //  / === MODIFIED LOGIC HERE ===
+        final storage = GetStorage();
+
+        // Check if it's the first time launching the app
+        // We default to 'true' if the key doesn't exist yet
+        bool isFirstTime = storage.read('IsFirstTime') ?? true;
+
+        if (isFirstTime) {
+          print("SplashScreen: First time launch. Going to Onboarding.");
+          Get.offAll(() => const OnBoardingScreen());
+        } else {
+          print("SplashScreen: Not first time. Going to User Selection.");
+          // Go straight to the screen where they choose Rider/Driver or Login
+          Get.offAll(() => const LoginScreenGetX());
+        }
+
         FlutterNativeSplash.remove();
       }
     }

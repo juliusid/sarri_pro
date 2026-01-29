@@ -50,6 +50,27 @@ class RiderOtpStep extends StatelessWidget {
             validator: (value) => TValidator.validateEmptyText('OTP', value),
           ),
         ),
+
+        const SizedBox(height: TSizes.spaceBtwItems),
+
+        // --- NEW: RESEND UI ---
+        Center(
+          child: Obx(
+            () => controller.resendTimer.value > 0
+                ? Text(
+                    "Resend OTP in ${controller.resendTimer.value}s",
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                  )
+                : TextButton(
+                    onPressed: () =>
+                        controller.sendVerificationEmail(isResend: true),
+                    child: const Text("Resend OTP"),
+                  ),
+          ),
+        ),
+
         const Spacer(),
         SizedBox(
           width: double.infinity,

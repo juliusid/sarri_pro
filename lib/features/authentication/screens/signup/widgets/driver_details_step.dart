@@ -1,8 +1,11 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/features/authentication/controllers/driver_signup_controller.dart';
+import 'package:sarri_ride/features/settings/screens/terms_conditions_screen.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
+import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/utils/validators/validation.dart';
 import 'package:intl/intl.dart';
 
@@ -12,6 +15,7 @@ class DriverDetailsStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<DriverSignupController>();
+    final isDark = THelperFunctions.isDarkMode(context); // Check for Dark Mode
 
     // Helper function to show date picker
     Future<void> selectDate(
@@ -87,14 +91,28 @@ class DriverDetailsStep extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: TSizes.spaceBtwInputFields),
+
+              // --- 🔴 FIX: Adaptive Phone Number Field ---
               TextFormField(
                 controller: controller.phoneNumberController,
-                validator: TValidator.validatePhoneNumber,
-                decoration: const InputDecoration(
-                  labelText: 'Phone Number',
-                  prefixIcon: Icon(Iconsax.call),
+                readOnly: true,
+                style: TextStyle(
+                  // Adapt text color for readability
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Phone Number (Verified)',
+                  prefixIcon: const Icon(Iconsax.call),
+                  suffixIcon: const Icon(Iconsax.verify, color: Colors.green),
+                  // Adapt background color: Light Grey for Light Mode, Transparent White for Dark Mode
+                  fillColor: isDark
+                      ? Colors.white.withOpacity(0.05)
+                      : Colors.grey.shade100,
+                  filled: true,
                 ),
               ),
+
+              // ------------------------------------------
               const SizedBox(height: TSizes.spaceBtwInputFields),
               TextFormField(
                 controller: controller.dobController,
@@ -319,6 +337,65 @@ class DriverDetailsStep extends StatelessWidget {
                 validator: (v) => TValidator.validateEmptyText('Seat count', v),
                 decoration: const InputDecoration(labelText: 'Number of Seats'),
               ),
+
+              // ========================================================
+              // START NEW SECTION: Terms & Conditions Checkbox
+              // ========================================================
+              const SizedBox(height: TSizes.spaceBtwSections),
+              Row(
+                children: [
+                  Obx(
+                    () => SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: Checkbox(
+                        value: controller.privacyPolicy.value,
+                        onChanged: (value) => controller.privacyPolicy.value =
+                            !controller.privacyPolicy.value,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'I agree to the ',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          TextSpan(
+                            text: 'Terms of Use',
+                            style: Theme.of(context).textTheme.bodySmall!.apply(
+                              color: Colors.blue,
+                              decoration: TextDecoration.underline,
+                            ),
+                            recognizer: TapGestureRecognizer()
+                              ..onTap = () =>
+                                  Get.to(() => const TermsConditionsScreen()),
+                          ),
+                          TextSpan(
+                            text: ' and ',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          TextSpan(
+                            text: 'Privacy Policy',
+                            style: Theme.of(context).textTheme.bodySmall!.apply(
+                              color: Colors.blue,
+                              decoration: TextDecoration.underline,
+                            ),
+                            recognizer: TapGestureRecognizer()
+                              ..onTap = () =>
+                                  Get.to(() => const TermsConditionsScreen()),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: TSizes.spaceBtwSections),
+              // ========================================================
             ],
           ),
         ),
@@ -331,7 +408,16 @@ class DriverDetailsStep extends StatelessWidget {
             () => ElevatedButton(
               onPressed: controller.isLoading.value
                   ? null
-                  : () => controller.registerDriverDetails(),
+                  : () {
+                      // 1. ADD CHECK HERE
+                      if (!controller.privacyPolicy.value) {
+                        THelperFunctions.showSnackBar(
+                          'Please accept the Terms & Conditions to continue',
+                        );
+                        return;
+                      }
+                      controller.registerDriverDetails();
+                    },
               child: controller.isLoading.value
                   ? const CircularProgressIndicator(color: Colors.white)
                   : const Text('Save & Continue to Documents'),

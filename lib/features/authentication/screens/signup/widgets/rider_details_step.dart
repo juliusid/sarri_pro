@@ -1,11 +1,14 @@
 // lib/features/authentication/screens/signup/widgets/rider_details_step.dart
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/features/authentication/controllers/rider_signup_controller.dart';
+import 'package:sarri_ride/features/settings/screens/terms_conditions_screen.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/constants/text_strings.dart';
+import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/utils/validators/validation.dart';
 
 class RiderDetailsStep extends StatelessWidget {
@@ -82,6 +85,69 @@ class RiderDetailsStep extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // ========================================================
+                  // START NEW SECTION: Terms & Conditions Checkbox
+                  // ========================================================
+                  const SizedBox(height: TSizes.spaceBtwSections),
+                  Row(
+                    children: [
+                      Obx(
+                        () => SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: Checkbox(
+                            value: controller.privacyPolicy.value,
+                            onChanged: (value) =>
+                                controller.privacyPolicy.value =
+                                    !controller.privacyPolicy.value,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'I agree to the ',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              TextSpan(
+                                text: 'Terms of Use',
+                                style: Theme.of(context).textTheme.bodySmall!
+                                    .apply(
+                                      color: Colors.blue,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () => Get.to(
+                                    () => const TermsConditionsScreen(),
+                                  ),
+                              ),
+                              TextSpan(
+                                text: ' and ',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              TextSpan(
+                                text: 'Privacy Policy',
+                                style: Theme.of(context).textTheme.bodySmall!
+                                    .apply(
+                                      color: Colors.blue,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () => Get.to(
+                                    () => const TermsConditionsScreen(),
+                                  ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // ========================================================
                   const SizedBox(height: TSizes.spaceBtwSections),
                   SizedBox(
                     width: double.infinity,
@@ -89,7 +155,16 @@ class RiderDetailsStep extends StatelessWidget {
                       () => ElevatedButton(
                         onPressed: controller.isLoading.value
                             ? null
-                            : () => controller.registerRider(),
+                            : () {
+                                // 1. ADD CHECK HERE
+                                if (!controller.privacyPolicy.value) {
+                                  THelperFunctions.showSnackBar(
+                                    'Please accept the Terms & Conditions',
+                                  );
+                                  return;
+                                }
+                                controller.registerRider();
+                              },
                         child: controller.isLoading.value
                             ? const CircularProgressIndicator(
                                 color: Colors.white,

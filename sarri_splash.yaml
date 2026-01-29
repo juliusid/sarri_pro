@@ -5,11 +5,11 @@ flutter_native_splash:
   color: "#ffffff"
   color_dark: "#272727"
 
-  image_dark: "assets/logos/SARRI.png"
-  image: "assets/logos/SARRI-2.png"
+  image_dark: "assets/logos/splash_light.png"
+  image: "assets/logos/splash_dark.png"
 
   android_12:
     color: "#ffffff"
     color_dark: "#272727"
-    image_dark: "assets/logos/SARRI (1).png"
-    image: "assets/logos/SARRI (2).png"
+    image_dark: "assets/logos/splash_light.png"
+    image: "assets/logos/splash_dark.png"

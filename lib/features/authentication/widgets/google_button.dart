@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart'; // <--- IMPORT THIS
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
@@ -19,9 +19,15 @@ class GoogleSignInButton extends StatelessWidget {
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: dark ? TColors.darkerGrey : TColors.lightGrey,
-          foregroundColor: dark ? TColors.white : TColors.black,
-          side: BorderSide(color: dark ? TColors.darkGrey : TColors.grey),
+          elevation: 0, // Google buttons are typically flat or low elevation
+          // Light Mode: Pure White. Dark Mode: Dark Container.
+          backgroundColor: dark ? TColors.white : TColors.white,
+          // Light Mode: Dark Text. Dark Mode: White Text.
+          foregroundColor: dark ? TColors.white : TColors.textPrimary,
+          // Border: Subtle Grey for definition
+          side: BorderSide(
+            color: dark ? TColors.borderSecondary : TColors.borderPrimary,
+          ),
           padding: const EdgeInsets.symmetric(vertical: TSizes.md),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
@@ -36,16 +42,19 @@ class GoogleSignInButton extends StatelessWidget {
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // --- CHANGED TO SVG ---
                   SvgPicture.asset(
-                    'assets/logos/google.svg', // Ensure this matches your file path
+                    'assets/logos/google.svg', // Make sure this file exists!
                     height: 24,
                     width: 24,
                   ),
                   const SizedBox(width: 12),
-                  const Text(
-                    'Continue with Google',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                  Text(
+                    'Sign in with Google', // Standard Google phrasing
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      color: dark ? TColors.textPrimary : TColors.textPrimary,
+                    ),
                   ),
                 ],
               ),

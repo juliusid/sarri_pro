@@ -1,41 +1,71 @@
 {
   "project_info": {
-    "project_number": "21448281203",
-    "project_id": "sarriride-9c8d1",
-    "storage_bucket": "sarriride-9c8d1.firebasestorage.app"
+    "project_number": "566802818676",
+    "project_id": "sarri-ride-7aced",
+    "storage_bucket": "sarri-ride-7aced.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:21448281203:android:17ebba92b036164499ee06",
+        "mobilesdk_app_id": "1:566802818676:android:a883136b1eeb63cf169321",
         "android_client_info": {
           "package_name": "com.example.sarri_ride"
         }
       },
       "oauth_client": [
         {
-          "client_id": "21448281203-k4b65f0gv2f75chs9r174qu2mjudh20a.apps.googleusercontent.com",
+          "client_id": "566802818676-kuc13au4v6ifp3oe6qimcdp78s84fnnd.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyAJ5rnWUf1u4MAqMYxnqI6Rt172TrAvZHk"
+          "current_key": "AIzaSyAXQ1WizVy0J_LmYIg8Fxwr5X0MKx2Uhm0"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "21448281203-k4b65f0gv2f75chs9r174qu2mjudh20a.apps.googleusercontent.com",
+              "client_id": "566802818676-kuc13au4v6ifp3oe6qimcdp78s84fnnd.apps.googleusercontent.com",
               "client_type": 3
-            },
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:566802818676:android:7b6eb385ba740529169321",
+        "android_client_info": {
+          "package_name": "com.sarri.sarri_ride"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "566802818676-39hq76nlgjm52m90gv76dief0alqouc8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sarri.sarri_ride",
+            "certificate_hash": "46971c7b95c0f8d526b4761e2334c220d5ed2d5b"
+          }
+        },
+        {
+          "client_id": "566802818676-kuc13au4v6ifp3oe6qimcdp78s84fnnd.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAXQ1WizVy0J_LmYIg8Fxwr5X0MKx2Uhm0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
             {
-              "client_id": "21448281203-h3pdin61q71kfvg79q6e5e0mj7umg7nk.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.example.sarriRide"
-              }
+              "client_id": "566802818676-kuc13au4v6ifp3oe6qimcdp78s84fnnd.apps.googleusercontent.com",
+              "client_type": 3
             }
           ]
         }

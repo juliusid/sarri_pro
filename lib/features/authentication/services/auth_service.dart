@@ -149,18 +149,18 @@ class AuthService extends GetxService {
       final uri = Uri.parse(ApiConfig.driverUploadImagesEndpoint);
       final request = http.MultipartRequest('POST', uri);
 
-      // Add Headers (Authorization)
+      // --- 🔴 FIX START: Add Headers ---
       final token = _httpService.accessToken;
-      if (token != null) {
-        request.headers['Authorization'] = 'Bearer $token';
-      }
-      request.headers['Content-Type'] = 'multipart/form-data';
+      request.headers.addAll({
+        'Content-Type': 'multipart/form-data',
+        'x-api-key': ApiConfig.apiKey, // <--- YOU WERE MISSING THIS
+        if (token != null) 'Authorization': 'Bearer $token',
+      });
+      // --- FIX END ---
 
       // Helper to add file safely
       Future<void> addFile(String key, File file) async {
         final mimeTypeData = lookupMimeType(file.path)?.split('/');
-
-        // Default to jpeg if lookup fails, or ensure your picker only picks jpg/png
         final type = mimeTypeData != null ? mimeTypeData[0] : 'image';
         final subtype = mimeTypeData != null ? mimeTypeData[1] : 'jpeg';
 

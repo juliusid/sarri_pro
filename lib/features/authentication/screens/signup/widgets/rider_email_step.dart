@@ -1,11 +1,12 @@
-// lib/features/authentication/screens/signup/widgets/rider_email_step.dart
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/features/authentication/controllers/rider_signup_controller.dart';
+import 'package:sarri_ride/features/authentication/widgets/google_button.dart'; // ADDED
+import 'package:sarri_ride/utils/constants/colors.dart'; // ADDED
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/constants/text_strings.dart';
+import 'package:sarri_ride/utils/helpers/helper_functions.dart'; // ADDED
 import 'package:sarri_ride/utils/validators/validation.dart';
 
 class RiderEmailStep extends StatelessWidget {
@@ -14,6 +15,8 @@ class RiderEmailStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<RiderSignupController>();
+    final dark = THelperFunctions.isDarkMode(context); // Check dark mode
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -44,7 +47,7 @@ class RiderEmailStep extends StatelessWidget {
             ),
           ),
         ),
-        const Spacer(),
+        const SizedBox(height: TSizes.spaceBtwSections),
         SizedBox(
           width: double.infinity,
           child: Obx(
@@ -56,6 +59,40 @@ class RiderEmailStep extends StatelessWidget {
                   ? const CircularProgressIndicator(color: Colors.white)
                   : const Text('Send OTP'),
             ),
+          ),
+        ),
+
+        // --- ADDED: Divider ---
+        const SizedBox(height: TSizes.spaceBtwSections),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Flexible(
+              child: Divider(
+                color: dark ? TColors.darkGrey : TColors.grey,
+                thickness: .5,
+                indent: 60,
+                endIndent: 5,
+              ),
+            ),
+            const Text(TTexts.orSignInWith),
+            Flexible(
+              child: Divider(
+                color: dark ? TColors.darkGrey : TColors.grey,
+                thickness: .5,
+                indent: 5,
+                endIndent: 60,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: TSizes.spaceBtwSections),
+
+        // --- ADDED: Google Button ---
+        Obx(
+          () => GoogleSignInButton(
+            isLoading: controller.isGoogleLoading.value,
+            onPressed: () => controller.handleGoogleSignup(),
           ),
         ),
         const SizedBox(height: TSizes.spaceBtwItems),

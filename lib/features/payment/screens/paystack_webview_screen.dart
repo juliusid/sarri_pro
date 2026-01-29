@@ -166,32 +166,22 @@ class _PaystackWebViewScreenState extends State<PaystackWebViewScreen> {
               final uri = navigationAction.request.url;
 
               if (uri != null && uri.scheme == _callbackScheme) {
-                print("WEBVIEW: Intercepted custom scheme: $uri");
-
-                // Check success
-                // The URL is like: sarriride://payment-callback/payment/success?type=card_added
-                if (uri.path.contains('/payment/success')) {
+                // Check for success (Catching both "payment/success" and "payment-success")
+                if (uri.path.contains('payment/success') ||
+                    uri.path.contains('payment-success')) {
                   print("WEBVIEW: Payment success detected.");
                   Get.back(result: "success");
                 }
-                // Check failure
-                else if (uri.path.contains('/payment/failed')) {
-                  String reason =
-                      uri.queryParameters['reason'] ?? "Verification failed";
-                  print("WEBVIEW: Payment failed. Reason: $reason");
-                  // You might want to pass the specific reason back
+                // Check for failure (Catching both "payment/failed" and "payment-failed")
+                else if (uri.path.contains('payment/failed') ||
+                    uri.path.contains('payment-failed')) {
+                  print("WEBVIEW: Payment failure detected.");
                   Get.back(result: "failure");
-                }
-                // Fallback for any other sarriride:// link
-                else {
-                  print("WEBVIEW: Unknown custom link, closing.");
+                } else {
                   Get.back(result: "cancelled");
                 }
-
-                // Stop the WebView from trying to load "sarriride://" (which would crash/error)
                 return NavigationActionPolicy.CANCEL;
               }
-
               // Let normal http/https links load
               return NavigationActionPolicy.ALLOW;
             },

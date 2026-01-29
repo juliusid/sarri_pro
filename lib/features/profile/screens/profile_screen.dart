@@ -7,8 +7,7 @@ import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:iconsax/iconsax.dart';
-// --- 1. IMPORT THE NEW CONTROLLER ---
-import 'package:sarri_ride/features/profile/controllers/profile_controller.dart';
+import 'package:sarri_ride/features/profile/controllers/profile_controller.dart'; // Import
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -16,16 +15,27 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
-    // --- 2. INITIALIZE BOTH CONTROLLERS ---
     final drawerController = Get.find<MapDrawerController>();
-    final profileController = Get.put(
-      ProfileController(),
-    ); // Use put to create it
+
+    // Initialize the ProfileController to fetch stats
+    final profileController = Get.put(ProfileController());
 
     return Scaffold(
       backgroundColor: dark ? TColors.dark : TColors.lightGrey,
       appBar: AppBar(
-        // ... (app bar remains the same)
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          onPressed: () => Get.back(),
+          icon: Icon(
+            Iconsax.arrow_left_2,
+            color: dark ? TColors.white : TColors.black,
+          ),
+        ),
+        title: Text(
+          "Profile",
+          style: TextStyle(color: dark ? TColors.white : TColors.black),
+        ),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -36,7 +46,6 @@ class ProfileScreen extends StatelessWidget {
               margin: const EdgeInsets.all(TSizes.defaultSpace),
               padding: const EdgeInsets.all(TSizes.defaultSpace),
               decoration: BoxDecoration(
-                // ... (decoration remains the same)
                 gradient: LinearGradient(
                   colors: [TColors.primary, TColors.primary.withOpacity(0.8)],
                   begin: Alignment.topLeft,
@@ -53,11 +62,10 @@ class ProfileScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  // --- 3. WRAP AVATAR STACK WITH Obx FOR LOADING ---
+                  // Avatar Stack
                   Obx(
                     () => Stack(
                       children: [
-                        // --- 4. WRAP CircleAvatar WITH Obx FOR IMAGE UPDATES ---
                         Obx(() {
                           final pictureUrl =
                               drawerController.fullProfile.value?.picture;
@@ -66,17 +74,11 @@ class ProfileScreen extends StatelessWidget {
                           if (pictureUrl != null && pictureUrl.isNotEmpty) {
                             backgroundImage = NetworkImage(pictureUrl);
                           }
-                          // } else {
-                          //   backgroundImage = const AssetImage(
-                          //     'assets/images/placeholder_user.png',
-                          //   ); // Add a placeholder asset if you want
-                          // }
 
                           return CircleAvatar(
                             radius: TSizes.xl + TSizes.lg,
                             backgroundColor: TColors.white.withOpacity(0.2),
                             backgroundImage: backgroundImage,
-                            // Show icon only if there is no image
                             child: (pictureUrl == null || pictureUrl.isEmpty)
                                 ? Icon(
                                     Iconsax.user,
@@ -87,11 +89,9 @@ class ProfileScreen extends StatelessWidget {
                           );
                         }),
 
-                        // --- END 4. ---
                         Positioned(
                           bottom: 0,
                           right: 0,
-                          // --- 5. UPDATE onTap TO USE profileController ---
                           child: GestureDetector(
                             onTap: () =>
                                 profileController.showImageSourceDialog(),
@@ -114,7 +114,6 @@ class ProfileScreen extends StatelessWidget {
                           ),
                         ),
 
-                        // --- 6. ADD LOADING INDICATOR ---
                         if (profileController.isLoading.value)
                           Positioned.fill(
                             child: Container(
@@ -133,13 +132,11 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // --- END 3. & 6. ---
                   const SizedBox(height: TSizes.spaceBtwItems),
 
-                  // This Obx already exists and is correct
                   Obx(
                     () => Text(
-                      drawerController.userName.value, // <-- Use real name
+                      drawerController.userName.value,
                       style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(
                             color: TColors.white,
@@ -150,14 +147,13 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: TSizes.xs),
                   Obx(
                     () => Text(
-                      drawerController.userEmail.value, // <-- Use real email
+                      drawerController.userEmail.value,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: TColors.white.withOpacity(0.8),
                       ),
                     ),
                   ),
 
-                  // ... (rest of the header card)
                   const SizedBox(height: TSizes.spaceBtwItems),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -178,7 +174,7 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         const SizedBox(width: TSizes.xs),
                         Text(
-                          '4.8 Rating', // This is still hardcoded
+                          '5.0 Rating', // Keep this default or fetch if available
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: TColors.white,
@@ -192,8 +188,7 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
 
-            // ... (rest of the ProfileScreen)
-            // Quick Stats Row
+            // Quick Stats Row (UPDATED TO USE REAL DATA)
             Container(
               margin: const EdgeInsets.symmetric(
                 horizontal: TSizes.defaultSpace,
@@ -201,24 +196,28 @@ class ProfileScreen extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: _buildStatCard(
-                      icon: Iconsax.car,
-                      title: 'Total Rides',
-                      value: '47', // This is still hardcoded
-                      color: TColors.info,
-                      dark: dark,
-                      context: context,
+                    child: Obx(
+                      () => _buildStatCard(
+                        icon: Iconsax.car,
+                        title: 'Total Rides',
+                        value: profileController.totalRides.value, // REAL DATA
+                        color: TColors.info,
+                        dark: dark,
+                        context: context,
+                      ),
                     ),
                   ),
                   const SizedBox(width: TSizes.spaceBtwItems),
                   Expanded(
-                    child: _buildStatCard(
-                      icon: Iconsax.wallet_money,
-                      title: 'Total Spent',
-                      value: '₦45,200', // This is still hardcoded
-                      color: TColors.success,
-                      dark: dark,
-                      context: context,
+                    child: Obx(
+                      () => _buildStatCard(
+                        icon: Iconsax.wallet_money,
+                        title: 'Total Spent',
+                        value: profileController.totalSpent.value, // REAL DATA
+                        color: TColors.success,
+                        dark: dark,
+                        context: context,
+                      ),
                     ),
                   ),
                 ],
@@ -375,7 +374,6 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // ... (all helper methods _buildStatCard, _buildProfileOption, _editProfile, etc. remain the same) ...
   Widget _buildStatCard({
     required IconData icon,
     required String title,
@@ -485,9 +483,5 @@ class ProfileScreen extends StatelessWidget {
 
   void _privacySettings() {
     THelperFunctions.showSnackBar('Privacy settings coming soon');
-  }
-
-  void _editEmergencyContact() {
-    THelperFunctions.showSnackBar('Emergency contact edit coming soon');
   }
 }

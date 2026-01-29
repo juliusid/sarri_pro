@@ -1,3 +1,5 @@
+// lib/features/authentication/screens/signup/widgets/driver_otp_step.dart
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -19,10 +21,15 @@ class DriverOtpStep extends StatelessWidget {
           onPressed: () => controller.previousStep(),
         ),
         const SizedBox(height: TSizes.spaceBtwSections),
-        Text("Verify your Email", style: Theme.of(context).textTheme.headlineMedium),
+        Text(
+          "Verify your Email",
+          style: Theme.of(context).textTheme.headlineMedium,
+        ),
         const SizedBox(height: TSizes.spaceBtwItems),
-        Text("We sent an OTP to ${controller.emailController.text}. Please enter it below.",
-            style: Theme.of(context).textTheme.bodyLarge),
+        Text(
+          "We sent an OTP to ${controller.emailController.text}. Please enter it below.",
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
         const SizedBox(height: TSizes.spaceBtwSections * 2),
         Form(
           key: controller.otpFormKey,
@@ -31,16 +38,44 @@ class DriverOtpStep extends StatelessWidget {
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
             maxLength: 6,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(letterSpacing: 20),
-            decoration: const InputDecoration(labelText: 'OTP', counterText: ""),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineMedium?.copyWith(letterSpacing: 20),
+            decoration: const InputDecoration(
+              labelText: 'OTP',
+              counterText: "",
+            ),
           ),
         ),
+
+        const SizedBox(height: TSizes.spaceBtwItems),
+
+        // --- NEW: RESEND UI ---
+        Center(
+          child: Obx(
+            () => controller.resendTimer.value > 0
+                ? Text(
+                    "Resend OTP in ${controller.resendTimer.value}s",
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                  )
+                : TextButton(
+                    onPressed: () =>
+                        controller.sendVerificationEmail(isResend: true),
+                    child: const Text("Resend OTP"),
+                  ),
+          ),
+        ),
+
         const Spacer(),
         SizedBox(
           width: double.infinity,
           child: Obx(
             () => ElevatedButton(
-              onPressed: controller.isLoading.value ? null : () => controller.verifyOtp(),
+              onPressed: controller.isLoading.value
+                  ? null
+                  : () => controller.verifyOtp(),
               child: controller.isLoading.value
                   ? const CircularProgressIndicator(color: Colors.white)
                   : const Text('Verify & Proceed'),

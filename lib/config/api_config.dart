@@ -4,14 +4,13 @@ class ApiConfig {
   static const String apiKey = "the_sarriride_2025@development_Backend";
   static const String _devBaseUrl =
       // 'https://sarriride.onrender.com'; // Replace with your dev API URL
-      'https://oyster-app-kfpml.ondigitalocean.app'; // Development API URL
+      'https://oyster-app-kfpml.ondigitalocean.app';
   static const String _stagingBaseUrl =
       // 'https://sarriride.onrender.com'; // Replace with your staging API URL
-      'https://oyster-app-kfpml.ondigitalocean.app'; // Development API URL
-
+      'https://oyster-app-kfpml.ondigitalocean.app';
   static const String _prodBaseUrl =
       // 'https://sarriride.onrender.com'; // Replace with your production API URL
-      'https://oyster-app-kfpml.ondigitalocean.app'; // Development API URL
+      'https://oyster-app-kfpml.ondigitalocean.app';
 
   // Timeouts
   static const Duration _connectionTimeout = Duration(seconds: 30);
@@ -39,6 +38,23 @@ class ApiConfig {
     } else {
       return _devBaseUrl;
     }
+  }
+
+  static String get isProductionUrl {
+    if (baseUrl == 'https://oyster-app-kfpml.ondigitalocean.app') {
+      print(
+        "___________________________________________ PRODUCTION __________________________________________________________",
+      );
+    } else if (baseUrl == 'https://sarriride.onrender.com') {
+      print(
+        "___________________________________________ STAGING __________________________________________________________",
+      );
+    } else {
+      print(
+        "___________________________________________ DEVELOPMENT __________________________________________________________",
+      );
+    }
+    return baseUrl;
   }
 
   // Get connection timeout

@@ -24,7 +24,7 @@ class MapPickerScreen extends StatefulWidget {
 class _MapPickerScreenState extends State<MapPickerScreen> {
   GoogleMapController? _mapController;
   final LocationService _locationService = LocationService.instance;
-  
+
   LatLng? _selectedLocation;
   String _selectedAddress = 'Loading address...';
   bool _isLoadingAddress = false;
@@ -77,10 +77,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   }
 
   CameraPosition get _initialCameraPosition {
-    return CameraPosition(
-      target: _selectedLocation!,
-      zoom: 16.0,
-    );
+    return CameraPosition(target: _selectedLocation!, zoom: 16.0);
   }
 
   void _onMapCreated(GoogleMapController controller) {
@@ -113,7 +110,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         location.latitude,
         location.longitude,
       );
-      
+
       setState(() {
         _selectedAddress = address ?? 'Unknown location';
         _isLoadingAddress = false;
@@ -141,20 +138,25 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       );
 
       // Return the selected location and details
-      Get.back(result: {
-        'location': _selectedLocation,
-        'address': _selectedAddress,
-        'name': placeDetails?.name ?? _selectedAddress,
-        'formattedAddress': placeDetails?.formattedAddress ?? _selectedAddress,
-      });
+      Get.back(
+        result: {
+          'location': _selectedLocation,
+          'address': _selectedAddress,
+          'name': placeDetails?.name ?? _selectedAddress,
+          'formattedAddress':
+              placeDetails?.formattedAddress ?? _selectedAddress,
+        },
+      );
     } catch (e) {
       // Return basic information if detailed lookup fails
-      Get.back(result: {
-        'location': _selectedLocation,
-        'address': _selectedAddress,
-        'name': _selectedAddress,
-        'formattedAddress': _selectedAddress,
-      });
+      Get.back(
+        result: {
+          'location': _selectedLocation,
+          'address': _selectedAddress,
+          'name': _selectedAddress,
+          'formattedAddress': _selectedAddress,
+        },
+      );
     }
 
     setState(() {
@@ -181,7 +183,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   @override
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
-    
+
     return Scaffold(
       body: Stack(
         children: [
@@ -231,7 +233,10 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
             right: 0,
             child: SafeArea(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: (dark ? TColors.dark : Colors.white).withOpacity(0.95),
                   boxShadow: [
@@ -285,10 +290,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
               ),
               child: IconButton(
                 onPressed: _getCurrentLocation,
-                icon: Icon(
-                  Icons.my_location,
-                  color: TColors.primary,
-                ),
+                icon: Icon(Icons.my_location, color: TColors.primary),
               ),
             ),
           ),
@@ -329,7 +331,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 20),
 
                     // Selected location info
@@ -355,9 +357,12 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                             children: [
                               Text(
                                 'Selected Location',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: dark ? TColors.lightGrey : TColors.darkGrey,
-                                ),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: dark
+                                          ? TColors.lightGrey
+                                          : TColors.darkGrey,
+                                    ),
                               ),
                               const SizedBox(height: 4),
                               _isLoadingAddress
@@ -368,23 +373,29 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                                           height: 16,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(
-                                              TColors.primary,
-                                            ),
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  TColors.primary,
+                                                ),
                                           ),
                                         ),
                                         const SizedBox(width: 8),
                                         Text(
                                           'Getting address...',
-                                          style: Theme.of(context).textTheme.bodyMedium,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodyMedium,
                                         ),
                                       ],
                                     )
                                   : Text(
                                       _selectedAddress,
-                                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w500,
+                                          ),
                                     ),
                             ],
                           ),
@@ -398,7 +409,9 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _isConfirming || _isLoadingAddress ? null : _confirmLocation,
+                        onPressed: _isConfirming || _isLoadingAddress
+                            ? null
+                            : _confirmLocation,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: TColors.primary,
                           foregroundColor: Colors.white,
@@ -413,16 +426,15 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
                               )
                             : Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(
-                                    Iconsax.tick_circle,
-                                    size: 20,
-                                  ),
+                                  const Icon(Iconsax.tick_circle, size: 20),
                                   const SizedBox(width: 8),
                                   Text(
                                     'Confirm Location',
@@ -444,4 +456,4 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       ),
     );
   }
-} 
+}

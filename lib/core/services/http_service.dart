@@ -1,5 +1,6 @@
 // lib/core/services/http_service.dart
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math'; // For min function
@@ -246,7 +247,6 @@ class HttpService extends GetxService {
   Future<http.Response> _makeRequest(
     Future<http.Response> Function() requestFunction, {
     bool requiresAuth = true,
-    // Details needed for retry
     required String method,
     required String endpoint,
     Map<String, String>? headers,
@@ -254,14 +254,16 @@ class HttpService extends GetxService {
     Map<String, dynamic>? queryParameters,
   }) async {
     try {
-      http.Response response = await requestFunction();
+      // 1. ADD TIMEOUT HERE
+      http.Response response = await requestFunction().timeout(
+        ApiConfig.receiveTimeout,
+      );
 
       if (response.statusCode == 401 && requiresAuth) {
         print(
           "HTTP_SERVICE: Received 401 for $method $endpoint. Attempting token refresh...",
         );
 
-        // --- MODIFIED: Get UserID for refresh ---
         ClientData? currentUser =
             Get.isRegistered<ClientData>(tag: 'currentUser')
             ? Get.find<ClientData>(tag: 'currentUser')
@@ -272,22 +274,22 @@ class HttpService extends GetxService {
             "HTTP_SERVICE: 401 received, but no user data/ID found. Logging out.",
           );
           _handleLogoutRedirect("Session invalid. Please log in again.");
-          return response; // Return original 401
+          return response;
         }
+
         bool isDriver = currentUser.role == 'driver';
         String userId = currentUser.id;
-        // --- END MODIFIED ---
 
         bool refreshed = await refreshTokenImmediately(
           isDriver: isDriver,
           userId: userId,
-        ); // <-- PASS userId
+        );
 
         if (refreshed) {
           print(
             "HTTP_SERVICE: Token refreshed. Retrying original request $method $endpoint...",
           );
-          // --- RETRY LOGIC (unchanged) ---
+
           Future<http.Response> Function() retryFunction;
           final uri = Uri.parse(
             endpoint,
@@ -319,35 +321,38 @@ class HttpService extends GetxService {
               retryFunction = () => _client.delete(uri, headers: retryHeaders);
               break;
             default:
-              print("HTTP_SERVICE: Unknown method '$method' for retry.");
               return response;
           }
+
+          // Retry also gets a timeout
           http.Response retryResponse = await retryFunction().timeout(
             ApiConfig.receiveTimeout,
           );
-          print(
-            "HTTP_SERVICE: Retry request completed with status: ${retryResponse.statusCode}",
-          );
           return retryResponse;
-          // --- END RETRY LOGIC ---
         } else {
-          print(
-            "HTTP_SERVICE: Refresh failed. Returning original 401 response for $method $endpoint.",
-          );
           return response;
         }
       }
 
-      return response; // Return original response if not 401
+      return response;
     } catch (e) {
-      print(
-        "HTTP_SERVICE: Network or timeout error during request ($method $endpoint): $e",
-      );
+      // 2. IMPROVED ERROR CATCHING
+      String message = 'Network error occurred';
+
+      if (e is TimeoutException) {
+        message = 'Connection timed out. Your internet is unstable.';
+      } else if (e is SocketException) {
+        message = 'No internet connection.';
+      } else {
+        message = 'Network error: ${e.toString()}';
+      }
+
+      print("HTTP_SERVICE: $message ($method $endpoint): $e");
+
+      // Return a 503 (Service Unavailable) with the specific message
+      // Your handleResponse method will pick this up and show it to the user.
       return http.Response(
-        json.encode({
-          'status': 'error',
-          'message': 'Network error: ${e.toString()}',
-        }),
+        json.encode({'status': 'error', 'message': message}),
         503,
         headers: {'content-type': 'application/json'},
       );

@@ -192,6 +192,7 @@ class LoginController extends GetxController {
 
   // Handle social login (Google)
   Future<void> handleGoogleLogin() async {
+    // 1. Check User Role (Google Sign-In is usually for Riders)
     if (selectedRole.value != UserType.rider) {
       THelperFunctions.showErrorSnackBar(
         'Error',
@@ -201,126 +202,98 @@ class LoginController extends GetxController {
     }
 
     isGoogleLoading.value = true;
+
     try {
-      // --- CONFIGURE GOOGLE SIGN IN ---
+      // 2. Configure Google Sign In
+      // I extracted this ID from the google-services.json you sent me.
+      // It is the "Web client (auto created by Google Service)"
       final googleSignIn = GoogleSignIn(
         serverClientId:
-            '189458277367-bnqmk6rsrtnh7no8u05vltkmsch4n6ig.apps.googleusercontent.com',
+            '566802818676-kuc13au4v6ifp3oe6qimcdp78s84fnnd.apps.googleusercontent.com',
+        scopes: ['email', 'profile'],
       );
 
-      await googleSignIn.signOut(); // Force account picker
+      // 3. Start the Sign-In Process
+      await googleSignIn.signOut(); // Ensure we are starting fresh
       final googleUser = await googleSignIn.signIn();
 
       if (googleUser != null) {
+        // 4. Get the Token
         final googleAuth = await googleUser.authentication;
         final googleToken = googleAuth.idToken;
 
         if (googleToken != null) {
-          print("LOGIN_CONTROLLER: Attempting Google Sign-In with token...");
+          print(
+            "LOGIN_CONTROLLER: Got Token from Google. Sending to Backend...",
+          );
+
+          // 5. Send the Token to YOUR Backend
+          // This calls the 'loginWithGoogle' method in your AuthService
           final loginResult = await AuthService.instance.loginWithGoogle(
             googleToken,
           );
 
           if (loginResult.success && loginResult.client != null) {
-            print(
-              "LOGIN_CONTROLLER: Google login successful via backend. Storing user data...",
-            );
+            print("LOGIN_CONTROLLER: Backend accepted the login!");
 
+            // --- SAVE DATA & NAVIGATE (Standard Login Flow) ---
+
+            // Clear old data
             if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
               Get.delete<ClientData>(tag: 'currentUser', force: true);
             }
 
+            // Save new user data
             Get.put<ClientData>(
               loginResult.client!,
               tag: 'currentUser',
               permanent: true,
             );
 
-            // Refresh user data
-            final drawerController = Get.find<MapDrawerController>();
-            await drawerController.refreshUserData();
-
+            // Save to local storage
             final storage = GetStorage();
             storage.write('user_role', loginResult.client!.role);
+            storage.write('current_user_data', loginResult.client!.toJson());
 
-            print(
-              "LOGIN_CONTROLLER: Attempting immediate token refresh after Google login...",
-            );
-            final String userId = loginResult.client!.id;
-            bool refreshSuccess = await HttpService.instance
-                .refreshTokenImmediately(
-                  isDriver: false, // Google login is for riders
-                  userId: userId,
-                );
-
-            if (!refreshSuccess) {
-              print(
-                "LOGIN_CONTROLLER: Immediate refresh failed after Google login. Logout initiated.",
-              );
-              await googleSignIn.signOut();
-              isGoogleLoading.value = false;
-              return;
-            }
-            print("LOGIN_CONTROLLER: Immediate token refresh successful.");
-
-            print("LOGIN_CONTROLLER: Connecting WebSocket for Rider...");
+            // Connect to Realtime features
             WebSocketService.instance.connect();
 
-            // CHECK FOR PHONE NUMBER
+            // Navigate
+            final drawerController = Get.find<MapDrawerController>();
+            await drawerController
+                .refreshUserData(); // Ensure profile is loaded
+
+            // Check if phone number needs verification
             final profile = drawerController.fullProfile.value;
-
-            // --- FIXED: Uncommented Phone Number Verification Logic for Google ---
-
-            // Check if profile exists and phone number is missing OR not verified
             if (profile != null && profile.phoneNumberVerified == false) {
-              print(
-                "LOGIN_CONTROLLER: Phone number missing. Forcing verification.",
-              );
-
-              // 1. Uncommented verification screen
               Get.offAll(() => const PhoneNumberScreen());
-
-              // 2. Removed bypass to MapScreen
-              // Get.offAll(() => const MapScreenGetX());
-
-              THelperFunctions.showSnackBar(
-                'Please verify your phone number to continue.',
-              );
             } else {
-              // Phone number exists, proceed to map
               Get.offAll(() => const MapScreenGetX());
               THelperFunctions.showSuccessSnackBar('Success', 'Welcome!');
             }
           } else {
+            // Backend rejected the token
             await googleSignIn.signOut();
             THelperFunctions.showErrorSnackBar(
               'Login Failed',
-              loginResult.error ?? 'Google login failed on our server.',
+              loginResult.error ?? 'Server rejected the login.',
             );
           }
         } else {
-          await googleSignIn.signOut();
           THelperFunctions.showErrorSnackBar(
             'Error',
-            'Could not get Google ID token.',
+            'Google did not return a token.',
           );
         }
-      } else {
-        print("LOGIN_CONTROLLER: Google Sign-In cancelled by user.");
       }
     } catch (e) {
       THelperFunctions.showErrorSnackBar(
         'Error',
         'Google login failed: ${e.toString()}',
       );
-      print("LOGIN_CONTROLLER: Google Sign-In Error: $e");
-      try {
-        await GoogleSignIn().signOut();
-      } catch (_) {}
+      print("Google Sign-In Error: $e");
     } finally {
-      if (!isClosed) {
-        isGoogleLoading.value = false;
-      }
+      isGoogleLoading.value = false;
     }
   }
 

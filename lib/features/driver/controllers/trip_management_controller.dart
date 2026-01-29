@@ -480,26 +480,34 @@ class TripManagementController extends GetxController {
 
   Future<void> _startNavigationToDestination() async {
     if (activeTrip.value == null || driverLocation.value == null) return;
-    if (tripStatus.value != TripStatus.arrivedAtPickup) {
+
+    // 1. Allow if we are already in progress (Restoration)
+    if (tripStatus.value != TripStatus.arrivedAtPickup &&
+        tripStatus.value != TripStatus.tripInProgress) {
       THelperFunctions.showSnackBar("Confirm arrival at pickup first.");
       return;
     }
 
     try {
-      final responseData = await _driverTripService.startTrip(
-        activeTrip.value!.id,
-        driverLocation.value!.latitude,
-        driverLocation.value!.longitude,
-      );
-
-      if (responseData['status'] != 'success') {
-        THelperFunctions.showErrorSnackBar(
-          "Error",
-          responseData['message'] ?? 'Failed to start trip.',
+      // 2. Only call the server if we are transitioning FROM Arrived TO InProgress.
+      if (tripStatus.value == TripStatus.arrivedAtPickup) {
+        final responseData = await _driverTripService.startTrip(
+          activeTrip.value!.id,
+          driverLocation.value!.latitude,
+          driverLocation.value!.longitude,
         );
-        return;
+
+        if (responseData['status'] != 'success') {
+          THelperFunctions.showErrorSnackBar(
+            "Error",
+            responseData['message'] ?? 'Failed to start trip.',
+          );
+          return;
+        }
+        THelperFunctions.showSuccessSnackBar('Success', 'Trip started!');
       }
 
+      // 3. MAP & BANNER DATA: Always runs to populate UI
       tripStatus.value = TripStatus.tripInProgress;
       isNavigating.value = true;
 
@@ -510,9 +518,15 @@ class TripManagementController extends GetxController {
 
       if (routeInfo.points.isNotEmpty) {
         currentRoute.assignAll(routeInfo.points);
+
+        // Populate precise calculation variables
         _initialRouteDistanceKm = routeInfo.distanceValue / 1000.0;
         _initialRouteDurationMinutes = (routeInfo.durationValue / 60).round();
         _navigationStartTime = DateTime.now();
+
+        // Update UI Observables immediately
+        distanceToDestination.value = _initialRouteDistanceKm;
+        estimatedTimeToDestination.value = _initialRouteDurationMinutes;
 
         mapPolylines.clear();
         mapPolylines.add(
@@ -531,12 +545,14 @@ class TripManagementController extends GetxController {
 
       activeTrip.value = activeTrip.value!.copyWith(
         status: TripStatus.tripInProgress,
-        pickupTime: DateTime.now(),
+        pickupTime: activeTrip.value!.pickupTime ?? DateTime.now(),
       );
-
-      THelperFunctions.showSuccessSnackBar('Success', 'Trip started!');
     } catch (e) {
-      THelperFunctions.showErrorSnackBar("Error", "Start trip failed: $e");
+      print("Navigation Error: $e");
+      THelperFunctions.showErrorSnackBar(
+        "Error",
+        "Could not load trip route: $e",
+      );
     }
     update();
   }
@@ -760,137 +776,94 @@ class TripManagementController extends GetxController {
 
   void _scheduleNextLocationUpdate() {
     _locationUpdateLoopTimer?.cancel();
-    if (!_webSocketService.isConnected.value ||
-        !HttpService.instance.isAuthenticated) {
+
+    // If not authenticated, slow down
+    if (!HttpService.instance.isAuthenticated) {
+      _locationUpdateLoopTimer = Timer(
+        const Duration(seconds: 30),
+        () => _runLocationUpdate(false),
+      );
       return;
     }
 
     final String currentTaskStatus =
         _dashboardController?.driverTaskStatus.value ?? 'unavailable';
     final bool isOnlineIntent = _dashboardController?.isOnline.value ?? false;
-    final bool isOnBreak = _dashboardController?.isOnBreak.value ?? false;
 
     Duration nextInterval;
     bool shouldSendUpdate = true;
 
-    if (isOnBreak) {
-      nextInterval = const Duration(seconds: 15);
-    } else if (currentTaskStatus == 'on_trip' ||
-        currentTaskStatus == 'accepted' ||
-        currentTaskStatus == 'booked') {
-      nextInterval = const Duration(seconds: 3);
-    } else if (isOnlineIntent && currentTaskStatus == 'available') {
-      nextInterval = const Duration(seconds: 10);
+    // THE FIX: Check hasActiveTrip directly.
+    // If we have a trip, we MUST ping fast (4s), regardless of dashboard status.
+    if (hasActiveTrip || (isOnlineIntent && currentTaskStatus == 'available')) {
+      nextInterval = const Duration(seconds: 4);
     } else {
       shouldSendUpdate = false;
-      nextInterval = const Duration(seconds: 30);
+      nextInterval = const Duration(seconds: 20);
     }
 
-    final jitterMs = (math.Random().nextDouble() * 1000).toInt();
-    _locationUpdateLoopTimer = Timer(
-      nextInterval + Duration(milliseconds: jitterMs),
-      () {
-        _runLocationUpdate(shouldSendUpdate);
-      },
-    );
+    _locationUpdateLoopTimer = Timer(nextInterval, () {
+      _runLocationUpdate(shouldSendUpdate);
+    });
   }
 
   Future<void> _runLocationUpdate(bool shouldSendUpdate) async {
-    if (!_webSocketService.isConnected.value ||
-        !HttpService.instance.isAuthenticated) {
-      _scheduleNextLocationUpdate();
-      return;
-    }
+    // We remove the connection check here so the loop keeps running
+    // even during a temporary disconnect, attempting to reconnect.
 
     try {
       final position = _locationService.getLocationForMap();
       final newLocation = LatLng(position.latitude, position.longitude);
-      bool hasMoved =
-          driverLocation.value == null ||
-          _calculateDistance(driverLocation.value!, newLocation) > 0.005;
 
-      if (hasMoved) {
-        driverLocation.value = newLocation;
-        _updateDriverLocationOnMap();
+      // Update local map UI
+      driverLocation.value = newLocation;
+      _updateDriverLocationOnMap();
 
-        if (isNavigating.value && mapController != null) {
-          mapController!.animateCamera(
-            CameraUpdate.newCameraPosition(
-              CameraPosition(
-                target: newLocation,
-                zoom: 17.0,
-                bearing: position.heading,
-                tilt: 45.0,
-              ),
+      if (isNavigating.value && mapController != null) {
+        mapController!.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: newLocation,
+              zoom: 17.0,
+              bearing: position.heading,
+              tilt: 45.0,
             ),
-          );
-        }
-      }
-
-      if (_currentState.isEmpty) await updateCurrentStateFromLocation();
-
-      final String currentTaskStatus =
-          _dashboardController?.driverTaskStatus.value ?? 'unavailable';
-      final bool isOnlineIntent = _dashboardController?.isOnline.value ?? false;
-      final bool isOnBreak = _dashboardController?.isOnBreak.value ?? false;
-
-      String availabilityStatusToSend;
-      if (isOnBreak) {
-        availabilityStatusToSend = 'unavailable';
-      } else if ([
-        'on_trip',
-        'accepted',
-        'booked',
-      ].contains(currentTaskStatus)) {
-        availabilityStatusToSend = currentTaskStatus;
-      } else if (isOnlineIntent && currentTaskStatus == 'available') {
-        availabilityStatusToSend = 'available';
-      } else {
-        availabilityStatusToSend = 'unavailable';
-      }
-
-      if (shouldSendUpdate) {
-        String? currentTripId;
-        if (activeTrip.value != null &&
-            (tripStatus.value == TripStatus.drivingToPickup ||
-                tripStatus.value == TripStatus.tripInProgress)) {
-          currentTripId = activeTrip.value!.id;
-        }
-        _webSocketService.updateDriverLocation(
-          latitude: driverLocation.value!.latitude,
-          longitude: driverLocation.value!.longitude,
-          state: _currentState.isEmpty ? "Ogun" : _currentState,
-          availabilityStatus: availabilityStatusToSend,
-          tripId: currentTripId,
-          heading: position.heading,
-          speed: position.speed,
+          ),
         );
       }
 
-      if (isNavigating.value &&
-          [
-            'on_trip',
-            'accepted',
-            'drivingToPickup',
-          ].contains(availabilityStatusToSend)) {
+      // FORCE send update if there is an active trip, even if dashboard says "offline"
+      bool forceUpdate = hasActiveTrip;
+
+      if ((shouldSendUpdate || forceUpdate) &&
+          _webSocketService.isConnected.value) {
+        String statusToSend = forceUpdate
+            ? 'on_trip'
+            : (_dashboardController?.driverTaskStatus.value ?? 'available');
+
+        _webSocketService.updateDriverLocation(
+          latitude: position.latitude,
+          longitude: position.longitude,
+          state: _currentState.isEmpty ? "Lagos" : _currentState,
+          availabilityStatus: statusToSend,
+          tripId: activeTrip.value?.id,
+          heading: position.heading,
+          speed: position.speed,
+        );
+        print("Location Ping Sent: $statusToSend"); // Verification Print
+      }
+
+      // Update Navigation Banner
+      if (isNavigating.value) {
         _updateNavigationInstructions();
-        if (driverLocation.value != null && currentRoute.isNotEmpty) {
-          if (_isOffRoute(driverLocation.value!, currentRoute)) {
-            _recalculateRoute();
-          }
-        }
-        if (_isNearDestination()) {
-          isNavigating.value = false;
-          _handleArrival();
-        }
       }
     } catch (e) {
-      print("Error in _runLocationUpdate: $e");
+      print("Error in location loop: $e");
     } finally {
+      // THE FIX: Always schedule the next update no matter what happened above
       _scheduleNextLocationUpdate();
     }
   }
-
   // --- RE-ROUTING ---
 
   bool _isOffRoute(LatLng driverLoc, List<LatLng> routePoints) {
@@ -1134,6 +1107,8 @@ class TripManagementController extends GetxController {
     LatLng? pickupLoc;
     LatLng? destLoc;
 
+    // 1. Resolve locations (Cached/Places)
+    // Pickup
     if (data.pickup.toLowerCase().contains('current location')) {
       final pos = _locationService.getLocationForMap();
       pickupLoc = LatLng(pos.latitude, pos.longitude);
@@ -1147,6 +1122,7 @@ class TripManagementController extends GetxController {
       }
     }
 
+    // Destination
     final dSuggestions = await PlacesService.getPlaceSuggestions(
       data.destination,
     );
@@ -1157,24 +1133,30 @@ class TripManagementController extends GetxController {
       destLoc = dDetails?.location;
     }
 
+    // 2. Refresh current position
     await _locationService.refreshLocation();
     final currentPos = _locationService.getLocationForMap();
-    final driverCurrentLoc = LatLng(currentPos.latitude, currentPos.longitude);
-    driverLocation.value = driverCurrentLoc;
+    driverLocation.value = LatLng(currentPos.latitude, currentPos.longitude);
 
+    // 3. Initialize navigation variables
+    _initialRouteDistanceKm = data.distance;
+    _initialRouteDurationMinutes = (data.distance * 2).round();
+    _navigationStartTime = DateTime.now();
+
+    // 4. Set Active Trip Model
     activeTrip.value = ActiveTrip(
       id: data.tripId,
       riderId: data.riderId,
       riderName: data.riderName,
       riderPhone: '',
       riderRating: 0.0,
-      pickupLocation: pickupLoc ?? driverCurrentLoc,
-      destinationLocation: destLoc ?? driverCurrentLoc,
+      pickupLocation: pickupLoc ?? driverLocation.value!,
+      destinationLocation: destLoc ?? driverLocation.value!,
       pickupAddress: data.pickup,
       destinationAddress: data.destination,
       fare: data.price,
       distance: data.distance,
-      estimatedDuration: 0,
+      estimatedDuration: _initialRouteDurationMinutes,
       rideType: data.category,
       startTime: DateTime.now(),
       status: TripStatus.none,
@@ -1184,6 +1166,7 @@ class TripManagementController extends GetxController {
     _storage.write('active_ride_id', data.tripId);
     _updateDriverLocationOnMap();
 
+    // 5. Restore specific status and trigger navigation
     switch (data.status.toLowerCase()) {
       case 'booked':
       case 'accepted':
@@ -1194,41 +1177,63 @@ class TripManagementController extends GetxController {
       case 'arrived':
         tripStatus.value = TripStatus.arrivedAtPickup;
         _addPickupMarker(activeTrip.value!.pickupLocation);
+        // If we arrived, navigation stops, so we check if button should be visible
         break;
       case 'on-trip':
       case 'in_progress':
         tripStatus.value = TripStatus.tripInProgress;
         _addDestinationMarker(activeTrip.value!.destinationLocation);
-        _startNavigationToDestination();
+        await _startNavigationToDestination();
+        _fitMapToCurrentRoute();
         break;
       default:
         _resetTripState();
+        return; // Exit early if no valid status
     }
+
+    // --- THE CRITICAL ADDITION FOR YOUR QUESTION ---
+    // 6. Immediate Proximity Check after restoration
+    // This forces the UI to show "Start Trip" or "Complete Trip" immediately
+    // if the driver is already within the 1km threshold upon app launch.
+    if (hasActiveTrip) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (_isNearDestination()) {
+          print(
+            "RESTORATION: Proximity detected immediately. Triggering Arrival.",
+          );
+          _handleArrival();
+        }
+      });
+    }
+
+    update(); // Force GetX update for UI
   }
 
   void _updateNavigationInstructions() {
-    if (activeTrip.value == null ||
-        !isNavigating.value ||
-        _navigationStartTime == null ||
-        (_initialRouteDurationMinutes <= 0 && _initialRouteDistanceKm <= 0)) {
-      return;
-    }
+    if (activeTrip.value == null || !isNavigating.value) return;
 
+    double initialDistance = _initialRouteDistanceKm > 0
+        ? _initialRouteDistanceKm
+        : activeTrip.value!.distance;
+    int initialDuration = _initialRouteDurationMinutes > 0
+        ? _initialRouteDurationMinutes
+        : activeTrip.value!.estimatedDuration;
+
+    if (initialDistance <= 0) return;
+
+    _navigationStartTime ??= DateTime.now();
     DateTime startTime = _navigationStartTime!;
-    double initialDistance = _initialRouteDistanceKm;
-    int initialDuration = _initialRouteDurationMinutes;
 
+    // Banner Text
     if (tripStatus.value == TripStatus.drivingToPickup) {
       navigationInstruction.value =
           'Continue to pickup: ${activeTrip.value!.pickupAddress}';
     } else if (tripStatus.value == TripStatus.tripInProgress) {
       navigationInstruction.value =
           'Continue to destination: ${activeTrip.value!.destinationAddress}';
-    } else {
-      isNavigating.value = false;
-      return;
     }
 
+    // Countdown Logic
     if (initialDuration > 0) {
       final elapsedSeconds = DateTime.now().difference(startTime).inSeconds;
       final elapsedMinutes = elapsedSeconds / 60.0;
@@ -1236,7 +1241,10 @@ class TripManagementController extends GetxController {
         0,
         initialDuration - elapsedMinutes.round(),
       );
-      final progress = math.min(1.0, elapsedMinutes / initialDuration);
+      final progress = math.min(
+        1.0,
+        elapsedSeconds / (initialDuration * 60),
+      ); // Fixed progress math
       final remainingDistance = math.max(
         0.0,
         initialDistance * (1.0 - progress),
@@ -1244,52 +1252,86 @@ class TripManagementController extends GetxController {
 
       distanceToDestination.value = remainingDistance;
       estimatedTimeToDestination.value = remainingMinutes;
-    } else {
-      distanceToDestination.value = 0.0;
-      estimatedTimeToDestination.value = 0;
-      if (_isNearDestination()) {
-        isNavigating.value = false;
-        _handleArrival();
-      }
     }
+
+    // THE KEY FIX: Run arrival check every time.
+    // This flips the status to 'arrivedAtPickup' or 'arrivedAtDestination'
+    if (_isNearDestination()) {
+      _handleArrival();
+    }
+
     update();
   }
 
   bool _isNearDestination() {
     if (driverLocation.value == null || activeTrip.value == null) return false;
-    LatLng target;
-    if (tripStatus.value == TripStatus.drivingToPickup) {
-      target = activeTrip.value!.pickupLocation;
+
+    LatLng targetLocation;
+    // Determine target based on trip phase
+    if (tripStatus.value == TripStatus.drivingToPickup ||
+        tripStatus.value == TripStatus.accepted) {
+      targetLocation = activeTrip.value!.pickupLocation;
     } else if (tripStatus.value == TripStatus.tripInProgress) {
-      target = activeTrip.value!.destinationLocation;
+      targetLocation = activeTrip.value!.destinationLocation;
     } else {
       return false;
     }
-    final distanceKm = _calculateDistance(driverLocation.value!, target);
-    return distanceKm < 0.1;
+
+    final distanceKm = _calculateDistance(
+      driverLocation.value!,
+      targetLocation,
+    );
+
+    // Debug print to see real-time distance in console
+    print("DEBUG: Distance to target: ${distanceKm.toStringAsFixed(2)} km");
+
+    // Return true if within 1km (1000 meters)
+    return distanceKm < 1.0;
+    print("DEBUG: Distance to target: 1------------- ");
+  }
+
+  // 2. ADD: Manual Arrival Trigger
+  // Call this if the GPS is stuck but the driver is physically there
+  Future<void> manualArrivedAtPickup() async {
+    if (activeTrip.value == null) return;
+
+    // Force the status change locally and notify server
+    _handleArrival();
+    THelperFunctions.showSuccessSnackBar(
+      'Success',
+      'Arrival confirmed manually.',
+    );
   }
 
   void _handleArrival() {
     if (activeTrip.value == null) return;
-    isNavigating.value = false;
 
-    if (tripStatus.value == TripStatus.drivingToPickup) {
+    // Phase A: Arriving at Pickup -> Shows "Start Trip"
+    if (tripStatus.value == TripStatus.drivingToPickup ||
+        tripStatus.value == TripStatus.accepted) {
+      print("APP LOGIC: Swapping to 'Arrived at Pickup' state.");
       tripStatus.value = TripStatus.arrivedAtPickup;
-      navigationInstruction.value = 'Arrived at pickup. Waiting for rider.';
+      isNavigating.value = false; // This stops the banner countdown
+
       activeTrip.value = activeTrip.value!.copyWith(
         status: TripStatus.arrivedAtPickup,
         arrivalTime: DateTime.now(),
       );
+
       _webSocketService.emit('ride:arrived', {'tripId': activeTrip.value!.id});
-      THelperFunctions.showSnackBar('Arrived at pickup location');
-    } else if (tripStatus.value == TripStatus.tripInProgress) {
+      forceLocationUpdate(statusOverride: 'arrived');
+    }
+    // Phase B: Arriving at Destination -> Shows "Complete Trip"
+    else if (tripStatus.value == TripStatus.tripInProgress) {
+      print("APP LOGIC: Swapping to 'Arrived at Destination' state.");
       tripStatus.value = TripStatus.arrivedAtDestination;
-      navigationInstruction.value =
-          'Arrived at destination. Tap "Complete Trip".';
+      isNavigating.value = false;
+
       activeTrip.value = activeTrip.value!.copyWith(
         status: TripStatus.arrivedAtDestination,
       );
-      THelperFunctions.showSnackBar('Arrived at destination');
+
+      forceLocationUpdate(statusOverride: 'arrived');
     }
     update();
   }

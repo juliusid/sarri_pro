@@ -562,30 +562,44 @@ class _TripCompletedWidgetState extends State<TripCompletedWidget> {
     final controller = Get.find<PaymentController>();
     final rideController = Get.find<RideController>();
 
-    // Map display name to API value
     String apiMethod = method.toLowerCase();
-    if (apiMethod.contains('wallet'))
-      apiMethod = 'transfer'; // Based on wallet notes
-    if (apiMethod.contains('cash')) apiMethod = 'cash';
-    if (apiMethod.contains('card')) apiMethod = 'card';
 
-    // For card, show dialog to select which card if needed
-    if (apiMethod == 'card') {
-      PaymentDialogs.showCardPayment(
-        context,
-        selectedRideType: widget.selectedRideType,
-        tripId: widget.tripId,
-      );
-      return;
+    // Get the card ID directly from the controller
+    String? currentCardId = rideController.selectedCardId.value;
+
+    // 1. Normalize the API method string
+    if (apiMethod.contains('cash')) {
+      apiMethod = 'cash';
+      currentCardId = null; // Ensure no card ID is sent for cash
+    } else if (apiMethod.contains('wallet')) {
+      apiMethod = 'transfer';
+      currentCardId = null;
+    } else {
+      // If it's not Cash or Wallet, it MUST be a Card (Visa, Mastercard, etc.)
+      apiMethod = 'card';
     }
 
-    // For Cash/Transfer, call directly
+    // 2. Handle Card Logic
+    if (apiMethod == 'card') {
+      // If we don't have a specific card ID yet (or ID is empty),
+      // it means the user clicked the generic "Card" option -> Show Picker
+      if (currentCardId == null || currentCardId.isEmpty) {
+        PaymentDialogs.showCardPayment(
+          context,
+          selectedRideType: widget.selectedRideType,
+          tripId: widget.tripId,
+        );
+        return;
+      }
+      // If we DO have a card ID, we proceed to pay directly without opening the dialog
+    }
+
+    // 3. Execute Payment
     controller.initiateTripPayment(
       widget.tripId,
-      paymentMethod: apiMethod,
-      cardId: rideController.selectedCardId.value.isNotEmpty
-          ? rideController.selectedCardId.value
-          : null,
+      paymentMethod:
+          apiMethod, // This will now correctly be 'card', 'cash', or 'transfer'
+      cardId: currentCardId,
     );
   }
 }

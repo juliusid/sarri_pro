@@ -1,4 +1,4 @@
-package com.example.sarri_ride
+package com.sarri.sarri_ride
 
 import io.flutter.embedding.android.FlutterActivity
 

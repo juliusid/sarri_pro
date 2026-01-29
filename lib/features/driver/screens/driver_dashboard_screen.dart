@@ -458,57 +458,79 @@ class DriverDashboardScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: TSizes.spaceBtwItems),
+
             // Action Button(s)
-            controller.isOnBreak.value
-                ? // Show End Break Button
-                  LoadingElevatedButton(
-                    isLoading: controller.isLoadingStatus.value,
-                    text: 'End Break',
-                    icon: Iconsax.play,
-                    onPressed: () => controller.endBreak(),
-                    backgroundColor: TColors.warning,
-                    foregroundColor: TColors.white,
-                  )
-                : // Show Go Online/Offline and Take Break Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: LoadingElevatedButton(
-                          isLoading: controller.isLoadingStatus.value,
-                          text: controller.isOnline.value
-                              ? 'Go Offline'
-                              : 'Go Online',
-                          loadingText: controller.isOnline.value
-                              ? 'Going Offline...'
-                              : 'Going Online...',
-                          backgroundColor: controller.isOnline.value
-                              ? TColors.error
-                              : TColors.success,
-                          foregroundColor: TColors.white,
-                          onPressed: controller.toggleDriverStatus,
-                        ),
-                      ),
-                      // Show Take Break button only if driver is online and NOT on a trip
-                      if (controller.isOnline.value &&
-                          !controller.hasActiveTrip) ...[
-                        const SizedBox(width: TSizes.spaceBtwItems),
-                        LoadingOutlinedButton(
-                          isLoading: controller.isLoadingStatus.value,
-                          text: 'Break',
-                          icon: Iconsax.coffee,
-                          foregroundColor: TColors.secondary,
-                          onPressed: () =>
-                              _showBreakDurationDialog(context, controller),
-                        ),
-                      ],
-                    ],
-                  ),
+            _buildActionButtonArea(context, controller),
           ],
         ),
       ),
     );
   }
-  // --- END UPDATED STATUS CARD ---
+
+  // Helper method to keep the main widget clean
+  Widget _buildActionButtonArea(
+    BuildContext context,
+    DriverDashboardController controller,
+  ) {
+    // 1. If on Break
+    if (controller.isOnBreak.value) {
+      return LoadingElevatedButton(
+        isLoading: controller.isLoadingStatus.value,
+        text: 'End Break',
+        icon: Iconsax.play,
+        onPressed: () => controller.endBreak(),
+        backgroundColor: TColors.warning,
+        foregroundColor: TColors.white,
+      );
+    }
+
+    // 2. If ON A TRIP (Priority State)
+    if (controller.hasActiveTrip) {
+      return SizedBox(
+        width: double.infinity,
+        child: LoadingElevatedButton(
+          isLoading: false,
+          text: 'On Trip',
+          icon: Iconsax.car,
+          backgroundColor: TColors.info, // Blue color to signify active status
+          foregroundColor: TColors.white,
+          onPressed: () {}, // Empty function makes it unclickable/disabled
+        ),
+      );
+    }
+
+    // 3. Normal Online/Offline Toggle
+    return Row(
+      children: [
+        Expanded(
+          child: LoadingElevatedButton(
+            isLoading: controller.isLoadingStatus.value,
+            text: controller.isOnline.value ? 'Go Offline' : 'Go Online',
+            loadingText: controller.isOnline.value
+                ? 'Going Offline...'
+                : 'Going Online...',
+            backgroundColor: controller.isOnline.value
+                ? TColors.error
+                : TColors.success,
+            foregroundColor: TColors.white,
+            onPressed: controller.toggleDriverStatus,
+          ),
+        ),
+
+        // Show Take Break button only if driver is online
+        if (controller.isOnline.value) ...[
+          const SizedBox(width: TSizes.spaceBtwItems),
+          LoadingOutlinedButton(
+            isLoading: controller.isLoadingStatus.value,
+            text: 'Break',
+            icon: Iconsax.coffee,
+            foregroundColor: TColors.secondary,
+            onPressed: () => _showBreakDurationDialog(context, controller),
+          ),
+        ],
+      ],
+    );
+  } // --- END UPDATED STATUS CARD ---
 
   // --- ADD BREAK DURATION DIALOG HELPER ---
   void _showBreakDurationDialog(

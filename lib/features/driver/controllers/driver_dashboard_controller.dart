@@ -448,39 +448,21 @@ class DriverDashboardController extends GetxController {
       if (responseData['status'] == 'success' && responseData['data'] is Map) {
         final Map<String, dynamic> data = responseData['data'];
 
-        // 1. Operational Status
-        final String? apiAccountStatus = data['accountStatus'] as String?;
-        if (apiAccountStatus != null) {
-          final statusLower = apiAccountStatus.toLowerCase();
-          if (driverOperationalStatus.value != statusLower) {
-            driverOperationalStatus.value = statusLower;
-          }
-          if (statusLower == 'banned' || statusLower == 'suspended') {
-            final String apiMessage =
-                data['message'] as String? ?? "Account restricted.";
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _handleAccountRestriction(statusLower, apiMessage);
-            });
-            return;
-          }
-        }
+        // If we are on a trip, IGNORE any availability or break status from the server
+        // This prevents the server from accidentally kicking us offline while driving
+        if (hasActiveTrip) return;
 
-        // 2. Task Status
+        // 1. Task Status
         final String? apiAvailability = data['availability'] as String?;
         if (apiAvailability != null) {
           driverTaskStatus.value = apiAvailability.toLowerCase();
+          isOnline.value = driverTaskStatus.value == 'available';
         }
 
-        // 3. Break Status
+        // 2. Break Status
         final bool? apiIsOnBreak = data['isOnBreak'] as bool?;
         if (apiIsOnBreak != null) {
           isOnBreak.value = apiIsOnBreak;
-          if (apiIsOnBreak) {
-            isOnline.value = false;
-          } else {
-            breakEndsAt.value = null;
-            _breakEndTimer?.cancel();
-          }
         }
       }
     } catch (e) {
@@ -545,20 +527,20 @@ class DriverDashboardController extends GetxController {
     update();
 
     if (targetIsOnline) {
-      bool serviceEnabled = await _locationService.isLocationServiceEnabled();
-      bool permissionGranted = await _locationService
-          .requestLocationPermission();
-      if (!serviceEnabled || !permissionGranted) {
+      // --- THE CRITICAL CHANGE: Pass isDriver: true ---
+      // This triggers the Prominent Disclosure Dialog from LocationService
+      bool locationReady = await _locationService.ensureLocationAvailable(
+        isDriver: true,
+      );
+
+      if (!locationReady) {
+        // If they declined the dialog or permission, revert status
         isOnline.value = false;
         update();
-        THelperFunctions.showSnackBar(
-          serviceEnabled
-              ? 'Location permission needed.'
-              : 'Please enable location services.',
-        );
         isLoadingStatus.value = false;
         return;
       }
+
       await _tripController?.updateCurrentStateFromLocation();
     }
 
@@ -747,7 +729,7 @@ class DriverDashboardController extends GetxController {
 
     switch (driverTaskStatus.value) {
       case 'on_trip':
-        return _tripController?.currentTripStatusDisplay ?? 'On Trip';
+        return 'On Trip';
       case 'available':
         return 'Online - Ready';
       case 'break':

@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart'; // For temp folders
 import 'package:path/path.dart' as p; // For path manipulation
 
 import 'package:sarri_ride/config/api_config.dart';
+import 'package:sarri_ride/core/services/http_service.dart';
 import 'package:sarri_ride/features/authentication/services/auth_service.dart';
 import 'package:sarri_ride/features/ride/controllers/drawer_controller.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
@@ -19,6 +20,37 @@ class ProfileController extends GetxController {
 
   final RxBool isLoading = false.obs;
   final Rx<File?> selectedImage = Rx<File?>(null);
+
+  final RxString totalRides = '0'.obs;
+  final RxString totalSpent = '₦0.00'.obs;
+  final HttpService _httpService = HttpService.instance;
+  @override
+  void onInit() {
+    super.onInit();
+    fetchProfileStats();
+  }
+
+  // --- ADDED: Fetch Stats ---
+  Future<void> fetchProfileStats() async {
+    try {
+      final response = await _httpService.get(
+        ApiConfig.clientTripHistoryEndpoint,
+        queryParameters: {'limit': '1'}, // We only need the summary
+      );
+      final responseData = _httpService.handleResponse(response);
+
+      if (responseData['status'] == 'success' && responseData['data'] != null) {
+        final summary = responseData['data']['summary'];
+        if (summary != null) {
+          totalRides.value = (summary['total'] ?? 0).toString();
+          totalSpent.value = (summary['formattedTotalSpent'] ?? '₦0.00')
+              .toString();
+        }
+      }
+    } catch (e) {
+      print("Error fetching profile stats: $e");
+    }
+  }
 
   /// Shows a dialog to select image from Camera or Gallery
   void showImageSourceDialog() {
@@ -105,30 +137,28 @@ class ProfileController extends GetxController {
 
     try {
       final file = selectedImage.value!;
-
-      // We KNOW it is a jpeg now because we converted it.
       final contentType = MediaType('image', 'jpeg');
 
-      // Prepare Request
-      // Combine base URL + endpoint
       final uri = Uri.parse(ApiConfig.updateProfilePictureEndpoint);
       var request = http.MultipartRequest('PUT', uri);
 
-      // Add File
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'picture', // Key expected by backend
-          file.path,
-          contentType: contentType, // Explicitly tell server it's a JPEG
-        ),
-      );
-      print("-------------------------------------------------${file.path}");
+      // 1. ADD THE MISSING SECURITY KEY (Critical for Render)
+      request.headers['x-api-key'] = ApiConfig.apiKey;
 
-      // Add Headers (Authorization)
+      // 2. Add Authorization
       final token = AuthService.instance.accessToken;
       if (token != null) {
         request.headers['Authorization'] = 'Bearer $token';
       }
+
+      // 3. Add the file with explicit Content-Type
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'picture',
+          file.path,
+          contentType: contentType,
+        ),
+      );
 
       // Send Request
       final streamedResponse = await request.send();
@@ -138,7 +168,9 @@ class ProfileController extends GetxController {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final responseData = jsonDecode(response.body);
 
-        if (responseData['success'] == true) {
+        // Your backend uses 'status' == 'success' based on earlier messages
+        if (responseData['status'] == 'success' ||
+            responseData['success'] == true) {
           final data = responseData['data'];
           if (data != null) {
             final newPicUrl = data['picture'] as String?;
@@ -158,6 +190,8 @@ class ProfileController extends GetxController {
           );
         }
       } else {
+        // Log the body to see WHY it was rejected (Render often returns HTML on 404/500)
+        print("Server Error Body: ${response.body}");
         THelperFunctions.showErrorSnackBar(
           'Upload Failed',
           'Server rejected the file (Status: ${response.statusCode})',

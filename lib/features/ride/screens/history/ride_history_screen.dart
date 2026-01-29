@@ -8,6 +8,8 @@ import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:sarri_ride/features/ride/screens/history/ride_history_screen.dart'; // Self import or keep clean
+import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
 class RideHistoryScreen extends StatelessWidget {
@@ -627,8 +629,10 @@ class RideHistoryScreen extends StatelessWidget {
   }
 
   void _viewDetails(Map<String, dynamic> ride) {
-    THelperFunctions.showSnackBar(
-      'Viewing details for ride on ${ride["bookedAt"]}',
+    Get.bottomSheet(
+      RideDetailsSheet(ride: ride),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
     );
   }
 
@@ -745,6 +749,216 @@ class RideHistoryScreen extends StatelessWidget {
         onChanged: onChanged,
         activeColor: TColors.primary,
       ),
+    );
+  }
+}
+
+class RideDetailsSheet extends StatelessWidget {
+  final Map<String, dynamic> ride;
+
+  const RideDetailsSheet({super.key, required this.ride});
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = THelperFunctions.isDarkMode(context);
+    final driver = ride['driver'] ?? {};
+    final pickup = ride['pickup'] ?? {};
+    final destination = ride['destination'] ?? {};
+
+    // Parse Dates
+    final bookedAt = DateTime.tryParse(ride['bookedAt'] ?? '');
+    final completedAt = DateTime.tryParse(ride['completedAt'] ?? '');
+    final dateStr = completedAt != null
+        ? DateFormat('EEE, d MMM yyyy • h:mm a').format(completedAt)
+        : (bookedAt != null
+              ? DateFormat('EEE, d MMM yyyy').format(bookedAt)
+              : 'Unknown Date');
+
+    // Parse Price
+    final priceStr = ride['formattedPrice'] ?? '₦0.00';
+
+    // Parse Status
+    final status = (ride['status'] ?? 'unknown').toString().capitalizeFirst;
+    final statusColor = status?.toLowerCase() == 'completed'
+        ? TColors.success
+        : (status?.toLowerCase() == 'cancelled' ? TColors.error : TColors.info);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: dark ? TColors.dark : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: const EdgeInsets.all(TSizes.defaultSpace),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: TSizes.spaceBtwItems),
+
+          // Header: Date & Price
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(dateStr, style: Theme.of(context).textTheme.bodyMedium),
+              Text(
+                priceStr,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: TColors.primary,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 30),
+
+          // Driver Info Section
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 25,
+                backgroundImage:
+                    (driver['picture'] != null && driver['picture'].isNotEmpty)
+                    ? NetworkImage(driver['picture'])
+                    : null,
+                backgroundColor: TColors.primary.withOpacity(0.1),
+                child: (driver['picture'] == null || driver['picture'].isEmpty)
+                    ? const Icon(Iconsax.user, color: TColors.primary)
+                    : null,
+              ),
+              const SizedBox(width: TSizes.spaceBtwItems),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    driver['name'] ?? 'Unknown Driver',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        "4.9",
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ), // Hardcoded rating as it's complex in JSON
+                    ],
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  status ?? 'Unknown',
+                  style: TextStyle(
+                    color: statusColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 30),
+
+          // Route Section
+          _buildLocationRow(
+            context,
+            icon: Icons.my_location,
+            color: TColors.primary,
+            time: (ride['startedAt'] != null)
+                ? DateFormat('h:mm a').format(DateTime.parse(ride['startedAt']))
+                : '',
+            address: pickup['name'] ?? 'Unknown Pickup',
+          ),
+          Container(
+            margin: const EdgeInsets.only(left: 11),
+            height: 20,
+            width: 2,
+            color: Colors.grey[300],
+          ),
+          _buildLocationRow(
+            context,
+            icon: Icons.location_on,
+            color: TColors.error,
+            time: (ride['completedAt'] != null)
+                ? DateFormat(
+                    'h:mm a',
+                  ).format(DateTime.parse(ride['completedAt']))
+                : '',
+            address: destination['name'] ?? 'Unknown Destination',
+          ),
+
+          const SizedBox(height: TSizes.spaceBtwSections),
+
+          // Close Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Get.back(),
+              child: const Text('Close'),
+            ),
+          ),
+          const SizedBox(height: TSizes.spaceBtwItems),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLocationRow(
+    BuildContext context, {
+    required IconData icon,
+    required Color color,
+    required String time,
+    required String address,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(width: TSizes.spaceBtwItems),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                address,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+              ),
+              if (time.isNotEmpty)
+                Text(
+                  time,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

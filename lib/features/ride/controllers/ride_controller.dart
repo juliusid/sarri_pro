@@ -12,6 +12,7 @@ import 'package:sarri_ride/features/ride/services/ride_service.dart';
 import 'package:sarri_ride/features/ride/widgets/payment_selection_sheet.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:sarri_ride/config/api_config.dart'; // IMPORTED FOR API CONFIG
 
 import 'package:sarri_ride/features/location/services/location_service.dart';
 import 'package:sarri_ride/features/location/services/places_service.dart';
@@ -42,6 +43,7 @@ enum BookingState {
 
 class RideController extends GetxController with GetTickerProviderStateMixin {
   static RideController get instance => Get.find();
+  final HttpService _httpService = HttpService.instance;
 
   // --- Services ---
   final WebSocketService _webSocketService = WebSocketService.instance;
@@ -112,6 +114,12 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
 
   final RxString rideId = ''.obs;
   final RxString activeRideChatId = ''.obs;
+
+  // --- Animation State ---
+  LatLng? _animStartLocation;
+  LatLng? _animEndLocation;
+  double _animStartRotation = 0.0;
+  double _animEndRotation = 0.0;
 
   // Local var to track rotation smoothly
   LatLng? _previousDriverLocation;
@@ -188,48 +196,106 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
   ];
 
   // --- ADDED THIS LIST BACK ---
-  final List<Map<String, dynamic>> recentDestinations = [
-    {
-      'name': 'Victoria Island',
-      'address': 'Victoria Island, Lagos',
-      'location': const LatLng(6.4281, 3.4219),
-      'icon': Icons.business,
-    },
-    {
-      'name': 'Lekki Phase 1',
-      'address': 'Lekki Phase 1, Lagos',
-      'location': const LatLng(6.4474, 3.4647),
-      'icon': Icons.home,
-    },
-    {
-      'name': 'Ikeja GRA',
-      'address': 'Ikeja GRA, Lagos',
-      'location': const LatLng(6.5955, 3.3087),
-      'icon': Icons.location_city,
-    },
-    {
-      'name': 'Surulere',
-      'address': 'Surulere, Lagos',
-      'location': const LatLng(6.5027, 3.3641),
-      'icon': Icons.store,
-    },
-  ];
-
+  final RxList<Map<String, dynamic>> recentDestinations =
+      <Map<String, dynamic>>[].obs;
   @override
   void onInit() {
     super.onInit();
-    // CHANGE: Clear ride types initially to force server calculation later
     rideTypes.clear();
 
+    // 1. Initialize Controller (Keep this)
     driverAnimationController = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: const Duration(
+        seconds: 3,
+      ), // 3 seconds creates a smooth glide for 4s pings
       vsync: this,
     );
+
+    // 2. Add Listener (New)
+    driverAnimationController.addListener(() {
+      if (_animStartLocation != null &&
+          _animEndLocation != null &&
+          assignedDriver.value != null) {
+        // Calculate the position at this exact moment (0.0 to 1.0)
+        final double t = driverAnimationController.value;
+
+        final double lat = _lerp(
+          _animStartLocation!.latitude,
+          _animEndLocation!.latitude,
+          t,
+        );
+        final double lng = _lerp(
+          _animStartLocation!.longitude,
+          _animEndLocation!.longitude,
+          t,
+        );
+        final double rot = _lerpRotation(
+          _animStartRotation,
+          _animEndRotation,
+          t,
+        );
+
+        final newPos = LatLng(lat, lng);
+
+        // Update the marker visually without triggering full logic re-calculations
+        _updateDriverMarkerVisualsOnly(newPos, rot);
+      }
+    });
 
     initializeMap();
     initializeStops();
     _checkCurrentRideStatus();
     _webSocketService.registerPaymentConfirmedListener(_handlePaymentConfirmed);
+    fetchRecentDestinations();
+  }
+
+  Future<void> fetchRecentDestinations() async {
+    try {
+      final response = await _httpService.get(
+        ApiConfig.clientTripHistoryEndpoint,
+        queryParameters: {
+          'limit': '10', // Fetch 10 to ensure we find enough unique ones
+          'sortBy': 'bookedAt',
+          'sortOrder': 'desc',
+        },
+      );
+
+      final responseData = _httpService.handleResponse(response);
+
+      if (responseData['status'] == 'success' && responseData['data'] != null) {
+        final List trips = responseData['data']['trips'] ?? [];
+        final Map<String, Map<String, dynamic>> uniqueDestinations = {};
+
+        for (var trip in trips) {
+          final dest = trip['destination'];
+          if (dest != null &&
+              dest['name'] != null &&
+              dest['coordinates'] != null) {
+            final String name = dest['name'];
+            // Only add if we haven't seen this destination name yet
+            if (!uniqueDestinations.containsKey(name)) {
+              uniqueDestinations[name] = {
+                'name': name,
+                'address': name, // Use name as address for now
+                'location': LatLng(
+                  (dest['latitude'] ?? dest['coordinates'][1] as num)
+                      .toDouble(),
+                  (dest['longitude'] ?? dest['coordinates'][0] as num)
+                      .toDouble(),
+                ),
+                'icon': Icons.history, // Use history icon
+              };
+            }
+          }
+          if (uniqueDestinations.length >= 5) break; // Limit to 5
+        }
+
+        recentDestinations.assignAll(uniqueDestinations.values.toList());
+      }
+    } catch (e) {
+      print("Error fetching recent destinations: $e");
+      // Don't clear list if error, just keep empty or previous state
+    }
   }
 
   // --- STATE RESTORATION ---
@@ -352,7 +418,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
         location.longitude,
       );
       if (placeDetails != null && placeDetails.state.isNotEmpty) {
-        pickupState.value = placeDetails.state;
+        pickupState.value = _cleanStateName(placeDetails.state);
       } else if (defaultState.isNotEmpty) {
         pickupState.value = defaultState;
       }
@@ -1228,6 +1294,29 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     }
   }
 
+  String _cleanStateName(String rawState) {
+    if (rawState.isEmpty) return 'Lagos'; // Fallback
+
+    String cleaned = rawState.trim();
+
+    // REGEX EXPLANATION:
+    // \s* -> Matches zero or more spaces
+    // state -> Matches the word "state"
+    // $     -> Matches the end of the string
+    // caseSensitive: false -> Matches "State", "state", "STATE"
+    final regExp = RegExp(r'\s*state$', caseSensitive: false);
+
+    // Replace the matched part with empty string
+    cleaned = cleaned.replaceAll(regExp, '');
+
+    // Capitalize the first letter (Optional, makes it look nice)
+    if (cleaned.isNotEmpty) {
+      cleaned = cleaned[0].toUpperCase() + cleaned.substring(1);
+    }
+
+    return cleaned.trim();
+  }
+
   void _onPickupLocationSelected(PlaceSuggestion suggestion) async {
     try {
       final placeDetails = await PlacesService.getPlaceDetails(
@@ -1242,7 +1331,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
         pickupController.text = pickupName.value;
 
         if (placeDetails.state.isNotEmpty) {
-          pickupState.value = placeDetails.state;
+          pickupState.value = _cleanStateName(placeDetails.state);
         } else {
           await _getAndSetStateFromLatLng(
             placeDetails.location,
@@ -1786,26 +1875,55 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
   }
 
   void updateDriverLocationOnMap(LatLng newLocation) {
-    if (assignedDriver.value != null) {
-      double bearing = 0.0;
-      if (_previousDriverLocation != null)
-        bearing = _calculateBearing(_previousDriverLocation!, newLocation);
-      _previousDriverLocation = newLocation;
-      if (currentState.value == BookingState.driverAssigned &&
-          pickupLocation.value != null) {
-        if (calculateDistance(newLocation, pickupLocation.value!) < 0.1) {
-          currentState.value = BookingState.driverArrived;
-          driverLocationTimer?.cancel();
-          THelperFunctions.showSuccessSnackBar(
-            'Driver Arrived',
-            'Your driver has arrived!',
-          );
-        }
+    if (assignedDriver.value == null) return;
+
+    // 1. Calculate Bearing (Rotation)
+    double newBearing = 0.0;
+    LatLng startLocation = assignedDriver.value!.location;
+
+    // Use previous location for bearing if available
+    if (_previousDriverLocation != null) {
+      // Only update bearing if the car actually moved distance > 0
+      if (calculateDistance(startLocation, newLocation) > 0.001) {
+        newBearing = _calculateBearing(startLocation, newLocation);
+      } else {
+        newBearing = _previousDriverLocation != null
+            ? _calculateBearing(_previousDriverLocation!, startLocation)
+            : 0.0;
       }
-      assignedDriver.value = assignedDriver.value!.copyWith(
-        location: newLocation,
-      );
-      updateDriverMarker(newPosition: newLocation, rotation: bearing);
+    }
+
+    // 2. Setup Animation Values
+    _animStartLocation = startLocation;
+    _animEndLocation = newLocation;
+
+    // Get current marker rotation if possible, or use 0
+    final currentMarker = markers.firstWhereOrNull(
+      (m) => m.markerId.value == 'driver',
+    );
+    _animStartRotation = currentMarker?.rotation ?? 0.0;
+    _animEndRotation = newBearing;
+
+    // 3. Update the Data Model immediately (so the app logic knows where the driver IS)
+    assignedDriver.value = assignedDriver.value!.copyWith(
+      location: newLocation,
+    );
+    _previousDriverLocation = newLocation;
+
+    // 4. Start the Animation (Visuals catch up to the Data)
+    driverAnimationController.forward(from: 0.0);
+
+    // 5. Arrival Logic (Keep your existing check)
+    if (currentState.value == BookingState.driverAssigned &&
+        pickupLocation.value != null) {
+      if (calculateDistance(newLocation, pickupLocation.value!) < 0.1) {
+        currentState.value = BookingState.driverArrived;
+        driverLocationTimer?.cancel();
+        THelperFunctions.showSuccessSnackBar(
+          'Driver Arrived',
+          'Your driver has arrived!',
+        );
+      }
     }
   }
 
@@ -1855,6 +1973,41 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
             math.sin(deltaLambda / 2);
     final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return (R * c) / 1000.0;
+  }
+
+  // Standard Linear Interpolation
+  double _lerp(double start, double end, double t) {
+    return start + (end - start) * t;
+  }
+
+  // Smart Rotation Interpolation (Takes the shortest path)
+  double _lerpRotation(double start, double end, double t) {
+    double difference = (end - start).abs();
+    if (difference > 180) {
+      // If the difference is > 180, it's shorter to go the other way around the circle
+      if (end > start) {
+        start += 360;
+      } else {
+        end += 360;
+      }
+    }
+    double result = start + (end - start) * t;
+    return result % 360;
+  }
+
+  // Updates ONLY the marker icon, keeping the map smooth
+  void _updateDriverMarkerVisualsOnly(LatLng pos, double rot) {
+    final markerIndex = markers.indexWhere((m) => m.markerId.value == 'driver');
+    if (markerIndex != -1) {
+      // Use the copyWith pattern to be efficient
+      markers[markerIndex] = markers[markerIndex].copyWith(
+        positionParam: pos,
+        rotationParam: rot,
+      );
+      // We use simple update() because markers is an RxList
+      // This triggers the GoogleMap widget to redraw the markers
+      markers.refresh();
+    }
   }
 }
 
