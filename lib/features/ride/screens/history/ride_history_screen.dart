@@ -3,13 +3,11 @@ import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sarri_ride/features/ride/controllers/client_trip_history_controller.dart';
 import 'package:sarri_ride/features/ride/controllers/ride_controller.dart';
-import 'package:sarri_ride/features/ride/models/ride_model.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:sarri_ride/features/ride/screens/history/ride_history_screen.dart'; // Self import or keep clean
-import 'package:iconsax/iconsax.dart';
+// Self import or keep clean
 import 'package:intl/intl.dart';
 
 class RideHistoryScreen extends StatelessWidget {
@@ -524,10 +522,10 @@ class RideHistoryScreen extends StatelessWidget {
               const SizedBox(width: TSizes.spaceBtwItems),
               OutlinedButton(
                 onPressed: () => _viewDetails(ride),
-                child: const Text('Details'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: dark ? TColors.lightGrey : TColors.black,
                 ),
+                child: const Text('Details'),
               ),
             ],
           ),

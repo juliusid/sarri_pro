@@ -43,14 +43,26 @@ class DriverTripService extends GetxService {
     double lat,
     double lng,
   ) async {
-    final response = await _httpService.post(
-      ApiConfig.endTripEndpoint,
-      body: {
-        "tripId": tripId,
-        "coordinates": [lng, lat],
-      },
-    );
-    return _httpService.handleResponse(response);
+    try {
+      final response = await _httpService.post(
+        ApiConfig.endTripEndpoint,
+        body: {
+          "tripId": tripId,
+          "coordinates": [lng, lat],
+        },
+      );
+      return _httpService.handleResponse(response);
+    } catch (e) {
+      // Handle specific errors like "In-progress trip not found"
+      if (e.toString().contains("In-progress trip not found")) {
+        // Maybe the trip was already completed?
+        // We could return a success-like response or rethrow a specific error
+        // For now, let's rethrow but log it
+        print("Trip end error: Trip might already be completed or invalid ID.");
+        rethrow;
+      }
+      rethrow;
+    }
   }
 
   /// Confirm cash payment received

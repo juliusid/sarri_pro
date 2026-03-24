@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:sarri_ride/features/driver/controllers/driver_dashboard_controller.dart';
 import 'package:sarri_ride/features/driver/controllers/driver_wallet_controller.dart';
 import 'package:sarri_ride/features/driver/screens/driver_trips_screen.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';

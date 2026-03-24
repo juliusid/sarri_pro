@@ -5,6 +5,9 @@ import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
 import 'package:sarri_ride/core/services/websocket_service.dart';
+import 'package:sarri_ride/features/location/services/location_service.dart'; // Moved up
+import 'package:sarri_ride/utils/logging/app_logger.dart'; // Added
+import 'package:sarri_ride/features/location/services/places_service.dart'; // Moved up
 import 'package:sarri_ride/core/services/map_marker_service.dart';
 import 'package:sarri_ride/features/emergency/screens/emergency_reporting_screen.dart';
 import 'package:sarri_ride/features/ride/models/ride_model.dart';
@@ -20,11 +23,9 @@ import 'package:sarri_ride/features/location/services/route_service.dart';
 import 'package:sarri_ride/features/ride/widgets/driver_info_card.dart';
 import 'package:sarri_ride/features/ride/widgets/ride_selection_widget.dart';
 import 'package:sarri_ride/features/ride/widgets/map_picker_screen.dart';
-import 'package:sarri_ride/utils/constants/enums.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/ride/widgets/pickup_location_modal.dart';
-import 'package:sarri_ride/features/settings/models/saved_place.dart';
 import 'package:sarri_ride/features/ride/widgets/no_drivers_available_widget.dart';
 
 // Enums
@@ -41,7 +42,7 @@ enum BookingState {
   freightBooking,
 }
 
-class RideController extends GetxController with GetTickerProviderStateMixin {
+class RideController extends GetxController with GetTickerProviderStateMixin, WidgetsBindingObserver {
   static RideController get instance => Get.find();
   final HttpService _httpService = HttpService.instance;
 
@@ -79,7 +80,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
   final Rx<BookingState> currentState = BookingState.initial.obs;
   final Rx<LatLng?> pickupLocation = Rx<LatLng?>(null);
   final Rx<LatLng?> destinationLocation = Rx<LatLng?>(null);
-  final RxString pickupState = 'Lagos'.obs;
+  final RxString pickupState = ''.obs;
 
   // Multi-stop support
   final RxList<StopPoint> stops = <StopPoint>[].obs;
@@ -202,6 +203,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
   void onInit() {
     super.onInit();
     rideTypes.clear();
+    WidgetsBinding.instance.addObserver(this);
 
     // 1. Initialize Controller (Keep this)
     driverAnimationController = AnimationController(
@@ -349,6 +351,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
 
   @override
   void onClose() {
+    WidgetsBinding.instance.removeObserver(this);
     driverAnimationController.dispose();
     driverLocationTimer?.cancel();
     destinationController.dispose();
@@ -359,6 +362,16 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       _handlePaymentConfirmed,
     );
     super.onClose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      print("RideController: App resumed, automatically syncing ride status...");
+      // Re-fetch the ride state from the server silently so the UI updates to the latest step
+      _checkCurrentRideStatus();
+    }
   }
 
   Future<void> initializeMap() async {
@@ -555,8 +568,9 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     if (oldIndex < 1 ||
         newIndex < 1 ||
         oldIndex >= stops.length ||
-        newIndex >= stops.length)
+        newIndex >= stops.length) {
       return;
+    }
     if (newIndex > oldIndex) newIndex -= 1;
     final StopPoint item = stops.removeAt(oldIndex);
     stops.insert(newIndex, item);
@@ -887,7 +901,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       case StopType.destination:
         return '🎯 Destination: ${stop.name}';
       case StopType.intermediate:
-        return '🛑 Stop ${index}: ${stop.name}';
+        return '🛑 Stop $index: ${stop.name}';
     }
   }
 
@@ -930,7 +944,13 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
         newLatLng.longitude,
       );
       if (address != null) pickupAddress.value = address;
-    } catch (_) {}
+    } catch (e, stack) {
+      AppLogger.error(
+        'Failed to get address from coordinates',
+        error: e,
+        stackTrace: stack,
+      );
+    }
 
     pickupController.text = pickupName.value;
     await _getAndSetStateFromLatLng(newLatLng, defaultState: "Lagos");
@@ -978,8 +998,9 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
   }
 
   Future<void> drawRoute() async {
-    if (pickupLocation.value == null || destinationLocation.value == null)
+    if (pickupLocation.value == null || destinationLocation.value == null) {
       return;
+    }
     try {
       final routeInfo = await RouteService.getRouteInfo(
         pickupLocation.value!,
@@ -1019,10 +1040,12 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     if (mapController == null) return;
     List<LatLng> pointsToFit = [];
     if (pickupLocation.value != null) pointsToFit.add(pickupLocation.value!);
-    if (destinationLocation.value != null)
+    if (destinationLocation.value != null) {
       pointsToFit.add(destinationLocation.value!);
-    if (assignedDriver.value != null)
+    }
+    if (assignedDriver.value != null) {
       pointsToFit.add(assignedDriver.value!.location);
+    }
 
     if (pointsToFit.length == 1) {
       mapController!.animateCamera(
@@ -1156,8 +1179,9 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
   }
 
   Future<bool> updatePricesFromApi() async {
-    if (pickupLocation.value == null || destinationLocation.value == null)
+    if (pickupLocation.value == null || destinationLocation.value == null) {
       return false;
+    }
     THelperFunctions.showSnackBar('Calculating fares...');
 
     try {
@@ -1170,7 +1194,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
         final newRideTypes = <RideType>[];
         final estimatedEtaMinutes = (totalDuration.value / 60).round() + 5;
 
-        if (prices.luxury != null)
+        if (prices.luxury != null) {
           newRideTypes.add(
             RideType(
               name: 'Luxury',
@@ -1180,7 +1204,8 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
               seats: prices.luxury!.seats,
             ),
           );
-        if (prices.comfort != null)
+        }
+        if (prices.comfort != null) {
           newRideTypes.add(
             RideType(
               name: 'Comfort',
@@ -1190,7 +1215,8 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
               seats: prices.comfort!.seats,
             ),
           );
-        if (prices.xl != null)
+        }
+        if (prices.xl != null) {
           newRideTypes.add(
             RideType(
               name: 'XL',
@@ -1200,6 +1226,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
               seats: prices.xl!.seats,
             ),
           );
+        }
 
         if (newRideTypes.isEmpty) {
           rideTypes.assignAll(_defaultRideTypes);
@@ -1295,7 +1322,12 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
   }
 
   String _cleanStateName(String rawState) {
-    if (rawState.isEmpty) return 'Lagos'; // Fallback
+    if (rawState.isEmpty) {
+      THelperFunctions.showSnackBar(
+        'State information is missing. Please ensure location permissions are granted and try again.',
+      );
+    }
+    // Fallback
 
     String cleaned = rawState.trim();
 
@@ -1361,7 +1393,13 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
         }
         update();
       }
-    } catch (_) {}
+    } catch (e, stack) {
+      AppLogger.error(
+        'Error in onPickupLocationSelected',
+        error: e,
+        stackTrace: stack,
+      );
+    }
   }
 
   void _onCurrentLocationPressed() async => await refreshCurrentLocation();
@@ -1407,8 +1445,16 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
         }
         update();
       }
-    } catch (_) {}
+    } catch (e, stack) {
+      AppLogger.error(
+        'Error in map picker selection',
+        error: e,
+        stackTrace: stack,
+      );
+    }
   }
+
+  final RxBool isBooking = false.obs;
 
   void selectRideType(RideType rideType) {
     selectedRideType.value = rideType;
@@ -1420,6 +1466,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       THelperFunctions.showSnackBar('Please select a ride type first.');
       return;
     }
+    if (isBooking.value) return; // FIX: Prevent double clicks
     if (pickupLocation.value == null || destinationLocation.value == null) {
       THelperFunctions.showSnackBar('Pickup or destination is missing.');
       return;
@@ -1431,6 +1478,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
       finalPickupName = pickupAddress.value;
     }
 
+    isBooking.value = true;
     currentState.value = BookingState.searchingDriver;
     panelController.close();
 
@@ -1482,8 +1530,17 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
         }
       }
     } catch (e) {
+      // FIX: Explicitly close any stranded dialogs
+      if (Get.isDialogOpen!) Get.back();
+      // FIX: Ensure snackbars aren't stuck loading
+      THelperFunctions.showErrorSnackBar(
+        'Error',
+        'Failed to connect to server.',
+      );
       currentState.value = BookingState.selectRide;
       if (!panelController.isPanelOpen) panelController.open();
+    } finally {
+      isBooking.value = false;
     }
   }
 
@@ -1535,8 +1592,9 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
         dSuggestions.first.placeId,
       );
       endCoords = dDetails?.location;
-      if (dDetails != null)
+      if (dDetails != null) {
         destinationAddress.value = dDetails.formattedAddress;
+      }
     }
 
     if (startCoords != null && endCoords != null) {
@@ -1685,11 +1743,12 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
               Get.back();
               THelperFunctions.showSnackBar('Cancelling ride...');
               bool success = await _rideService.cancelRide(rideId.value);
-              if (!success)
+              if (!success) {
                 THelperFunctions.showErrorSnackBar(
                   'Error',
                   'Failed to cancel ride.',
                 );
+              }
             },
             child: const Text(
               'Yes, Cancel',
@@ -1726,11 +1785,12 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
     driverLocationTimer?.cancel();
     _previousDriverLocation = null;
     _refreshPickupMarker();
-    if (panelController.isPanelOpen)
+    if (panelController.isPanelOpen) {
       panelController.animatePanelToPosition(
         0.5,
         duration: const Duration(milliseconds: 300),
       );
+    }
     update();
   }
 
@@ -1850,8 +1910,9 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
   }
 
   void handleRideRejected(String message) {
-    if (currentState.value == BookingState.searchingDriver)
+    if (currentState.value == BookingState.searchingDriver) {
       THelperFunctions.showSnackBar(message);
+    }
   }
 
   void handleCancellationConfirmed(String message) {
@@ -1861,12 +1922,14 @@ class RideController extends GetxController with GetTickerProviderStateMixin {
 
   void handleRideStarted(Map<String, dynamic> data) {
     if (currentState.value != BookingState.driverArrived &&
-        currentState.value != BookingState.driverAssigned)
+        currentState.value != BookingState.driverAssigned) {
       return;
-    if (data['startedAt'] != null)
+    }
+    if (data['startedAt'] != null) {
       actualTripStartTime.value = DateTime.tryParse(
         data['startedAt'].toString(),
       );
+    }
     actualTripStartTime.value ??= DateTime.now();
     currentState.value = BookingState.tripInProgress;
     startTripAnimation();

@@ -35,256 +35,353 @@ class DestinationSearchWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
-    
+    final backgroundColor = dark ? TColors.dark : TColors.white;
+    final inputFillColor = dark ? TColors.darkerGrey : const Color(0xFFF5F5F5);
+    final textColor = dark ? TColors.white : TColors.textPrimary;
+    final hintColor = dark ? TColors.lightGrey : TColors.textSecondary;
+
     return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: dark ? TColors.dark : TColors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Drag handle
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
+      color: backgroundColor,
+      child: SafeArea(
+        child: Column(
+          children: [
+            // --- HEADER & INPUTS ---
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               decoration: BoxDecoration(
-                color: dark ? TColors.darkGrey : Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+                color: backgroundColor,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
               ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          
-          // Header with back button
-          Row(
-            children: [
-              IconButton(
-                onPressed: onBackPressed,
-                icon: Icon(
-                  Icons.arrow_back,
-                  color: dark ? TColors.white : TColors.black,
-                ),
-              ),
-              Text(
-                'Choose a ride',
-                style: TextStyle(
-                  fontSize: 18, 
-                  fontWeight: FontWeight.bold,
-                  color: dark ? TColors.white : TColors.black,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          
-          // Pickup location with change option
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: dark ? TColors.darkerGrey.withOpacity(0.3) : Colors.white,
-              border: Border.all(
-                color: dark ? TColors.darkerGrey : Colors.grey[300]!,
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.my_location, color: TColors.primary),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              child: Column(
+                children: [
+                  // Back Button & Title
+                  Row(
                     children: [
-                      Text(
-                        'Pickup Location',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: dark ? TColors.lightGrey : Colors.grey[600],
+                      InkWell(
+                        onTap: onBackPressed,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Icon(
+                            Icons.arrow_back,
+                            color: textColor,
+                            size: 24,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(width: 8),
                       Text(
-                        pickupController.text,
+                        "Plan your ride",
                         style: TextStyle(
-                          fontWeight: FontWeight.w500,
-                          color: dark ? TColors.white : TColors.black,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: textColor,
                         ),
                       ),
                     ],
                   ),
-                ),
-                TextButton(
-                  onPressed: onPickupLocationChangePressed,
-                  child: Text(
-                    'Change',
-                    style: TextStyle(color: TColors.primary),
+                  const SizedBox(height: 20),
+
+                  // INPUT GROUP
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Visual Connector (Timeline)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          top: 14,
+                          right: 12,
+                          left: 4,
+                        ),
+                        child: Column(
+                          children: [
+                            // Start Dot
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: dark
+                                    ? Colors.grey[400]
+                                    : Colors.grey[600],
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            // Line
+                            Container(
+                              width: 2,
+                              height:
+                                  45, // Height spanning the distance between inputs
+                              color: dark ? Colors.grey[700] : Colors.grey[300],
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                            ),
+                            // End Square
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: TColors.primary,
+                                shape: BoxShape.rectangle,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Input Fields Container
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: inputFillColor,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: dark
+                                  ? Colors.transparent
+                                  : Colors.grey.withOpacity(0.2),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              // Pickup Input (Touchable)
+                              InkWell(
+                                onTap: onPickupLocationChangePressed,
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(12),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          pickupController.text.isEmpty
+                                              ? "Current Location"
+                                              : pickupController.text,
+                                          style: TextStyle(
+                                            color: pickupController.text.isEmpty
+                                                ? TColors.primary
+                                                : textColor,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
+                              // Divider
+                              Divider(
+                                height: 1,
+                                color: dark ? TColors.dark : Colors.grey[300],
+                              ),
+
+                              // Destination Input (Actual TextField)
+                              TextField(
+                                controller: destinationController,
+                                autofocus: true,
+                                onChanged: onDestinationChanged,
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: "Where to?",
+                                  hintStyle: TextStyle(color: hintColor),
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  isDense: true,
+                                  suffixIcon:
+                                      destinationController.text.isNotEmpty
+                                      ? GestureDetector(
+                                          onTap: () {
+                                            destinationController.clear();
+                                            onDestinationChanged('');
+                                          },
+                                          child: Icon(
+                                            Icons.cancel,
+                                            size: 18,
+                                            color: hintColor,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Add Stop Button (Optional, can be added later)
+                      // const SizedBox(width: 8),
+                      // IconButton(icon: Icon(Icons.add, color: textColor), onPressed: (){}),
+                    ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Destination input with enhanced autocomplete
-          TextField(
-            controller: destinationController,
-            style: TextStyle(
-              color: dark ? TColors.white : TColors.black,
-            ),
-            decoration: InputDecoration(
-              hintText: 'Where to?',
-              hintStyle: TextStyle(
-                color: dark ? TColors.lightGrey : Colors.grey[600],
-              ),
-              prefixIcon: const Icon(Icons.location_on, color: Colors.red),
-              suffixIcon: destinationController.text.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.clear,
-                        color: dark ? TColors.lightGrey : Colors.grey[600],
-                      ),
-                      onPressed: () {
-                        destinationController.clear();
-                      },
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: dark ? TColors.darkerGrey : Colors.grey[300]!,
-                ),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: dark ? TColors.darkGrey : Colors.grey[300]!,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                  color: TColors.primary,
-                  width: 2,
-                ),
-              ),
-              filled: true,
-              fillColor: dark ? TColors.darkerGrey.withOpacity(0.3) : Colors.white,
-            ),
-            onChanged: onDestinationChanged,
-            autofocus: true,
-          ),
-          
-          const SizedBox(height: 20),
-          
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+
+            // --- SUGGESTIONS LIST ---
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
-                  // Show autocomplete suggestions if available
-                  if (showDestinationSuggestions && destinationSuggestions.isNotEmpty) ...[
-                    Text(
-                      'Suggestions',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: dark ? TColors.white : TColors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    ...List.generate(destinationSuggestions.length, (index) {
-                      final suggestion = destinationSuggestions[index];
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                          leading: Icon(
-                            Icons.location_on,
-                            color: dark ? TColors.lightGrey : Colors.grey,
-                          ),
-                          title: Text(
-                            suggestion.mainText,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w500,
-                              color: dark ? TColors.white : TColors.black,
-                            ),
-                          ),
-                          subtitle: Text(
-                            suggestion.secondaryText,
-                            style: TextStyle(
-                              color: dark ? TColors.lightGrey : Colors.grey[600],
-                            ),
-                          ),
-                          onTap: () => onSuggestionTap(suggestion),
-                        ),
+                  if (showDestinationSuggestions &&
+                      destinationSuggestions.isNotEmpty) ...[
+                    // AUTOCOMPLETE RESULTS
+                    ...destinationSuggestions.map((suggestion) {
+                      return _buildLocationItem(
+                        context,
+                        icon: Icons.location_on_rounded,
+                        title: suggestion.mainText,
+                        subtitle: suggestion.secondaryText,
+                        onTap: () => onSuggestionTap(suggestion),
+                        dark: dark,
                       );
                     }),
-                  ] else if (destinationController.text.isEmpty) ...[
-                    // Show recent searches when input is empty
-                    Text(
-                      'Recent searches',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: dark ? TColors.white : TColors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    // Recent destinations as quick options
-                    ...List.generate(recentDestinations.length.clamp(0, 3), (index) {
-                      final destination = recentDestinations[index];
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                          leading: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: TColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Icon(
-                              destination['icon'] as IconData,
-                              color: TColors.primary,
-                              size: 20,
-                            ),
+                  ] else ...[
+                    // RECENT SEARCHES
+                    if (recentDestinations.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                        child: Text(
+                          'Recent',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: textColor,
                           ),
-                          title: Text(
-                            destination['name'] as String,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w500,
-                              color: dark ? TColors.white : TColors.black,
-                            ),
-                          ),
-                          subtitle: Text(
-                            destination['address'] as String,
-                            style: TextStyle(
-                              color: dark ? TColors.lightGrey : Colors.grey[600],
-                            ),
-                          ),
-                          trailing: Text(
-                            '~${calculateDistanceToDestination(destination['location'] as LatLng).toStringAsFixed(1)} km',
-                            style: TextStyle(
-                              color: dark ? TColors.lightGrey : Colors.grey[600],
-                              fontSize: 12,
-                            ),
-                          ),
-                          onTap: () => onRecentDestinationTap(destination),
                         ),
+                      ),
+
+                    ...recentDestinations.map((destination) {
+                      final dist = calculateDistanceToDestination(
+                        destination['location'] as LatLng,
+                      );
+                      return _buildLocationItem(
+                        context,
+                        icon: destination['icon'] as IconData? ?? Icons.history,
+                        title: destination['name'] as String,
+                        subtitle: destination['address'] as String,
+                        trailing: '${dist.toStringAsFixed(1)} km',
+                        onTap: () => onRecentDestinationTap(destination),
+                        dark: dark,
                       );
                     }),
+
+                    // FALLBACK / EMPTY STATE (Optional)
+                    if (recentDestinations.isEmpty &&
+                        destinationController.text.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 40),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.map_outlined,
+                                size: 48,
+                                color: hintColor.withOpacity(0.5),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                "Search for a destination",
+                                style: TextStyle(color: hintColor),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                   ],
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
-} 
+
+  Widget _buildLocationItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    String? trailing,
+    required VoidCallback onTap,
+    required bool dark,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: dark ? TColors.darkerGrey : const Color(0xFFEEEEEE),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 22,
+                color: dark ? TColors.lightGrey : Colors.grey[700],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      color: dark ? TColors.white : TColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: dark ? TColors.lightGrey : TColors.textSecondary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: 8),
+              Text(
+                trailing,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: dark ? TColors.lightGrey : TColors.textSecondary,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}

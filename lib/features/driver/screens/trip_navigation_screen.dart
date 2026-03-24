@@ -1,5 +1,3 @@
-// lib/features/driver/screens/trip_navigation_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -404,50 +402,85 @@ class TripNavigationScreen extends StatelessWidget {
     return Obx(() {
       switch (controller.tripStatus.value) {
         case TripStatus.drivingToPickup:
-          return Row(
+          return Column(
             children: [
-              Expanded(
-                flex: 1,
-                child: OutlinedButton(
-                  onPressed: () => _showCancelDialog(context, controller),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: TSizes.md),
-                    side: BorderSide(color: TColors.error),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 1,
+                    child: OutlinedButton(
+                      onPressed: () => _showCancelDialog(context, controller),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: TSizes.md,
+                        ),
+                        side: BorderSide(color: TColors.error),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Icon(
+                        Iconsax.close_circle,
+                        color: TColors.error,
+                      ),
                     ),
                   ),
-                  child: const Icon(Iconsax.close_circle, color: TColors.error),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
-                child: OutlinedButton.icon(
-                  onPressed: () => controller.messageRider(),
-                  icon: const Icon(Iconsax.message, color: TColors.primary),
-                  label: const Text('Chat'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: TSizes.md),
-                    side: const BorderSide(color: TColors.primary),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: OutlinedButton.icon(
+                      onPressed: () => controller.messageRider(),
+                      icon: const Icon(Iconsax.message, color: TColors.primary),
+                      label: const Text('Chat'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: TSizes.md,
+                        ),
+                        side: const BorderSide(color: TColors.primary),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton.icon(
+                      onPressed: () => controller.contactRider(),
+                      icon: const Icon(Iconsax.call, color: Colors.white),
+                      label: const Text(
+                        'Call',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: TColors.primary,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: TSizes.md,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
+              const SizedBox(height: TSizes.spaceBtwItems),
+              SizedBox(
+                width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => controller.contactRider(),
-                  icon: const Icon(Iconsax.call, color: Colors.white),
+                  onPressed: () => controller.verifyAndTriggerArrival(),
+                  icon: const Icon(Iconsax.location_tick, color: Colors.white),
                   label: const Text(
-                    'Call',
-                    style: TextStyle(color: Colors.white),
+                    'Arrived at Pickup',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: TColors.primary,
+                    backgroundColor: TColors.info,
                     padding: const EdgeInsets.symmetric(vertical: TSizes.md),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -459,50 +492,85 @@ class TripNavigationScreen extends StatelessWidget {
           );
 
         case TripStatus.tripInProgress:
-          return Row(
+          return Column(
             children: [
-              Expanded(
-                flex: 1,
-                child: OutlinedButton(
-                  onPressed: () => controller.requestEmergencyAssistance(),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: TSizes.md),
-                    side: BorderSide(color: TColors.error),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 1,
+                    child: OutlinedButton(
+                      onPressed: () => controller.requestEmergencyAssistance(),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: TSizes.md,
+                        ),
+                        side: BorderSide(color: TColors.error),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Icon(
+                        Iconsax.warning_2,
+                        color: TColors.error,
+                      ),
                     ),
                   ),
-                  child: const Icon(Iconsax.warning_2, color: TColors.error),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
-                child: OutlinedButton.icon(
-                  onPressed: () => controller.messageRider(),
-                  icon: const Icon(Iconsax.message, color: TColors.primary),
-                  label: const Text('Chat'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: TSizes.md),
-                    side: const BorderSide(color: TColors.primary),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: OutlinedButton.icon(
+                      onPressed: () => controller.messageRider(),
+                      icon: const Icon(Iconsax.message, color: TColors.primary),
+                      label: const Text('Chat'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: TSizes.md,
+                        ),
+                        side: const BorderSide(color: TColors.primary),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton.icon(
+                      onPressed: () => controller.contactRider(),
+                      icon: const Icon(Iconsax.call, color: Colors.white),
+                      label: const Text(
+                        'Call',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: TColors.primary,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: TSizes.md,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
+              const SizedBox(height: TSizes.spaceBtwItems),
+              SizedBox(
+                width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => controller.contactRider(),
-                  icon: const Icon(Iconsax.call, color: Colors.white),
+                  onPressed: () => controller.verifyAndTriggerArrival(),
+                  icon: const Icon(Iconsax.location_tick, color: Colors.white),
                   label: const Text(
-                    'Call',
-                    style: TextStyle(color: Colors.white),
+                    'Arrived at Destination',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: TColors.primary,
+                    backgroundColor: TColors.info,
                     padding: const EdgeInsets.symmetric(vertical: TSizes.md),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -538,23 +606,29 @@ class TripNavigationScreen extends StatelessWidget {
         case TripStatus.arrivedAtDestination:
           return SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () => controller.completeTripManual(),
-              icon: Icon(Iconsax.tick_circle, color: TColors.white),
-              label: Text(
-                'Complete Trip',
-                style: TextStyle(
-                  color: TColors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: TColors.success,
-                padding: const EdgeInsets.symmetric(
-                  vertical: TSizes.md + TSizes.xs,
-                ),
-              ),
-            ),
+            child: controller.isCompletingTrip.value
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: TColors.success,
+                    ),
+                  )
+                : ElevatedButton.icon(
+                    onPressed: () => controller.completeTripManual(),
+                    icon: const Icon(Iconsax.tick_circle, color: TColors.white),
+                    label: const Text(
+                      'Complete Trip',
+                      style: TextStyle(
+                        color: TColors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: TColors.success,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: TSizes.md + TSizes.xs,
+                      ),
+                    ),
+                  ),
           );
 
         case TripStatus.completed:

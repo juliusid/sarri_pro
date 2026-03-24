@@ -175,7 +175,7 @@ class RouteService {
     return RouteInfo(
       points: _getFallbackRoute(origin, destination),
       distance: '${distance.toStringAsFixed(1)} km',
-      duration: '${estimatedTime} min',
+      duration: '$estimatedTime min',
       distanceValue: (distance * 1000).round(),
       durationValue: estimatedTime * 60,
     );

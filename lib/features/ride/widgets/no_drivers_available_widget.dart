@@ -1,7 +1,6 @@
 // lib/features/ride/widgets/no_drivers_available_widget.dart
 
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/features/ride/widgets/common_widgets.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';

@@ -8,7 +8,6 @@ import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/utils/theme/theme_controller.dart';
 import 'package:sarri_ride/features/settings/screens/edit_profile_screen.dart';
 import 'package:sarri_ride/features/settings/screens/change_password_screen.dart';
-import 'package:sarri_ride/features/settings/screens/placeholder_screen.dart';
 import 'package:sarri_ride/features/settings/screens/saved_places_screen.dart';
 import 'package:sarri_ride/features/settings/screens/emergency_contacts_screen.dart';
 import 'package:sarri_ride/features/settings/screens/help_support_screen.dart';
@@ -25,8 +24,8 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _notificationsEnabled = true;
-  bool _locationEnabled = true;
+  final bool _notificationsEnabled = true;
+  final bool _locationEnabled = true;
   bool _autoAcceptRides = false;
   String _selectedLanguage = 'English';
 
@@ -551,7 +550,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                   )
-                  .toList(),
+                  ,
             ],
           ),
         );

@@ -1,5 +1,3 @@
-// lib/features/ride/widgets/map_drawer_widget.dart
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sarri_ride/features/communication/controllers/chat_controller.dart';
@@ -7,6 +5,7 @@ import 'package:sarri_ride/features/communication/screens/chat_list_screen.dart'
 import 'package:sarri_ride/features/notifications/screens/notification_screen.dart';
 import 'package:sarri_ride/features/ride/controllers/drawer_controller.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
+import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/location/services/location_service.dart';
 import 'package:sarri_ride/features/profile/screens/profile_screen.dart';
 import 'package:sarri_ride/features/ride/screens/history/ride_history_screen.dart';
@@ -35,204 +34,334 @@ class MapDrawerWidget extends StatelessWidget {
     final notificationController = Get.find<NotificationController>();
     final chatController = Get.find<ChatController>();
     final drawerController = Get.find<MapDrawerController>();
+    final dark = THelperFunctions.isDarkMode(context);
+
+    // Modern Styling Colors
+    final backgroundColor = dark ? TColors.dark : TColors.white;
+    final textColor = dark ? TColors.white : TColors.textPrimary;
+    final subtitleColor = dark ? TColors.lightGrey : TColors.textSecondary;
+    final dividerColor = dark ? TColors.darkGrey : Colors.grey[200];
 
     return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
+      backgroundColor: backgroundColor,
+      surfaceTintColor: Colors.transparent, // Removes standard Material tint
+      child: Column(
         children: [
-          // --- DRAWER HEADER ---
-          DrawerHeader(
-            decoration: const BoxDecoration(color: TColors.primary),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center, // Center vertically
+          // --- CUSTOM MODERN HEADER ---
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.only(
+              top: 60,
+              left: 24,
+              bottom: 24,
+              right: 24,
+            ),
+            decoration: BoxDecoration(
+              color: dark ? TColors.darkerGrey : TColors.white,
+              border: Border(bottom: BorderSide(color: dividerColor!)),
+            ),
+            child: Row(
               children: [
-                // 1. FIXED PROFILE PICTURE
+                // Profile Picture
                 Obx(() {
                   final profile = drawerController.fullProfile.value;
                   final image = profile?.picture;
 
-                  return CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Colors.white,
-                    // Check if we have an image URL
-                    backgroundImage: (image != null && image.isNotEmpty)
-                        ? NetworkImage(image)
-                        : null,
-                    // If no image, show the Icon as a child fallback
-                    child: (image == null || image.isEmpty)
-                        ? const Icon(
-                            Iconsax.user,
-                            size: 30,
-                            color: TColors.primary,
-                          )
-                        : null,
+                  return Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: TColors.primary, width: 2),
+                    ),
+                    child: CircleAvatar(
+                      radius: 30,
+                      backgroundColor: dark ? TColors.dark : Colors.grey[200],
+                      backgroundImage: (image != null && image.isNotEmpty)
+                          ? NetworkImage(image)
+                          : null,
+                      child: (image == null || image.isEmpty)
+                          ? const Icon(
+                              Iconsax.user,
+                              size: 28,
+                              color: TColors.primary,
+                            )
+                          : null,
+                    ),
                   );
                 }),
-                const SizedBox(height: 12),
+                const SizedBox(width: 16),
 
-                // 2. FIXED NAME OVERFLOW
-                Obx(
-                  () => Text(
-                    drawerController.userName.value,
-                    maxLines: 1, // Prevent wrapping
-                    overflow: TextOverflow.ellipsis, // Show "..." if too long
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-
-                // 3. FIXED EMAIL OVERFLOW
-                Obx(
-                  () => Text(
-                    drawerController.userEmail.value,
-                    maxLines: 1, // Prevent wrapping
-                    overflow: TextOverflow.ellipsis, // Show "..." if too long
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                // Text Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Obx(
+                        () => Text(
+                          drawerController.userName.value,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: textColor,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Obx(
+                        () => Text(
+                          drawerController.userEmail.value,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 13, color: subtitleColor),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      InkWell(
+                        onTap: () {
+                          Navigator.pop(context);
+                          Get.to(() => const ProfileScreen());
+                        },
+                        child: Text(
+                          'View Profile',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: TColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
 
-          // --- MENU ITEMS (Unchanged) ---
-          ListTile(
-            leading: const Icon(Iconsax.user),
-            title: const Text('Profile'),
-            onTap: () {
-              Navigator.pop(context);
-              Get.to(() => const ProfileScreen());
-            },
-          ),
-          ListTile(
-            leading: const Icon(Iconsax.clock),
-            title: const Text('Ride History'),
-            onTap: () {
-              Navigator.pop(context);
-              Get.to(() => const RideHistoryScreen());
-            },
-          ),
-          ListTile(
-            leading: const Icon(Iconsax.wallet),
-            title: const Text('Payment Methods'),
-            onTap: () {
-              Navigator.pop(context);
-              Get.to(() => const PaymentMethodsScreen());
-            },
-          ),
-          ListTile(
-            leading: const Icon(Iconsax.wallet_money),
-            title: const Text('My Wallet'),
-            onTap: () {
-              Navigator.pop(context);
-              Get.to(() => const WalletScreen());
-            },
+          // --- SCROLLABLE MENU ITEMS ---
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              children: [
+                _buildDrawerItem(
+                  icon: Iconsax.clock,
+                  title: 'Ride History',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Get.to(() => const RideHistoryScreen());
+                  },
+                  dark: dark,
+                  textColor: textColor,
+                ),
+                _buildDrawerItem(
+                  icon: Iconsax.wallet,
+                  title: 'Payment Methods',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Get.to(() => const PaymentMethodsScreen());
+                  },
+                  dark: dark,
+                  textColor: textColor,
+                ),
+                _buildDrawerItem(
+                  icon: Iconsax.wallet_money,
+                  title: 'My Wallet',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Get.to(() => const WalletScreen());
+                  },
+                  dark: dark,
+                  textColor: textColor,
+                ),
+
+                const SizedBox(height: 8),
+                Divider(
+                  height: 1,
+                  color: dividerColor,
+                  indent: 24,
+                  endIndent: 24,
+                ),
+                const SizedBox(height: 8),
+
+                // Messages
+                Obx(() {
+                  final unread = chatController.totalUnreadCount.value;
+                  return _buildDrawerItem(
+                    icon: Iconsax.message,
+                    title: 'Messages',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Get.to(() => const ChatListScreen());
+                    },
+                    dark: dark,
+                    textColor: textColor,
+                    badgeCount: unread,
+                  );
+                }),
+
+                // Notifications
+                Obx(() {
+                  final unread = notificationController.unreadCount.value;
+                  return _buildDrawerItem(
+                    icon: Iconsax.notification,
+                    title: 'Notifications',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Get.to(() => const NotificationScreen());
+                    },
+                    dark: dark,
+                    textColor: textColor,
+                    badgeCount: unread,
+                  );
+                }),
+
+                const SizedBox(height: 8),
+                Divider(
+                  height: 1,
+                  color: dividerColor,
+                  indent: 24,
+                  endIndent: 24,
+                ),
+                const SizedBox(height: 8),
+
+                // Location Refresh
+                GetBuilder<LocationService>(
+                  builder: (locationService) {
+                    return _buildDrawerItem(
+                      icon: Icons.my_location,
+                      title: 'Refresh Location',
+                      onTap: () {
+                        Navigator.pop(context);
+                        onRefreshLocation();
+                      },
+                      dark: dark,
+                      textColor: textColor,
+                      iconColor: locationService.isLocationEnabled
+                          ? TColors.primary
+                          : Colors.grey,
+                      subtitle: locationService.isLocationEnabled
+                          ? 'GPS Enabled'
+                          : 'GPS Disabled',
+                      subtitleColor: locationService.isLocationEnabled
+                          ? TColors.success
+                          : TColors.error,
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Iconsax.setting,
+                  title: 'Settings',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Get.to(() => const SettingsScreen());
+                  },
+                  dark: dark,
+                  textColor: textColor,
+                ),
+              ],
+            ),
           ),
 
-          // Messages Item
-          ListTile(
-            leading: Obx(
-              () => badges.Badge(
-                position: badges.BadgePosition.topEnd(top: -10, end: -10),
-                showBadge: chatController.totalUnreadCount.value > 0,
-                badgeContent: Text(
-                  chatController.totalUnreadCount.value.toString(),
-                  style: const TextStyle(color: Colors.white, fontSize: 10),
+          // --- LOGOUT (Bottom) ---
+          Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: InkWell(
+              onTap: () {
+                Navigator.pop(context);
+                settingsController.logout();
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: TColors.error.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                badgeStyle: const badges.BadgeStyle(
-                  badgeColor: TColors.error,
-                  padding: EdgeInsets.all(5),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Iconsax.logout, color: TColors.error, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Log Out',
+                      style: TextStyle(
+                        color: TColors.error,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
                 ),
-                child: const Icon(Iconsax.message),
               ),
             ),
-            title: const Text('Messages'),
-            onTap: () {
-              Navigator.pop(context);
-              Get.to(() => const ChatListScreen());
-            },
-          ),
-
-          // Notifications Item
-          ListTile(
-            leading: Obx(
-              () => badges.Badge(
-                position: badges.BadgePosition.topEnd(top: -10, end: -10),
-                showBadge: notificationController.unreadCount.value > 0,
-                badgeContent: Text(
-                  notificationController.unreadCount.value.toString(),
-                  style: const TextStyle(color: Colors.white, fontSize: 10),
-                ),
-                badgeStyle: const badges.BadgeStyle(
-                  badgeColor: TColors.error,
-                  padding: EdgeInsets.all(5),
-                ),
-                child: const Icon(Iconsax.notification),
-              ),
-            ),
-            title: const Text('Notifications'),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Get.to(() => const NotificationScreen());
-            },
-          ),
-
-          const Divider(),
-
-          // Location Refresh
-          GetBuilder<LocationService>(
-            builder: (locationService) {
-              return ListTile(
-                leading: Icon(
-                  Icons.my_location,
-                  color: locationService.isLocationEnabled
-                      ? TColors.primary
-                      : TColors.grey,
-                ),
-                title: const Text('Refresh Location'),
-                subtitle: Text(
-                  locationService.isLocationEnabled
-                      ? 'Location enabled'
-                      : 'Location disabled',
-                  style: TextStyle(
-                    color: locationService.isLocationEnabled
-                        ? TColors.success
-                        : TColors.error,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  onRefreshLocation();
-                },
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Iconsax.setting),
-            title: const Text('Settings'),
-            onTap: () {
-              Navigator.pop(context);
-              Get.to(() => const SettingsScreen());
-            },
-          ),
-
-          const Divider(),
-
-          // Logout
-          ListTile(
-            leading: const Icon(Iconsax.logout, color: TColors.error),
-            title: const Text('Logout', style: TextStyle(color: TColors.error)),
-            onTap: () {
-              Navigator.pop(context);
-              settingsController.logout();
-            },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    required bool dark,
+    required Color textColor,
+    Color? iconColor,
+    int badgeCount = 0,
+    String? subtitle,
+    Color? subtitleColor,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Row(
+          children: [
+            // Simple Icon without container
+            badges.Badge(
+              showBadge: badgeCount > 0,
+              badgeContent: Text(
+                badgeCount.toString(),
+                style: const TextStyle(color: Colors.white, fontSize: 10),
+              ),
+              position: badges.BadgePosition.topEnd(top: -8, end: -8),
+              child: Icon(
+                icon,
+                size: 26,
+                color:
+                    iconColor ?? (dark ? TColors.lightGrey : Colors.grey[600]),
+              ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 16,
+                      color: textColor,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: subtitleColor ?? Colors.grey,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            // Removed Arrow
+          ],
+        ),
       ),
     );
   }

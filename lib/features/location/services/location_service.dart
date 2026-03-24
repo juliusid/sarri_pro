@@ -43,7 +43,45 @@ class LocationService extends GetxController {
     _currentPosition.value = _defaultPosition;
   }
 
-  /// --- 1. ENSURE LOCATION AVAILABLE ---
+  /// --- 1. GET POSITION STREAM (THE GOOGLE REQUIREMENT) ---
+  /// This is the stream that keeps the app alive in the background
+  /// and shows the notification required by Play Console.
+  Stream<Position> getPositionStream() {
+    late LocationSettings locationSettings;
+
+    if (Platform.isAndroid) {
+      locationSettings = AndroidSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 10, // Update every 10 meters
+        forceLocationManager: true,
+        intervalDuration: const Duration(seconds: 3),
+        // [IMPORTANT] This config triggers the persistent notification
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: "Sarri Driver",
+          notificationText: "Tracking your trip in real-time",
+          notificationIcon: AndroidResource(name: 'launcher_icon'),
+          enableWakeLock: true, // Prevents CPU from sleeping
+        ),
+      );
+    } else if (Platform.isIOS) {
+      locationSettings = AppleSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        activityType: ActivityType.automotiveNavigation,
+        distanceFilter: 10,
+        pauseLocationUpdatesAutomatically: false,
+        showBackgroundLocationIndicator: true,
+      );
+    } else {
+      locationSettings = const LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 10,
+      );
+    }
+
+    return Geolocator.getPositionStream(locationSettings: locationSettings);
+  }
+
+  /// --- 2. ENSURE LOCATION AVAILABLE ---
   Future<bool> ensureLocationAvailable({bool isDriver = false}) async {
     bool serviceEnabled;
     LocationPermission permission;
@@ -75,14 +113,20 @@ class LocationService extends GetxController {
       return false;
     }
 
-    // C. Driver "Background" Check (Google Policy Requirement)
+    // C. Driver Checks (Google Policy Requirements)
     if (isDriver && Platform.isAndroid) {
+      // 1. NOTIFICATION PERMISSION (Android 13+) - CRITICAL FOR FOREGROUND SERVICE
+      if (await Permission.notification.isDenied) {
+        await Permission.notification.request();
+      }
+
+      // 2. BACKGROUND LOCATION CHECK
       var backgroundStatus = await Permission.locationAlways.status;
 
       if (!backgroundStatus.isGranted) {
         bool userAccepted = false;
 
-        // --- 1. Show the "Prominent Disclosure" Bottom Sheet ---
+        // --- Show the "Prominent Disclosure" Bottom Sheet ---
         await Get.bottomSheet(
           Container(
             padding: const EdgeInsets.all(TSizes.defaultSpace),
@@ -162,15 +206,11 @@ class LocationService extends GetxController {
           enableDrag: false,
         );
 
-        // --- 2. Handle Logic with DELAY (The Fix) ---
+        // --- Handle Logic with DELAY ---
         if (userAccepted) {
-          // Wait for the BottomSheet close animation to finish
           await Future.delayed(const Duration(milliseconds: 300));
-
-          // Now execute the request
           var status = await Permission.locationAlways.request();
 
-          // If request failed/blocked, Force Open Settings
           if (!status.isGranted) {
             THelperFunctions.showSnackBar(
               'Please select "Allow all the time" in Settings.',
@@ -179,7 +219,6 @@ class LocationService extends GetxController {
           }
         }
 
-        // --- 3. Final Verification ---
         if (!await Permission.locationAlways.isGranted) {
           THelperFunctions.showSnackBar(
             'You cannot go online without "Always Allow" location permission.',
@@ -193,7 +232,7 @@ class LocationService extends GetxController {
     return true;
   }
 
-  /// --- 2. INITIALIZATION ---
+  /// --- 3. INITIALIZATION ---
   Future<void> initialize({bool isDriver = false}) async {
     _isLocationLoading.value = true;
     _locationStatus.value = 'Verifying GPS...';
@@ -234,7 +273,7 @@ class LocationService extends GetxController {
     }
   }
 
-  /// --- 3. GET CURRENT LOCATION ---
+  /// --- 4. GET CURRENT LOCATION ---
   Future<Position?> getCurrentLocation({bool isDriver = false}) async {
     bool isReady = await ensureLocationAvailable(isDriver: isDriver);
     if (!isReady) return _currentPosition.value ?? _defaultPosition;

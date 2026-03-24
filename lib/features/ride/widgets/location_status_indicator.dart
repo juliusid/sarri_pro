@@ -10,43 +10,31 @@ class LocationStatusIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     return GetBuilder<LocationService>(
       builder: (locationService) {
+        final isEnabled = locationService.isLocationEnabled;
+
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: locationService.isLocationEnabled 
+            color: isEnabled
                 ? TColors.success.withOpacity(0.1)
                 : TColors.warning.withOpacity(0.1),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: locationService.isLocationEnabled 
-                  ? TColors.success
-                  : TColors.warning,
-              width: 1,
-            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                locationService.isLocationEnabled 
-                    ? Icons.location_on 
-                    : Icons.location_off,
-                size: 16,
-                color: locationService.isLocationEnabled 
-                    ? TColors.success
-                    : TColors.warning,
+                isEnabled ? Icons.my_location_rounded : Icons.location_disabled,
+                size: 14,
+                color: isEnabled ? TColors.success : TColors.warning,
               ),
               const SizedBox(width: 6),
               Text(
-                locationService.isLocationEnabled 
-                    ? 'Using your location'
-                    : 'Using default location (Lagos)',
+                isEnabled ? 'GPS Active' : 'Default Location',
                 style: TextStyle(
-                  fontSize: 12,
-                  color: locationService.isLocationEnabled 
-                      ? TColors.success
-                      : TColors.warning,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 11,
+                  color: isEnabled ? TColors.success : TColors.warning,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -55,4 +43,4 @@ class LocationStatusIndicator extends StatelessWidget {
       },
     );
   }
-} 
+}

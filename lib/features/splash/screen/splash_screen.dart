@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:sarri_ride/core/services/notification_service.dart';
 import 'package:sarri_ride/core/services/websocket_service.dart';
 import 'package:sarri_ride/features/authentication/models/auth_model.dart';
 import 'package:sarri_ride/features/authentication/screens/login/login_screen_getx.dart';
 import 'package:sarri_ride/features/authentication/screens/phone_verification/phone_number_screen.dart';
-import 'package:sarri_ride/features/authentication/screens/user_type_selection/user_type_selection_screen.dart';
 // import 'package:sarri_ride/features/authentication/screens/phone_verification/phone_number_screen.dart';
 import 'package:sarri_ride/features/authentication/services/auth_service.dart';
 import 'package:sarri_ride/features/onboarding/screen/onboarding_screen.dart';
@@ -71,12 +71,23 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _initializeApp() async {
+    // 1. Start the minimum splash timer immediately
+    // This serves as a buffer time for other system dialogs (like Notifications) to be handled.
     final minimumSplashDuration = Future.delayed(const Duration(seconds: 3));
 
+    // 2. Inject LocationService (but do not initialize/request permission yet)
     final locationService = Get.put(LocationService());
-    await locationService.initialize();
 
+    // 3. Wait for the splash duration to finish.
     await minimumSplashDuration;
+
+    // 4. Await notification permission first
+    // By doing this here, we ensure it's evaluated sequentially before location
+    await NotificationService.instance.init();
+
+    // 5. NOW request location permissions.
+    // This avoids the conflict where two permission dialogs try to show at once.
+    await locationService.initialize();
 
     if (mounted) {
       if (AuthService.instance.isAuthenticated) {
@@ -107,6 +118,7 @@ class _SplashScreenState extends State<SplashScreen>
         if (userRole == 'driver' || userRole == 'client') {
           print("SplashScreen: User is '$userRole', connecting WebSocket...");
           WebSocketService.instance.connect();
+          await NotificationService.instance.updateTokenOnBackend();
         }
 
         // 2. Check for Active Ride

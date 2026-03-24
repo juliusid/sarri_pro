@@ -15,70 +15,65 @@ class RecentDestinationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
-    
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 140,
-        height: 100,
+        width: 160,
         margin: const EdgeInsets.only(right: 12),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
           color: dark ? TColors.darkerGrey.withOpacity(0.3) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: dark ? TColors.darkerGrey : Colors.grey[300]!,
-          ),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: dark 
-                  ? Colors.black.withOpacity(0.3)
-                  : Colors.black.withOpacity(0.05),
-              blurRadius: 4,
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 5,
               offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
             Container(
-              width: 32,
-              height: 32,
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: TColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
+                color: dark ? TColors.dark : TColors.light,
+                shape: BoxShape.circle,
               ),
               child: Icon(
-                destination['icon'] as IconData,
-                color: TColors.primary,
-                size: 18,
+                destination['icon'] as IconData? ?? Icons.history,
+                color: dark ? TColors.lightGrey : TColors.textSecondary,
+                size: 16,
               ),
             ),
-            const SizedBox(height: 8),
-            Flexible(
-              child: Text(
-                destination['name'] as String,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: dark ? TColors.white : TColors.black,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Flexible(
-              child: Text(
-                destination['address'] as String,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: dark ? TColors.lightGrey : Colors.grey[600],
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    destination['name'] as String,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: dark ? TColors.white : TColors.textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    destination['address'] as String,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: dark ? TColors.lightGrey : TColors.textSecondary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
             ),
           ],
@@ -86,4 +81,4 @@ class RecentDestinationCard extends StatelessWidget {
       ),
     );
   }
-} 
+}

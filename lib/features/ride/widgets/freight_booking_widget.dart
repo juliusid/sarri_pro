@@ -3,7 +3,6 @@ import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/ride/widgets/common_widgets.dart';
 import 'package:sarri_ride/features/location/services/places_service.dart';
-import 'package:iconsax/iconsax.dart';
 
 class FreightBookingWidget extends StatelessWidget {
   final VoidCallback onBackPressed;

@@ -1,7 +1,5 @@
-// lib/features/driver/controllers/driver_dashboard_controller.dart
-
 import 'dart:async';
-import 'dart:math'; // For jitter in reconnect timer
+// For jitter in reconnect timer
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -18,7 +16,7 @@ import 'package:sarri_ride/features/location/services/location_service.dart';
 import 'package:sarri_ride/features/rating/services/rating_service.dart'; // <--- IMPORT RATING SERVICE
 
 // --- Screens ---
-import 'package:sarri_ride/features/driver/screens/driver_earnings_screen.dart';
+import 'package:sarri_ride/features/driver/screens/wallet_screen.dart'; // Updated import
 import 'package:sarri_ride/features/driver/screens/driver_trips_screen.dart';
 import 'package:sarri_ride/features/driver/screens/driver_profile_screen.dart';
 import 'package:sarri_ride/features/driver/screens/driver_vehicle_screen.dart';
@@ -33,7 +31,7 @@ import 'package:sarri_ride/utils/constants/enums.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 
-class DriverDashboardController extends GetxController {
+class DriverDashboardController extends GetxController with WidgetsBindingObserver {
   static DriverDashboardController get instance => Get.find();
 
   // Services
@@ -85,6 +83,7 @@ class DriverDashboardController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    WidgetsBinding.instance.addObserver(this);
     _initializeDriver();
     Future.delayed(
       const Duration(milliseconds: 100),
@@ -96,6 +95,7 @@ class DriverDashboardController extends GetxController {
 
   @override
   void onClose() {
+    WidgetsBinding.instance.removeObserver(this);
     _breakEndTimer?.cancel();
     _statusRefreshTimer?.cancel();
     _webSocketService.unregisterWalletUpdateListener(_handleWalletUpdate);
@@ -103,6 +103,23 @@ class DriverDashboardController extends GetxController {
       _handlePaymentProcessed,
     );
     super.onClose();
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+    // Force a fresh sync every time the dashboard becomes the active route
+    print("Dashboard Ready: Forcing status sync...");
+    checkDriverStatus();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      print("APP RESUMED: Syncing driver status with backend...");
+      checkDriverStatus();
+    }
   }
 
   void _initializeDriver() async {
@@ -702,7 +719,10 @@ class DriverDashboardController extends GetxController {
   }
 
   // --- Navigation methods ---
-  void navigateToEarnings() => Get.to(() => const DriverEarningsScreen());
+  // void navigateToEarnings() => Get.to(() => const DriverEarningsScreen()); // Old
+  void navigateToEarnings() =>
+      Get.to(() => const WalletScreen()); // New Wallet Navigation
+
   void navigateToTrips() => Get.to(() => const DriverTripsScreen());
   void navigateToProfile() => Get.to(() => const DriverProfileScreen());
   void navigateToVehicle() => Get.to(() => const DriverVehicleScreen());

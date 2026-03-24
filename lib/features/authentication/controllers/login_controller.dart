@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
+import 'package:sarri_ride/core/services/notification_service.dart';
 import 'package:sarri_ride/core/services/websocket_service.dart';
 import 'package:sarri_ride/features/authentication/models/auth_model.dart';
 import 'package:sarri_ride/features/authentication/screens/phone_verification/phone_number_screen.dart';
@@ -125,6 +126,7 @@ class LoginController extends GetxController {
         if (loginResult.client!.role == "client" ||
             loginResult.client!.role == "driver") {
           WebSocketService.instance.connect();
+          await NotificationService.instance.updateTokenOnBackend();
         }
 
         if (loginResult.client!.role == "client") {
@@ -257,6 +259,7 @@ class LoginController extends GetxController {
 
             // Connect to Realtime features
             WebSocketService.instance.connect();
+            await NotificationService.instance.updateTokenOnBackend();
 
             // Navigate
             final drawerController = Get.find<MapDrawerController>();

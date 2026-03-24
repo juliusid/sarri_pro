@@ -1,11 +1,11 @@
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
 import 'package:sarri_ride/config/api_config.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
 import 'package:sarri_ride/core/services/websocket_service.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
+import 'package:sarri_ride/utils/logging/app_logger.dart';
 
-// --- MODELS FOR PARSING API DATA ---
+// --- MODELS ---
 
 class WalletBalance {
   final double balance;
@@ -36,9 +36,6 @@ class WalletBalance {
   }
 
   String get formattedBalance => '₦${balance.toStringAsFixed(2)}';
-  String get formattedTotalEarnings => '₦${totalEarnings.toStringAsFixed(2)}';
-  String get formattedPendingEarnings =>
-      '₦${pendingEarnings.toStringAsFixed(2)}';
 }
 
 class WalletTransaction {
@@ -60,12 +57,42 @@ class WalletTransaction {
 
   factory WalletTransaction.fromJson(Map<String, dynamic> json) {
     return WalletTransaction(
-      id: json['id'] as String,
-      type: json['type'] as String,
-      status: json['status'] as String,
+      id: json['id'] as String? ?? '',
+      type: json['type'] as String? ?? 'unknown',
+      status: json['status'] as String? ?? 'pending',
       amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
-      description: json['description'] as String,
-      date: DateTime.tryParse(json['date'] as String? ?? '') ?? DateTime.now(),
+      description: json['description'] as String? ?? '',
+      date:
+          DateTime.tryParse(
+            json['date'] as String? ?? json['createdAt'] as String? ?? '',
+          ) ??
+          DateTime.now(),
+    );
+  }
+}
+
+class WithdrawalRequest {
+  final String id;
+  final double amount;
+  final String status; // pending, approved, rejected
+  final String reference;
+  final DateTime date;
+
+  WithdrawalRequest({
+    required this.id,
+    required this.amount,
+    required this.status,
+    required this.reference,
+    required this.date,
+  });
+
+  factory WithdrawalRequest.fromJson(Map<String, dynamic> json) {
+    return WithdrawalRequest(
+      id: json['_id'] ?? '',
+      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      status: json['status'] ?? 'pending',
+      reference: json['reference'] ?? '',
+      date: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
     );
   }
 }
@@ -77,17 +104,21 @@ class DriverWalletController extends GetxController {
   final HttpService _httpService = HttpService.instance;
   final WebSocketService _webSocketService = WebSocketService.instance;
 
-  // Wallet Data
+  // Data
   final Rx<WalletBalance?> walletBalance = Rx<WalletBalance?>(null);
   final RxList<WalletTransaction> transactions = <WalletTransaction>[].obs;
-
-  // Statistics (for the charts/cards)
+  final RxList<WithdrawalRequest> withdrawals = <WithdrawalRequest>[].obs;
   final RxMap<String, dynamic> walletStats = <String, dynamic>{}.obs;
 
-  // State
+  // Pending Earnings Data
+  final RxDouble totalPendingEarnings = 0.0.obs;
+
+  // Load States
   final RxBool isLoadingBalance = true.obs;
   final RxBool isLoadingStats = true.obs;
   final RxBool isLoadingTransactions = true.obs;
+  final RxBool isLoadingWithdrawals = false.obs;
+  final RxBool isWithdrawing = false.obs;
 
   // Pagination
   final RxInt currentPage = 1.obs;
@@ -96,69 +127,68 @@ class DriverWalletController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Fetch all data when the controller is first initialized
-    _webSocketService.registerWalletUpdateListener((data) {
-      print("WalletController: Received update, refreshing balance...");
-      fetchWalletBalance();
-      fetchTransactions();
-    });
-
-    _webSocketService.registerPaymentProcessedListener((data) {
-      print("WalletController: Payment processed, refreshing balance...");
-      fetchWalletBalance();
-      fetchTransactions();
-    });
+    _webSocketService.registerWalletUpdateListener((data) => refreshAll());
+    _webSocketService.registerPaymentProcessedListener((data) => refreshAll());
     fetchAllWalletData();
   }
 
-  /// Fetches all essential data for the wallet screen in parallel
+  void refreshAll() {
+    fetchAllWalletData();
+  }
+
   Future<void> fetchAllWalletData() async {
-    // Reset states
     isLoadingBalance.value = true;
     isLoadingStats.value = true;
     isLoadingTransactions.value = true;
-    currentPage.value = 1;
-    transactions.clear();
 
     try {
-      // Run all fetches at the same time
       await Future.wait([
         fetchWalletBalance(),
-        fetchWalletStatistics('month'), // Default to 'month'
-        fetchTransactions(), // Fetch first page
+        fetchPendingEarnings(),
+        fetchWalletStatistics('month'),
+        fetchTransactions(),
+        fetchWithdrawals(),
       ]);
-    } catch (e) {
-      print("Error fetching all wallet data: $e");
+    } catch (e, stack) {
+      AppLogger.error("Error fetching wallet data", error: e, stackTrace: stack);
+    } finally {
+      isLoadingBalance.value = false;
+      isLoadingStats.value = false;
+      isLoadingTransactions.value = false;
     }
   }
 
-  /// 1. Fetches the main wallet balance
   Future<void> fetchWalletBalance() async {
     try {
       final response = await _httpService.get(
         ApiConfig.driverWalletBalanceEndpoint,
       );
       final responseData = _httpService.handleResponse(response);
-
       if (responseData['success'] == true && responseData['data'] != null) {
         walletBalance.value = WalletBalance.fromJson(responseData['data']);
-      } else {
-        throw Exception(
-          responseData['message'] ?? 'Failed to load wallet balance',
-        );
       }
-    } catch (e) {
-      String msg = e is ApiException ? e.message : e.toString();
-      THelperFunctions.showErrorSnackBar(
-        'Error',
-        'Could not load balance: $msg',
-      );
-    } finally {
-      isLoadingBalance.value = false;
+    } catch (e, stack) {
+      AppLogger.error("Balance fetch error", error: e, stackTrace: stack);
     }
   }
 
-  /// 2. Fetches wallet statistics for a given period
+  Future<void> fetchPendingEarnings() async {
+    try {
+      final response = await _httpService.get(
+        ApiConfig.driverWalletPendingEarningsEndpoint,
+      );
+      final responseData = _httpService.handleResponse(response);
+      if (responseData['success'] == true && responseData['data'] != null) {
+        totalPendingEarnings.value =
+            (responseData['data']['totalPendingEarnings'] as num?)
+                ?.toDouble() ??
+            0.0;
+      }
+    } catch (e, stack) {
+      AppLogger.error("Pending earnings error", error: e, stackTrace: stack);
+    }
+  }
+
   Future<void> fetchWalletStatistics(String period) async {
     isLoadingStats.value = true;
     try {
@@ -167,21 +197,16 @@ class DriverWalletController extends GetxController {
         queryParameters: {'period': period},
       );
       final responseData = _httpService.handleResponse(response);
-
       if (responseData['success'] == true && responseData['data'] != null) {
         walletStats.value = responseData['data'];
-      } else {
-        throw Exception(responseData['message'] ?? 'Failed to load statistics');
       }
-    } catch (e) {
-      String msg = e is ApiException ? e.message : e.toString();
-      THelperFunctions.showErrorSnackBar('Error', 'Could not load stats: $msg');
+    } catch (e, stack) {
+      AppLogger.error("Wallet stats fetch error", error: e, stackTrace: stack);
     } finally {
       isLoadingStats.value = false;
     }
   }
 
-  /// 3. Fetches paginated transaction history
   Future<void> fetchTransactions({
     String type = 'all',
     bool loadMore = false,
@@ -190,30 +215,25 @@ class DriverWalletController extends GetxController {
       if (!hasNextPage.value || isLoadingTransactions.value) return;
       currentPage.value++;
     } else {
-      // This is a new fetch or refresh
       currentPage.value = 1;
       transactions.clear();
     }
-
     isLoadingTransactions.value = true;
 
     try {
-      final Map<String, dynamic> queryParams = {
-        'page': currentPage.value.toString(),
-        'limit': '20',
-        'type': type == 'all' ? '' : type,
-      };
-
       final response = await _httpService.get(
         ApiConfig.driverWalletTransactionsEndpoint,
-        queryParameters: queryParams,
+        queryParameters: {
+          'page': currentPage.value.toString(),
+          'limit': '20',
+          'type': type == 'all' ? '' : type,
+        },
       );
       final responseData = _httpService.handleResponse(response);
 
       if (responseData['status'] == 'success' && responseData['data'] != null) {
         final List<dynamic> txList = responseData['data']['transactions'] ?? [];
         final pagination = responseData['data']['pagination'] ?? {};
-
         final newTransactions = txList
             .map((tx) => WalletTransaction.fromJson(tx))
             .toList();
@@ -223,21 +243,62 @@ class DriverWalletController extends GetxController {
         } else {
           transactions.assignAll(newTransactions);
         }
-
         hasNextPage.value = pagination['hasNextPage'] ?? false;
-      } else {
-        throw Exception(
-          responseData['message'] ?? 'Failed to load transactions',
+      }
+    } catch (e) {
+      // THelperFunctions.showErrorSnackBar('Error', 'Could not load transactions');
+    } finally {
+      isLoadingTransactions.value = false;
+    }
+  }
+
+  Future<void> fetchWithdrawals() async {
+    isLoadingWithdrawals.value = true;
+    try {
+      final response = await _httpService.get(
+        ApiConfig.driverWalletWithdrawalsEndpoint,
+      );
+      final responseData = _httpService.handleResponse(response);
+      if (responseData['success'] == true && responseData['data'] != null) {
+        final List<dynamic> wList = responseData['data']['withdrawals'] ?? [];
+        withdrawals.assignAll(
+          wList.map((w) => WithdrawalRequest.fromJson(w)).toList(),
         );
       }
     } catch (e) {
-      String msg = e is ApiException ? e.message : e.toString();
-      THelperFunctions.showErrorSnackBar(
-        'Error',
-        'Could not load transactions: $msg',
-      );
+      print("Withdrawals fetch error: $e");
     } finally {
-      isLoadingTransactions.value = false;
+      isLoadingWithdrawals.value = false;
+    }
+  }
+
+  Future<bool> initiateWithdrawal(double amount) async {
+    isWithdrawing.value = true;
+    try {
+      final response = await _httpService.post(
+        ApiConfig.driverWalletWithdrawEndpoint,
+        body: {'amount': amount},
+      );
+
+      final responseData = _httpService.handleResponse(response);
+
+      if (responseData['status'] == 'success' ||
+          responseData['success'] == true) {
+        await fetchAllWalletData(); // Refresh everything
+        return true;
+      } else {
+        THelperFunctions.showErrorSnackBar(
+          'Withdrawal Failed',
+          responseData['message'] ?? 'Unknown error',
+        );
+        return false;
+      }
+    } catch (e) {
+      String msg = e is ApiException ? e.message : e.toString();
+      THelperFunctions.showErrorSnackBar('Withdrawal Error', msg);
+      return false;
+    } finally {
+      isWithdrawing.value = false;
     }
   }
 }

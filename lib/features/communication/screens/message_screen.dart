@@ -42,6 +42,7 @@ class MessageScreen extends StatefulWidget {
 
   final double rating;
   final String chatId;
+  final String? profileImage;
 
   const MessageScreen({
     super.key,
@@ -52,6 +53,7 @@ class MessageScreen extends StatefulWidget {
     this.subtitle,
     required this.rating,
     required this.chatId,
+    this.profileImage,
   }) : peerName = driverName;
 
   @override
@@ -209,7 +211,6 @@ class _MessageScreenState extends State<MessageScreen> {
 
   // --- Handle incoming message with De-duplication ---
   void _handleIncomingMessage(dynamic data) {
-    print("MessageScreen: Received chat:newMessage -> $data");
     if (mounted &&
         data is Map<String, dynamic> &&
         data['chatId'] == widget.chatId) {
@@ -219,22 +220,12 @@ class _MessageScreenState extends State<MessageScreen> {
       if (_messages.any((m) => m.id == serverId)) return;
 
       // 2. Self-Message check (Is this message from ME?)
-      // We need to know who 'I' am to filter this out.
-      // Since we don't have easy access to my own ID here without complex lookups,
-      // we can use the 'tempId' in meta!
-
       String? tempId;
       if (data['meta'] != null && data['meta'] is Map) {
         tempId = data['meta']['tempId'];
       }
 
-      // If I have a local message with this tempId, it means *I* sent it.
-      // The 'chat:sent' event will handle the confirmation/ID swap.
-      // We should IGNORE this 'chat:newMessage' event to avoid duplication.
       if (tempId != null && _messages.any((m) => m.id == tempId)) {
-        print(
-          "Ignoring echoed newMessage because I sent it (found tempId match).",
-        );
         return;
       }
       setState(() {
@@ -254,16 +245,13 @@ class _MessageScreenState extends State<MessageScreen> {
 
   // --- Handle sent confirmation (Reconciliation) ---
   void _handleSentConfirmation(dynamic data) {
-    print("MessageScreen: Received chat:sent -> $data");
     if (mounted &&
         data is Map<String, dynamic> &&
         data['chatId'] == widget.chatId) {
-      // --- FIX: Look for tempId inside 'meta' ---
       String? tempId;
       if (data['meta'] != null && data['meta'] is Map) {
         tempId = data['meta']['tempId'];
       }
-      // -----------------------------------------
 
       final serverId = data['_id'];
       final serverTime = data['createdAt'];
@@ -295,11 +283,12 @@ class _MessageScreenState extends State<MessageScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: dark ? TColors.dark : Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
           ),
           title: Text(
-            'Call ${widget.peerName}',
+            'Contact ${widget.peerName}',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: dark ? TColors.white : TColors.black,
@@ -309,87 +298,77 @@ class _MessageScreenState extends State<MessageScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'How would you like to call?',
+                'Choose a method to call',
                 style: TextStyle(
                   color: dark ? TColors.lightGrey : TColors.darkGrey,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               // Normal Call Option
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _makePhoneCall(widget.peerName);
-                  },
-                  icon: const Icon(Icons.phone, color: Colors.white),
-                  label: const Text(
-                    'Phone Call',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: TColors.success,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
+              _buildDialogButton(
+                icon: Iconsax.call,
+                label: 'Mobile Call',
+                color: TColors.success,
+                onTap: () {
+                  Navigator.pop(context);
+                  _makePhoneCall(widget.peerName);
+                },
               ),
               const SizedBox(height: 12),
               // In-App Call Option
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _makeInAppCall();
-                  },
-                  icon: const Icon(Icons.videocam, color: Colors.white),
-                  label: const Text(
-                    'In-App Call',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: TColors.info,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
+              _buildDialogButton(
+                icon: Iconsax.video,
+                label: 'In-App Call',
+                color: TColors.primary,
+                onTap: () {
+                  Navigator.pop(context);
+                  _makeInAppCall();
+                },
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: dark ? TColors.lightGrey : TColors.darkGrey,
-                ),
-              ),
-            ),
-          ],
         );
       },
     );
   }
 
-  void _makePhoneCall(String name) async {
-    // Use a placeholder or fetch phone from somewhere if available.
-    // In real app, pass phone number to MessageScreen.
-    const phoneNumber = '+2349012345678';
-    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+  Widget _buildDialogButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color.withOpacity(0.1),
+          foregroundColor: color,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 20),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
+  void _makePhoneCall(String name) async {
+    const phoneNumber = '+2349012345678'; // Placeholder
+    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
     try {
       if (await canLaunchUrl(phoneUri)) {
         await launchUrl(phoneUri);
@@ -403,26 +382,17 @@ class _MessageScreenState extends State<MessageScreen> {
 
   void _makeInAppCall() {
     if (Get.isRegistered<CallController>()) {
-      // 1. Find the Active Trip ID dynamically
       String tripId = '';
-
-      // Check if Rider
       if (Get.isRegistered<RideController>()) {
         tripId = Get.find<RideController>().rideId.value;
       }
-      // Check if Driver (if Rider ID wasn't found)
       if (tripId.isEmpty && Get.isRegistered<TripManagementController>()) {
         tripId =
             Get.find<TripManagementController>().activeTrip.value?.id ?? '';
       }
 
       if (tripId.isNotEmpty) {
-        // 2. Start call with valid Trip ID
-        CallController.instance.startCall(
-          tripId, // Valid Trip ID
-          widget.peerName, // Name to display
-          'User', // Role (optional display)
-        );
+        CallController.instance.startCall(tripId, widget.peerName, 'User');
       } else {
         THelperFunctions.showErrorSnackBar(
           'Error',
@@ -440,7 +410,6 @@ class _MessageScreenState extends State<MessageScreen> {
     final messageText = _messageController.text.trim();
     _messageController.clear();
 
-    // 1. Optimistic UI Update
     final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
 
     final message = ChatMessage(
@@ -456,22 +425,8 @@ class _MessageScreenState extends State<MessageScreen> {
     });
     _scrollToBottom();
 
-    // 2. Send via HTTP API with tempId
-    print("Attempting to send message via API: $messageText"); // <--- ADD LOG
-
     try {
-      final success = await _chatService.sendMessage(
-        widget.chatId,
-        messageText,
-        tempId,
-      );
-      if (success) {
-        print("API call successful. Waiting for socket confirmation.");
-      } else {
-        print("API call returned false/failed.");
-        // Optional: Mark message as error in UI
-        THelperFunctions.showSnackBar("Failed to send message");
-      }
+      await _chatService.sendMessage(widget.chatId, messageText, tempId);
     } catch (e) {
       print("Exception sending message: $e");
       THelperFunctions.showSnackBar("Error sending message");
@@ -498,6 +453,9 @@ class _MessageScreenState extends State<MessageScreen> {
   @override
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
+    final backgroundColor = dark ? TColors.dark : const Color(0xFFF5F5F5);
+    final inputColor = dark ? TColors.darkerGrey : Colors.white;
+    final textColor = dark ? TColors.white : TColors.textPrimary;
 
     // Construct subtitle logic
     String displaySubtitle = widget.subtitle ?? '';
@@ -506,24 +464,42 @@ class _MessageScreenState extends State<MessageScreen> {
         widget.plateNumber != null) {
       displaySubtitle = '${widget.carModel} • ${widget.plateNumber}';
     } else if (displaySubtitle.isEmpty) {
-      displaySubtitle = 'Rider';
+      displaySubtitle = 'Active now';
     }
 
     return Scaffold(
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        backgroundColor: TColors.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: dark ? TColors.darkerGrey : Colors.white,
         elevation: 0,
+        scrolledUnderElevation: 2,
+        shadowColor: Colors.black.withOpacity(0.1),
         leading: IconButton(
           onPressed: () => Get.back(),
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: textColor),
         ),
+        titleSpacing: 0,
         title: Row(
           children: [
-            const CircleAvatar(
-              radius: 20,
-              backgroundColor: Colors.white,
-              child: Icon(Iconsax.user, color: TColors.primary, size: 20),
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.grey.withOpacity(0.2)),
+              ),
+              child: CircleAvatar(
+                radius: 20,
+                backgroundColor: TColors.primary.withOpacity(0.1),
+                backgroundImage:
+                    (widget.profileImage != null &&
+                        widget.profileImage!.isNotEmpty)
+                    ? NetworkImage(widget.profileImage!)
+                    : null,
+                child:
+                    (widget.profileImage == null ||
+                        widget.profileImage!.isEmpty)
+                    ? const Icon(Iconsax.user, color: TColors.primary, size: 20)
+                    : null,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -532,23 +508,49 @@ class _MessageScreenState extends State<MessageScreen> {
                 children: [
                   Text(
                     widget.peerName,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: textColor,
                       fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                   Row(
                     children: [
-                      const Icon(Icons.star, color: Colors.amber, size: 14),
-                      const SizedBox(width: 2),
-                      Text(
-                        '${widget.rating} • $displaySubtitle',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
+                      if (widget.rating > 0) ...[
+                        const Icon(
+                          Icons.star_rounded,
+                          color: Colors.amber,
+                          size: 14,
                         ),
-                        overflow: TextOverflow.ellipsis,
+                        const SizedBox(width: 2),
+                        Text(
+                          widget.rating.toString(),
+                          style: TextStyle(
+                            color: dark ? TColors.lightGrey : TColors.darkGrey,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 3,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[400],
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Expanded(
+                        child: Text(
+                          displaySubtitle,
+                          style: TextStyle(
+                            color: dark ? TColors.lightGrey : Colors.grey[600],
+                            fontSize: 12,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
@@ -558,126 +560,186 @@ class _MessageScreenState extends State<MessageScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            onPressed: () => _showCallOptionsDialog(context),
-            icon: const Icon(Iconsax.call, color: Colors.white),
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            decoration: BoxDecoration(
+              color: TColors.success.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              onPressed: () => _showCallOptionsDialog(context),
+              icon: const Icon(Iconsax.call, color: TColors.success, size: 22),
+            ),
           ),
         ],
       ),
       body: Column(
         children: [
           Expanded(
-            // Chat messages
-            child: Container(
-              color: dark ? TColors.dark : Colors.grey[100],
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : Column(
-                      children: [
-                        // Show loader at top when pulling/loading more
-                        if (_isLoadingMore)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8.0),
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          ),
-                        Expanded(
-                          child: ListView.builder(
-                            controller: _scrollController,
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _messages.length,
-                            itemBuilder: (context, index) {
-                              final message = _messages[index];
-                              return _buildMessageBubble(message, dark);
-                            },
-                          ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : Stack(
+                    children: [
+                      // Chat List
+                      ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 20,
                         ),
+                        itemCount: _messages.length,
+                        itemBuilder: (context, index) {
+                          final message = _messages[index];
+                          // Check if previous message was from same sender
+                          bool isFirstInSequence = true;
+                          if (index > 0) {
+                            if (_messages[index - 1].isFromDriver ==
+                                message.isFromDriver) {
+                              isFirstInSequence = false;
+                            }
+                          }
+                          return Column(
+                            children: [
+                              // Loading indicator if fetching more
+                              if (index == 0 && _isLoadingMore)
+                                const Padding(
+                                  padding: EdgeInsets.only(bottom: 20),
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              _buildMessageBubble(
+                                message,
+                                dark,
+                                isFirstInSequence,
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+          ),
+
+          // Bottom Input Area
+          Container(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 12,
+              bottom: MediaQuery.of(context).padding.bottom + 12,
+            ),
+            decoration: BoxDecoration(
+              color: dark ? TColors.darkerGrey : Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -5),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Quick Responses
+                if (_shouldShowQuickResponses())
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        _buildQuickResponseChip('I\'m here'),
+                        const SizedBox(width: 8),
+                        _buildQuickResponseChip('2 minutes away'),
+                        const SizedBox(width: 8),
+                        _buildQuickResponseChip('Ok, thanks!'),
+                        const SizedBox(width: 8),
+                        _buildQuickResponseChip('See you soon'),
                       ],
                     ),
-            ),
-          ),
-          if (_shouldShowQuickResponses())
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: dark ? TColors.dark : Colors.white,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
+                  ),
+
+                // Input Row
+                Row(
                   children: [
-                    _buildQuickResponseChip('I\'m here'),
-                    const SizedBox(width: 8),
-                    _buildQuickResponseChip('2 minutes away'),
-                    const SizedBox(width: 8),
-                    _buildQuickResponseChip('Thank you'),
-                    const SizedBox(width: 8),
-                    _buildQuickResponseChip('See you soon'),
-                  ],
-                ),
-              ),
-            ),
-          Container(
-            // Message input
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: dark ? TColors.dark : Colors.white,
-              border: Border(
-                top: BorderSide(
-                  color: dark ? TColors.darkerGrey : TColors.lightGrey,
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    constraints: const BoxConstraints(minHeight: 48),
-                    decoration: BoxDecoration(
-                      color: dark ? TColors.darkerGrey : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Center(
-                      child: TextField(
-                        controller: _messageController,
-                        decoration: InputDecoration(
-                          hintText: 'Type a message...',
-                          hintStyle: TextStyle(
-                            color: dark ? TColors.lightGrey : Colors.grey[600],
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.zero,
-                          isCollapsed: true,
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        constraints: const BoxConstraints(
+                          minHeight: 48,
+                          maxHeight: 100,
                         ),
-                        style: TextStyle(
-                          color: dark ? TColors.white : TColors.black,
+                        decoration: BoxDecoration(
+                          color: dark ? TColors.dark : const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(24),
+                          // Removed unnecessary border to fix visual artifact
                         ),
-                        maxLines: null,
-                        minLines: 1,
-                        textCapitalization: TextCapitalization.sentences,
-                        keyboardType: TextInputType.multiline,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _messageController,
+                                decoration: InputDecoration(
+                                  hintText: 'Type a message...',
+                                  hintStyle: TextStyle(
+                                    color: dark
+                                        ? TColors.lightGrey
+                                        : Colors.grey[500],
+                                    fontSize: 15,
+                                  ),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                ),
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: 16,
+                                ),
+                                maxLines: null,
+                                keyboardType: TextInputType.multiline,
+                                textCapitalization:
+                                    TextCapitalization.sentences,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: _sendMessage,
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    decoration: const BoxDecoration(
-                      color: TColors.primary,
-                      shape: BoxShape.circle,
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: _sendMessage,
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: TColors.primary,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: TColors.primary.withOpacity(0.4),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Iconsax.send_1,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
                     ),
-                    child: const Icon(
-                      Iconsax.send_1,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -687,126 +749,113 @@ class _MessageScreenState extends State<MessageScreen> {
     );
   }
 
-  Widget _buildMessageBubble(ChatMessage message, bool dark) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        mainAxisAlignment: message.isFromDriver
-            ? MainAxisAlignment.start
-            : MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (message.isFromDriver) ...[
-            const CircleAvatar(
-              radius: 16,
-              backgroundColor: TColors.primary,
-              child: Icon(Iconsax.support, color: Colors.white, size: 16),
+  Widget _buildMessageBubble(
+    ChatMessage message,
+    bool dark,
+    bool isFirstInSequence,
+  ) {
+    final isMe = !message.isFromDriver;
+    final bubbleColor = isMe
+        ? TColors.primary
+        : (dark ? TColors.darkerGrey : Colors.white);
+    final textColor = isMe
+        ? Colors.white
+        : (dark ? TColors.white : TColors.black);
+
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: EdgeInsets.only(
+          top: isFirstInSequence ? 12 : 2,
+          left: isMe ? 60 : 0,
+          right: isMe ? 0 : 60,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: bubbleColor,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(18),
+            topRight: const Radius.circular(18),
+            bottomLeft: Radius.circular(
+              isMe ? 18 : (isFirstInSequence ? 0 : 4),
             ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.7,
-              ),
-              decoration: BoxDecoration(
-                color: message.isFromDriver
-                    ? (dark ? TColors.darkerGrey : Colors.white)
-                    : TColors.primary,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(18),
-                  topRight: const Radius.circular(18),
-                  bottomLeft: message.isFromDriver
-                      ? const Radius.circular(4)
-                      : const Radius.circular(18),
-                  bottomRight: message.isFromDriver
-                      ? const Radius.circular(18)
-                      : const Radius.circular(4),
-                ),
-                boxShadow: [
+            bottomRight: Radius.circular(
+              isMe ? (isFirstInSequence ? 0 : 4) : 18,
+            ),
+          ),
+          boxShadow: isMe
+              ? []
+              : [
                   BoxShadow(
-                    color: Colors.black.withOpacity(dark ? 0.2 : 0.08),
-                    blurRadius: 4,
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 2,
                     offset: const Offset(0, 1),
                   ),
                 ],
-              ),
-              child: Column(
-                crossAxisAlignment: message.isFromDriver
-                    ? CrossAxisAlignment.start
-                    : CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    message.text,
-                    style: TextStyle(
-                      color: message.isFromDriver
-                          ? (dark ? TColors.white : TColors.black)
-                          : Colors.white,
-                      fontSize: 15,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              message.text,
+              style: TextStyle(color: textColor, fontSize: 15, height: 1.3),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _formatTime(message.timestamp),
+                  style: TextStyle(
+                    color: isMe
+                        ? Colors.white.withOpacity(0.7)
+                        : (dark ? Colors.grey[500] : Colors.grey[400]),
+                    fontSize: 10,
+                  ),
+                ),
+                if (isMe) ...[
+                  const SizedBox(width: 4),
+                  Obx(
+                    () => Icon(
+                      message.isSent.value ? Icons.done_all : Icons.done,
+                      size: 14,
+                      color: Colors.white.withOpacity(0.8),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  // --- Sent Status Indicator ---
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _formatTime(message.timestamp),
-                        style: TextStyle(
-                          color: message.isFromDriver
-                              ? (dark
-                                    ? TColors.lightGrey.withOpacity(0.7)
-                                    : Colors.grey[600])
-                              : Colors.white.withOpacity(0.7),
-                          fontSize: 11,
-                        ),
-                      ),
-                      if (!message.isFromDriver) ...[
-                        const SizedBox(width: 4),
-                        Obx(
-                          () => Icon(
-                            message.isSent.value ? Icons.done_all : Icons.done,
-                            size: 14,
-                            color: message.isSent.value
-                                ? Colors.lightBlueAccent.withOpacity(0.8)
-                                : Colors.white.withOpacity(0.7),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
                 ],
-              ),
+              ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildQuickResponseChip(String text) {
     final dark = THelperFunctions.isDarkMode(context);
+    final chipColor = dark ? TColors.dark : Colors.white;
+    final borderColor = dark ? TColors.darkGrey : Colors.grey[300]!;
 
-    return GestureDetector(
-      onTap: () => _sendQuickMessage(text),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: dark ? TColors.darkerGrey : Colors.grey[200],
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: dark
-                ? TColors.darkGrey.withOpacity(0.5)
-                : TColors.grey.withOpacity(0.5),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _sendQuickMessage(text),
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: chipColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: borderColor),
           ),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-            color: dark ? TColors.lightGrey : TColors.darkGrey,
-            fontSize: 13,
+          child: Text(
+            text,
+            style: TextStyle(
+              color: dark ? TColors.lightGrey : TColors.darkGrey,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ),
@@ -818,6 +867,6 @@ class _MessageScreenState extends State<MessageScreen> {
   }
 
   String _formatTime(DateTime dateTime) {
-    return DateFormat('HH:mm').format(dateTime);
+    return DateFormat('h:mm a').format(dateTime);
   }
 }

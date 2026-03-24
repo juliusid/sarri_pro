@@ -560,7 +560,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                 
                 setState(() {
                   if (isEditing) {
-                    final index = _emergencyContacts.indexWhere((c) => c.id == contact!.id);
+                    final index = _emergencyContacts.indexWhere((c) => c.id == contact.id);
                     _emergencyContacts[index] = newContact;
                   } else {
                     _emergencyContacts.add(newContact);

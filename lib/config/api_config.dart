@@ -1,15 +1,20 @@
-// lib/config/api_config.dart
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class ApiConfig {
   // Base URLs for different environments
-  static const String apiKey = "the_sarriride_2025@development_Backend";
-  static const String _devBaseUrl =
+  static String get apiKey =>
+      dotenv.env['API_KEY'] ?? "the_sarriride_2025@development_Backend";
+  static String get _devBaseUrl =>
       // 'https://sarriride.onrender.com'; // Replace with your dev API URL
+      dotenv.env['DEV_BASE_URL'] ??
       'https://oyster-app-kfpml.ondigitalocean.app';
-  static const String _stagingBaseUrl =
+  static String get _stagingBaseUrl =>
       // 'https://sarriride.onrender.com'; // Replace with your staging API URL
+      dotenv.env['STAGING_BASE_URL'] ??
       'https://oyster-app-kfpml.ondigitalocean.app';
-  static const String _prodBaseUrl =
+  static String get _prodBaseUrl =>
       // 'https://sarriride.onrender.com'; // Replace with your production API URL
+      dotenv.env['PROD_BASE_URL'] ??
       'https://oyster-app-kfpml.ondigitalocean.app';
 
   // Timeouts
@@ -17,7 +22,7 @@ class ApiConfig {
   static const Duration _receiveTimeout = Duration(seconds: 30);
 
   // Headers
-  static const Map<String, String> _defaultHeaders = {
+  static final Map<String, String> _defaultHeaders = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     'User-Agent': 'SarriRide/1.0.0',

@@ -56,10 +56,6 @@ class PaymentController extends GetxController {
   final RxBool isAddingCard = false.obs;
   final RxBool isPaying = false.obs;
 
-  @override
-  void onInit() {
-    super.onInit();
-  }
 
   /// Fetches the list of saved payment cards from the API
   Future<void> fetchSavedCards() async {

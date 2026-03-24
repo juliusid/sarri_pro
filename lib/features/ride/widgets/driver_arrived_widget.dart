@@ -7,9 +7,7 @@ import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/ride/widgets/common_widgets.dart';
 import 'package:sarri_ride/features/ride/widgets/driver_info_card.dart';
-import 'package:sarri_ride/features/communication/screens/call_screen.dart';
 import 'package:sarri_ride/features/communication/screens/message_screen.dart';
-import 'package:iconsax/iconsax.dart';
 
 class DriverArrivedWidget extends StatelessWidget {
   final Driver driver;
@@ -51,7 +49,7 @@ class DriverArrivedWidget extends StatelessWidget {
               const SizedBox(height: 20),
 
               // Normal Call Option
-              Container(
+              SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
@@ -79,7 +77,7 @@ class DriverArrivedWidget extends StatelessWidget {
               const SizedBox(height: 12),
 
               // In-App Call Option
-              Container(
+              SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {

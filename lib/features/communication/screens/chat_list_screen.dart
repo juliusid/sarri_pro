@@ -182,8 +182,9 @@ class ChatListScreen extends StatelessWidget {
   String _formatTimestamp(DateTime timestamp) {
     final now = DateTime.now();
     final difference = now.difference(timestamp);
-    if (difference.inSeconds < 60)
+    if (difference.inSeconds < 60) {
       return '${difference.inSeconds}s ago'; // More granular for recent
+    }
     if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
     if (difference.inHours < 24) return '${difference.inHours}h ago';
     if (difference.inDays == 1) return 'Yesterday';

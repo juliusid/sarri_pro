@@ -366,18 +366,24 @@ class SavedPlacesScreen extends StatelessWidget {
   IconData _getPlaceIcon(String label) {
     final lowerLabel = label.toLowerCase();
     if (lowerLabel.contains('home')) return Iconsax.home;
-    if (lowerLabel.contains('work') || lowerLabel.contains('office'))
+    if (lowerLabel.contains('work') || lowerLabel.contains('office')) {
       return Iconsax.building;
-    if (lowerLabel.contains('gym') || lowerLabel.contains('fitness'))
+    }
+    if (lowerLabel.contains('gym') || lowerLabel.contains('fitness')) {
       return Iconsax.health;
-    if (lowerLabel.contains('school') || lowerLabel.contains('university'))
+    }
+    if (lowerLabel.contains('school') || lowerLabel.contains('university')) {
       return Iconsax.teacher;
-    if (lowerLabel.contains('hospital') || lowerLabel.contains('clinic'))
+    }
+    if (lowerLabel.contains('hospital') || lowerLabel.contains('clinic')) {
       return Iconsax.hospital;
-    if (lowerLabel.contains('mall') || lowerLabel.contains('shop'))
+    }
+    if (lowerLabel.contains('mall') || lowerLabel.contains('shop')) {
       return Iconsax.shop;
-    if (lowerLabel.contains('airport'))
+    }
+    if (lowerLabel.contains('airport')) {
       return Icons.local_airport; // You might want to add this if it's missing
+    }
     // ...
     return Iconsax.location;
   }
@@ -385,18 +391,24 @@ class SavedPlacesScreen extends StatelessWidget {
   Color _getPlaceColor(String label) {
     final lowerLabel = label.toLowerCase();
     if (lowerLabel.contains('home')) return TColors.success;
-    if (lowerLabel.contains('work') || lowerLabel.contains('office'))
+    if (lowerLabel.contains('work') || lowerLabel.contains('office')) {
       return TColors.info;
-    if (lowerLabel.contains('gym') || lowerLabel.contains('fitness'))
+    }
+    if (lowerLabel.contains('gym') || lowerLabel.contains('fitness')) {
       return TColors.warning;
-    if (lowerLabel.contains('school') || lowerLabel.contains('university'))
+    }
+    if (lowerLabel.contains('school') || lowerLabel.contains('university')) {
       return TColors.secondary;
-    if (lowerLabel.contains('hospital') || lowerLabel.contains('clinic'))
+    }
+    if (lowerLabel.contains('hospital') || lowerLabel.contains('clinic')) {
       return TColors.error;
-    if (lowerLabel.contains('mall') || lowerLabel.contains('shop'))
+    }
+    if (lowerLabel.contains('mall') || lowerLabel.contains('shop')) {
       return const Color(0xFF8B5CF6);
-    if (lowerLabel.contains('restaurant') || lowerLabel.contains('cafe'))
+    }
+    if (lowerLabel.contains('restaurant') || lowerLabel.contains('cafe')) {
       return const Color(0xFFEC4899);
+    }
     return TColors.primary;
   }
 

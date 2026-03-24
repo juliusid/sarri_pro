@@ -1,7 +1,6 @@
 // lib/features/authentication/controllers/rider_signup_controller.dart
 
 import 'dart:async'; // Required for Timer
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';

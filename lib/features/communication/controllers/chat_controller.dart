@@ -8,11 +8,6 @@ class ChatController extends GetxController {
 
   // TODO: Implement more granular tracking if needed (e.g., Map<String, int> unreadPerChat)
 
-  @override
-  void onInit() {
-    super.onInit();
-    // TODO: Load initial unread count from storage or API if needed
-  }
 
   // Called by WebSocketService when a new message arrives for any chat
   void handleIncomingMessage(dynamic messageData) {

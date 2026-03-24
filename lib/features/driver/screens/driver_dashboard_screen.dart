@@ -627,7 +627,6 @@ class DriverDashboardScreen extends StatelessWidget {
           ),
           ElevatedButton(
             //
-            child: const Text('Start Break'), //
             style: ElevatedButton.styleFrom(
               backgroundColor: TColors.primary,
             ), //
@@ -636,6 +635,8 @@ class DriverDashboardScreen extends StatelessWidget {
               Get.back(); // Close dialog
               controller.startBreak(selectedDuration); // Call controller method
             },
+            //
+            child: const Text('Start Break'),
           ),
         ],
       ),
@@ -649,69 +650,72 @@ class DriverDashboardScreen extends StatelessWidget {
     DriverDashboardController controller, //
     bool dark, //
   ) {
-    return Obx(
-      //
-      () => Container(
+    return GestureDetector(
+      onTap: () => controller.navigateToEarnings(),
+      child: Obx(
         //
-        width: double.infinity, //
-        padding: const EdgeInsets.all(TSizes.defaultSpace), //
-        decoration: BoxDecoration(
+        () => Container(
           //
-          gradient: LinearGradient(
+          width: double.infinity, //
+          padding: const EdgeInsets.all(TSizes.defaultSpace), //
+          decoration: BoxDecoration(
             //
-            colors: [TColors.primary, TColors.primary.withOpacity(0.8)], //
-            begin: Alignment.topLeft, //
-            end: Alignment.bottomRight, //
+            gradient: LinearGradient(
+              //
+              colors: [TColors.primary, TColors.primary.withOpacity(0.8)], //
+              begin: Alignment.topLeft, //
+              end: Alignment.bottomRight, //
+            ),
+            borderRadius: BorderRadius.circular(TSizes.cardRadiusLg), //
           ),
-          borderRadius: BorderRadius.circular(TSizes.cardRadiusLg), //
-        ),
-        child: Column(
-          //
-          crossAxisAlignment: CrossAxisAlignment.start, //
-          children: [
-            Text(
-              //
-              'Today\'s Earnings', //
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          child: Column(
+            //
+            crossAxisAlignment: CrossAxisAlignment.start, //
+            children: [
+              Text(
                 //
-                color: TColors.white, //
-                fontWeight: FontWeight.w600, //
+                'Today\'s Earnings', //
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  //
+                  color: TColors.white, //
+                  fontWeight: FontWeight.w600, //
+                ),
               ),
-            ),
-            const SizedBox(height: TSizes.spaceBtwItems), //
-            Text(
-              //
-              controller.formattedTodayEarnings, //
-              style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+              const SizedBox(height: TSizes.spaceBtwItems), //
+              Text(
                 //
-                color: TColors.white, //
-                fontWeight: FontWeight.bold, //
+                controller.formattedTodayEarnings, //
+                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  //
+                  color: TColors.white, //
+                  fontWeight: FontWeight.bold, //
+                ),
               ),
-            ),
-            const SizedBox(height: TSizes.spaceBtwItems), //
-            Row(
-              //
-              children: [
-                Text(
-                  //
-                  'Trips: ${controller.todayTripsCount.value}', //
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              const SizedBox(height: TSizes.spaceBtwItems), //
+              Row(
+                //
+                children: [
+                  Text(
                     //
-                    color: TColors.white.withOpacity(0.7), //
+                    'Trips: ${controller.todayTripsCount.value}', //
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      //
+                      color: TColors.white.withOpacity(0.7), //
+                    ),
                   ),
-                ),
-                const SizedBox(width: TSizes.spaceBtwItems), //
-                Text(
-                  //
-                  'Hours: ${controller.todayHours.value.toStringAsFixed(1)}h', //
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  const SizedBox(width: TSizes.spaceBtwItems), //
+                  Text(
                     //
-                    color: TColors.white.withOpacity(0.7), //
+                    'Hours: ${controller.todayHours.value.toStringAsFixed(1)}h', //
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      //
+                      color: TColors.white.withOpacity(0.7), //
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -748,8 +752,8 @@ class DriverDashboardScreen extends StatelessWidget {
             _buildActionCard(
               //
               context,
-              'Earnings',
-              Iconsax.chart,
+              'Wallet', // Updated Label
+              Iconsax.wallet_money, // Updated Icon
               TColors.success,
               () => controller.navigateToEarnings(),
               dark,

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-import 'package:iconsax/iconsax.dart'; // Add iconsax import
-import 'package:sarri_ride/features/driver/screens/document_upload/document_upload_screen.dart'; //
-import 'package:sarri_ride/utils/constants/colors.dart'; //
+// Add iconsax import
+//
+//
 import 'package:sarri_ride/utils/constants/sizes.dart'; //
-import 'package:sarri_ride/utils/helpers/helper_functions.dart'; // For THelperFunctions
+// For THelperFunctions
 
 // --- MODIFICATION START ---
 class VerificationBanner extends StatelessWidget {

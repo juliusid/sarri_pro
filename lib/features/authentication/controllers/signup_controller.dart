@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sarri_ride/features/authentication/screens/otp/otp_screen_getx.dart';
-import 'package:sarri_ride/features/ride/widgets/map_screen_getx.dart';
 // import 'package:sarri_ride/features/driver/screens/driver_dashboard_screen.dart';
 import 'package:sarri_ride/features/authentication/services/auth_service.dart';
-import 'package:sarri_ride/features/shared/models/user_model.dart';
 import 'package:sarri_ride/utils/constants/enums.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
@@ -27,11 +25,6 @@ class SignupController extends GetxController {
   final RxBool obscurePassword = true.obs;
   final RxBool isLoading = false.obs;
 
-  @override
-  void onInit() {
-    super.onInit();
-    // No need to initialize demo data for production
-  }
 
   @override
   void onClose() {

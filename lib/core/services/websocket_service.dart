@@ -1,7 +1,6 @@
 // lib/core/services/websocket_service.dart
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math'; // For jitter
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -22,8 +21,6 @@ import 'package:sarri_ride/features/ride/controllers/ride_controller.dart';
 import 'package:sarri_ride/features/driver/controllers/trip_management_controller.dart';
 import 'package:sarri_ride/features/authentication/screens/login/login_screen_getx.dart';
 
-import 'package:sarri_ride/features/driver/controllers/trip_management_controller.dart'
-    show TripRequest;
 import 'package:sarri_ride/features/ride/widgets/driver_info_card.dart'
     show Driver;
 
@@ -338,7 +335,7 @@ class WebSocketService extends GetxService {
         if (response is Map && response['status'] == 'success') {
           // Success, location updated.
           print(
-            "Location update acknowledged by server.${response}",
+            "Location update acknowledged by server.$response",
           ); // Can be too noisy
         } else {
           // Handle failure
@@ -717,6 +714,13 @@ class WebSocketService extends GetxService {
       if (data is Map<String, dynamic> && data['rideId'] != null) {
         try {
           final tripController = Get.find<TripManagementController>();
+          
+          // --- Fix Logic Loophole ---
+          // Block new ride requests if the driver just completed a ride and is actively waiting for payment or already has an active request
+          if (tripController.isWaitingForCash.value || tripController.hasActiveTrip || tripController.hasNewRequest.value) {
+            print("WS: Ignored incoming ride:request because driver lies in an active payment or trip flow.");
+            return;
+          }
 
           LatLng parseLatLng(dynamic locationData, LatLng fallback) {
             if (locationData is Map) {
@@ -859,14 +863,17 @@ class WebSocketService extends GetxService {
           final String plateNumber = vehicleData['licensePlate'] ?? 'N/A';
           final String eta = data['eta'] ?? '...';
 
+          // Get Profile Picture
+          final String? profilePicture = driverData['picture'];
+
           // --- FIX: Safe Rating Parsing ---
-          double driverRating = 4.5;
+          double driverRating =
+              0.0; // Default to 0.0 ("New") if data is missing or average is null
           final rawRating = driverData['rating'];
 
           if (rawRating is num) {
             driverRating = rawRating.toDouble();
           } else if (rawRating is Map) {
-            // If rating is an object { average: null, ... }
             final avg = rawRating['average'];
             if (avg is num) {
               driverRating = avg.toDouble();
@@ -895,6 +902,7 @@ class WebSocketService extends GetxService {
             phoneNumber: driverPhone,
             eta: eta,
             location: driverLoc,
+            profileImage: profilePicture, // Pass the image URL
           );
 
           final chatId = data['chatId'] as String? ?? '';
@@ -963,7 +971,7 @@ class WebSocketService extends GetxService {
 
           // Log for debugging
           print("Updating Map Marker to: $lat, $lng");
-          print("Location update acknowledged by server.${data}");
+          print("Location update acknowledged by server.$data");
 
           // Find controller and update
           if (Get.isRegistered<RideController>()) {

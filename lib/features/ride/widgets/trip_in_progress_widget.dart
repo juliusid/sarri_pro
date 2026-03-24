@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sarri_ride/features/communication/controllers/call_controller.dart';
 import 'package:sarri_ride/features/ride/controllers/ride_controller.dart';
-// Import the ShareController
+import 'package:sarri_ride/features/ride/widgets/driver_info_card.dart';
 import 'package:sarri_ride/features/share/controllers/share_controller.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
-import 'package:sarri_ride/features/ride/widgets/common_widgets.dart';
-import 'package:sarri_ride/features/ride/widgets/driver_info_card.dart';
 import 'package:sarri_ride/features/communication/screens/message_screen.dart';
 import 'package:iconsax/iconsax.dart';
 
@@ -22,7 +20,6 @@ class TripInProgressWidget extends StatelessWidget {
     required this.onEmergency,
   });
 
-  // Function to show call type selection dialog
   void _showCallOptionsDialog(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
 
@@ -30,11 +27,12 @@ class TripInProgressWidget extends StatelessWidget {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: dark ? TColors.dark : Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
           ),
           title: Text(
-            'Call ${driver.name}',
+            'Contact ${driver.name}',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: dark ? TColors.white : TColors.black,
@@ -44,87 +42,73 @@ class TripInProgressWidget extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'How would you like to call the driver?',
+                'Choose a method to call',
                 style: TextStyle(
                   color: dark ? TColors.lightGrey : TColors.darkGrey,
                 ),
               ),
-              const SizedBox(height: 20),
-
-              // Normal Call Option
-              Container(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _makePhoneCall(driver.name);
-                  },
-                  icon: const Icon(Icons.phone, color: Colors.white),
-                  label: const Text(
-                    'Phone Call',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: TColors.success,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
+              const SizedBox(height: 24),
+              _buildDialogButton(
+                icon: Iconsax.call,
+                label: 'Mobile Call',
+                color: TColors.success,
+                onTap: () {
+                  Navigator.pop(context);
+                  _makePhoneCall(driver.name);
+                },
               ),
-
               const SizedBox(height: 12),
-
-              // In-App Call Option
-              Container(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _makeInAppCall();
-                  },
-                  icon: const Icon(Icons.videocam, color: Colors.white),
-                  label: const Text(
-                    'In-App Call',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: TColors.info,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
+              _buildDialogButton(
+                icon: Iconsax.video,
+                label: 'In-App Call',
+                color: TColors.primary,
+                onTap: () {
+                  Navigator.pop(context);
+                  _makeInAppCall();
+                },
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: dark ? TColors.lightGrey : TColors.darkGrey,
-                ),
-              ),
-            ),
-          ],
         );
       },
     );
   }
 
-  // Function to make normal phone call
+  Widget _buildDialogButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color.withOpacity(0.1),
+          foregroundColor: color,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 20),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _makePhoneCall(String driverName) async {
-    // Use the driver's phone number
     final phoneNumber = driver.phoneNumber.isNotEmpty
         ? driver.phoneNumber
         : '+2349012345678';
@@ -141,7 +125,6 @@ class TripInProgressWidget extends StatelessWidget {
     }
   }
 
-  // Function to make in-app call
   void _makeInAppCall() {
     CallController.instance.startCall(driver.id, driver.name, 'Driver');
   }
@@ -150,77 +133,151 @@ class TripInProgressWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
     final rideController = Get.find<RideController>();
+    final backgroundColor = dark ? TColors.dark : TColors.white;
+    final textColor = dark ? TColors.white : TColors.textPrimary;
+    final subtitleColor = dark ? TColors.lightGrey : TColors.textSecondary;
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 30),
       decoration: BoxDecoration(
-        color: dark ? TColors.dark : TColors.white,
+        color: backgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 15,
+            offset: const Offset(0, -5),
+          ),
+        ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const DragHandle(),
-          const SizedBox(height: 20),
-
-          Text(
-            'Trip in Progress',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: dark ? TColors.white : TColors.black,
+          // Drag Handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 24),
+              decoration: BoxDecoration(
+                color: dark ? TColors.darkGrey : Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Obx(
-            () => Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Stops: ${(rideController.stops.length - 2).clamp(0, 3)}',
-                  style: TextStyle(
-                    color: dark ? TColors.lightGrey : TColors.darkGrey,
+
+          // Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Trip in Progress',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: TColors.success,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Heading to destination',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: subtitleColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Obx(
+                () => Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: TColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '₦${rideController.totalPrice.value.toStringAsFixed(0)}',
+                    style: TextStyle(
+                      color: TColors.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
-                Text(
-                  'Fare est: ₦${rideController.totalPrice.value.toStringAsFixed(0)}',
-                  style: TextStyle(
-                    color: dark ? TColors.white : TColors.black,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: 24),
 
-          Text(
-            'Enjoy your ride with ${driver.name}',
-            style: TextStyle(
-              color: dark ? TColors.lightGrey : Colors.grey[600],
-              fontSize: 16,
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // Driver info compact
+          // Driver & Car Info
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: dark
-                  ? TColors.darkerGrey.withOpacity(0.3)
+                  ? TColors.darkerGrey.withOpacity(0.5)
                   : Colors.grey[50],
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: dark ? Colors.transparent : Colors.grey[200]!,
+              ),
             ),
             child: Row(
               children: [
-                const CircleAvatar(
-                  radius: 25,
-                  backgroundColor: TColors.primary,
-                  child: Icon(Icons.person, color: Colors.white, size: 25),
+                // Driver Avatar
+                Stack(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: TColors.primary, width: 2),
+                      ),
+                      child: CircleAvatar(
+                        radius: 24,
+                        backgroundColor: Colors.grey[300],
+                        backgroundImage:
+                            (driver.profileImage != null &&
+                                driver.profileImage!.isNotEmpty)
+                            ? NetworkImage(driver.profileImage!)
+                            : null,
+                        child:
+                            (driver.profileImage == null ||
+                                driver.profileImage!.isEmpty)
+                            ? const Icon(
+                                Iconsax.user,
+                                color: Colors.grey,
+                                size: 24,
+                              )
+                            : null,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
+
+                // Info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,33 +286,127 @@ class TripInProgressWidget extends StatelessWidget {
                         driver.name,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: dark ? TColors.white : TColors.black,
+                          fontSize: 16,
+                          color: textColor,
                         ),
                       ),
+                      const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 14),
+                          Icon(Iconsax.star1, size: 14, color: Colors.amber),
+                          const SizedBox(width: 4),
                           Text(
-                            ' ${driver.rating}',
+                            driver.rating.toString(),
                             style: TextStyle(
-                              fontWeight: FontWeight.w500,
-                              color: dark ? TColors.lightGrey : TColors.black,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                              color: subtitleColor,
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          Container(
+                            width: 4,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: subtitleColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           Text(
-                            ' • ${driver.carModel}',
+                            driver.carModel,
                             style: TextStyle(
-                              color: dark ? TColors.lightGrey : TColors.black,
+                              fontSize: 12,
+                              color: subtitleColor,
                             ),
                           ),
                         ],
                       ),
+                    ],
+                  ),
+                ),
+
+                // Plate Number
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: dark ? Colors.black26 : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: dark ? Colors.grey[700]! : Colors.grey[300]!,
+                    ),
+                  ),
+                  child: Text(
+                    driver.plateNumber,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: textColor,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Timeline
+          Container(
+            padding: const EdgeInsets.only(left: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Column(
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      margin: const EdgeInsets.only(top: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: TColors.primary, width: 3),
+                      ),
+                    ),
+                    Container(
+                      width: 2,
+                      height: 34,
+                      color: dark ? Colors.grey[700] : Colors.grey[300],
+                      margin: const EdgeInsets.symmetric(vertical: 2),
+                    ),
+                    const Icon(
+                      Iconsax.location5,
+                      color: TColors.error,
+                      size: 16,
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        driver.plateNumber,
+                        rideController.pickupController.text,
+                        style: TextStyle(color: subtitleColor, fontSize: 13),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 26),
+                      Text(
+                        rideController.destinationController.text,
                         style: TextStyle(
-                          color: dark ? TColors.lightGrey : Colors.grey[600],
-                          fontSize: 12,
+                          color: textColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -264,181 +415,116 @@ class TripInProgressWidget extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 30),
 
-          // Trip progress indicator
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: TColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.directions_car, color: TColors.primary),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'On the way to destination...',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: dark ? TColors.white : TColors.black,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // Call and Message buttons
+          // Action Grid
           Row(
             children: [
               Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: TColors.success,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () => _showCallOptionsDialog(context),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.phone, color: Colors.white, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'Call',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                child: _buildActionButton(
+                  icon: Iconsax.call,
+                  label: "Call",
+                  color: TColors.success,
+                  onTap: () => _showCallOptionsDialog(context),
+                  isOutlined: false,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: TColors.info,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () {
-                        // Get chatId from RideController
-                        final rideController = Get.find<RideController>();
-                        final chatId = rideController.activeRideChatId.value;
-
-                        Get.to(
-                          () => MessageScreen(
-                            driverName: driver.name,
-                            carModel: driver.carModel,
-                            plateNumber: driver.plateNumber,
-                            rating: driver.rating,
-                            chatId: chatId,
-                          ),
-                        );
-                      },
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.message, color: Colors.white, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'Message',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
+                child: _buildActionButton(
+                  icon: Iconsax.message,
+                  label: "Message",
+                  color: TColors.primary,
+                  onTap: () {
+                    final chatId = rideController.activeRideChatId.value;
+                    Get.to(
+                      () => MessageScreen(
+                        driverName: driver.name,
+                        carModel: driver.carModel,
+                        plateNumber: driver.plateNumber,
+                        rating: driver.rating,
+                        chatId: chatId,
+                        profileImage: driver.profileImage,
                       ),
-                    ),
-                  ),
+                    );
+                  },
+                  isOutlined: false,
                 ),
               ),
             ],
           ),
-
-          const SizedBox(height: 16),
-
-          // Share Trip & Emergency Buttons
+          const SizedBox(height: 12),
           Row(
             children: [
-              // Share Trip Button
               Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    // Initialize ShareController on demand
+                child: _buildActionButton(
+                  icon: Iconsax.export_1, // Share icon
+                  label: "Share Trip",
+                  color: textColor,
+                  onTap: () {
                     final shareController = Get.put(ShareController());
                     shareController.shareTrip();
                   },
-                  icon: const Icon(Icons.share, color: TColors.primary),
-                  label: const Text(
-                    'Share Trip',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: TColors.primary,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    side: const BorderSide(color: TColors.primary),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+                  isOutlined: true,
+                  borderColor: dark ? Colors.grey[700]! : Colors.grey[300]!,
                 ),
               ),
-
               const SizedBox(width: 12),
-
-              // Emergency (SOS) Button
               Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onEmergency,
-                  icon: const Icon(
-                    Icons.warning_amber_rounded,
-                    color: TColors.error,
-                  ),
-                  label: const Text(
-                    'SOS',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: TColors.error,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    side: const BorderSide(color: TColors.error),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+                child: _buildActionButton(
+                  icon: Iconsax.shield_security,
+                  label: "Emergency",
+                  color: TColors.error,
+                  onTap: onEmergency,
+                  isOutlined: true,
+                  borderColor: TColors.error.withOpacity(0.5),
                 ),
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+    required bool isOutlined,
+    Color? borderColor,
+  }) {
+    return Material(
+      color: isOutlined ? Colors.transparent : color,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.hardEdge,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: isOutlined
+              ? BoxDecoration(
+                  border: Border.all(color: borderColor ?? color),
+                  borderRadius: BorderRadius.circular(14),
+                )
+              : null,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: isOutlined ? color : Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isOutlined ? color : Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

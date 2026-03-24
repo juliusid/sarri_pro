@@ -118,8 +118,9 @@ class SavedPlacesController extends GetxController {
     for (var component in placeDetails.addressComponents) {
       final types = List<String>.from(component['types'] ?? []);
       if (types.contains('locality')) city = component['long_name'];
-      if (types.contains('administrative_area_level_1'))
+      if (types.contains('administrative_area_level_1')) {
         state = component['long_name'];
+      }
       if (types.contains('country')) country = component['long_name'];
     }
 

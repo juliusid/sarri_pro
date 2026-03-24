@@ -5,7 +5,6 @@ import 'package:sarri_ride/features/ride/controllers/drawer_controller.dart'; //
 import 'package:sarri_ride/features/ride/widgets/map_screen_getx.dart';
 import 'package:sarri_ride/utils/formatters/formatter.dart'; // Import Formatter
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
-import 'package:sarri_ride/utils/validators/validation.dart';
 import '../screens/phone_verification/verify_phone_number_screen.dart';
 
 class PhoneVerificationController extends GetxController {

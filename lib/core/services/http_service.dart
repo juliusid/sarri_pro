@@ -3,7 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math'; // For min function
+// For min function
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:get/get.dart';
@@ -607,12 +607,14 @@ class HttpService extends GetxService {
 
     try {
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        if (response.body.isEmpty)
+        if (response.body.isEmpty) {
           return {'status': 'success', 'message': 'Operation successful'};
+        }
         final decodedBody = json.decode(response.body);
         if (decodedBody is Map<String, dynamic>) {
-          if (!decodedBody.containsKey('status'))
+          if (!decodedBody.containsKey('status')) {
             decodedBody['status'] = 'success';
+          }
           return decodedBody;
         } else {
           return {'status': 'success', 'data': decodedBody};
@@ -631,8 +633,9 @@ class HttpService extends GetxService {
           errorData['message'] = response.reasonPhrase ?? 'Request failed';
         }
         if (!errorData.containsKey('status')) errorData['status'] = 'error';
-        if (!errorData.containsKey('message'))
+        if (!errorData.containsKey('message')) {
           errorData['message'] = response.reasonPhrase ?? 'Request failed';
+        }
 
         throw ApiException(
           message: errorData['message'],

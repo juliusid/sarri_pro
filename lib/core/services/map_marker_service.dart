@@ -19,7 +19,7 @@ class MapMarkerService extends GetxService {
     try {
       // Load all icons in parallel for speed
       final results = await Future.wait([
-        _loadSafeIcon('assets/icons/maps/car (1).png', 70),
+        _loadSafeIcon('assets/icons/maps/car.png', 70),
         _loadSafeIcon('assets/icons/maps/Map pin (3).png', 80),
         _loadSafeIcon('assets/icons/maps/Map pin (4).png', 80),
         _loadSafeIcon('assets/icons/maps/currentLocation.png', 100),

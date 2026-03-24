@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sarri_ride/core/services/websocket_service.dart';
 import 'package:sarri_ride/features/emergency/services/emergency_service.dart';

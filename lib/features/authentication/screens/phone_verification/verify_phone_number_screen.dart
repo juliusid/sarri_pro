@@ -6,7 +6,6 @@ import 'package:sarri_ride/common/widgets/loading_button.dart';
 import 'package:sarri_ride/features/authentication/controllers/phone_verification_controller.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/validators/validation.dart';
-import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
 class VerifyPhoneNumberScreen extends StatelessWidget {
   const VerifyPhoneNumberScreen({super.key});
