@@ -85,7 +85,23 @@ class THelperFunctions {
     );
   }
 
-  // --- NEW: WARNING/INFO SNACKBAR ---
+  // --- NEW: WARNING SNACKBAR ---
+  static void showWarningSnackBar(String title, String message) {
+    Get.snackbar(
+      title,
+      message,
+      isDismissible: true,
+      shouldIconPulse: true,
+      colorText: TColors.white,
+      backgroundColor: Colors.orange.withOpacity(0.9),
+      snackPosition: SnackPosition.TOP,
+      duration: const Duration(seconds: 3),
+      margin: const EdgeInsets.all(15),
+      icon: const Icon(Iconsax.warning_2, color: TColors.white),
+    );
+  }
+
+  // --- NEW: INFO SNACKBAR ---
   static void showSnackBar(String message) {
     // This will be for general info/notices
     Get.snackbar(

@@ -79,8 +79,8 @@ class BookPackageResponse {
       tripId: json['data']?['tripId'],
       rideId: json['data']?['rideId'],
       driverId: json['data']?['driverId'],
-      price: json['data']?['price']?['$numberDecimal'] != null
-          ? double.tryParse(json['data']['price']['$numberDecimal'])
+      price: json['data']?['price']?['\$numberDecimal'] != null
+          ? double.tryParse(json['data']['price']['\$numberDecimal'])
           : null,
       distanceKm: json['data']?['distanceKm'],
       estimatedArrival: json['data']?['estimatedArrival'],
