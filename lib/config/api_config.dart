@@ -210,4 +210,44 @@ class ApiConfig {
       '$baseUrl/rating/$ratingId';
   static String get driverRatingsEndpoint =>
       '$baseUrl/rating/my-driver-ratings';
+
+  // Package Delivery Endpoints
+  static String get packageDeliveryUpdateLocationEndpoint =>
+      '$baseUrl/package_delivery/update-location';
+  static String get packageDeliveryCancelEndpoint =>
+      '$baseUrl/package_delivery/cancel-delivery-request';
+  static String get packageDeliveryBookEndpoint =>
+      '$baseUrl/package_delivery/book-package-delivery';
+  static String get packageDeliveryAcceptEndpoint =>
+      '$baseUrl/package_delivery/accept-delivery-request';
+  static String get packageDeliveryRejectEndpoint =>
+      '$baseUrl/package_delivery/reject-delivery-request';
+  static String get packageDeliveryStartTripEndpoint =>
+      '$baseUrl/package_delivery/start-delivery-trip';
+  static String get packageDeliveryArriveAtDropoffEndpoint =>
+      '$baseUrl/package_delivery/arrive-at-dropoff';
+  static String get packageDeliveryConfirmPickupEndpoint =>
+      '$baseUrl/package_delivery/confirm-pickup';
+  static String get packageDeliveryConfirmDeliveryWithCodeEndpoint =>
+      '$baseUrl/package_delivery/confirm-deliveryWithCode';
+  static String get packageDeliveryConfirmDeliveryBySenderEndpoint =>
+      '$baseUrl/package_delivery/confirm-delivery-by-sender';
+  static String get packageDeliveryRaiseDisputeEndpoint =>
+      '$baseUrl/package_delivery/raise-dispute';
+  static String get packageDeliveryResolveDisputeEndpoint =>
+      '$baseUrl/package_delivery/resolve-dispute';
+
+  // Package Payment Endpoints
+  static String get packagePaymentInitEndpoint =>
+      '$baseUrl/package_payment/Package_trip/init';
+  static String get packagePaymentSwitchMethodEndpoint =>
+      '$baseUrl/package_payment/Package_trip/switch-method';
+  static String get packagePaymentCashConfirmEndpoint =>
+      '$baseUrl/package_payment/Package_cash/confirm';
+  static String get packagePaymentDebtStatusEndpoint =>
+      '$baseUrl/package_payment/Package_debt/status';
+  static String get packagePaymentPayDebtEndpoint =>
+      '$baseUrl/package_payment/Package_debt/pay';
+  static String get packagePaymentPreviewEndpoint =>
+      '$baseUrl/package_payment/Package_payment/preview';
 }

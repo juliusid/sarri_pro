@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/ride/widgets/common_widgets.dart';
 import 'package:sarri_ride/features/location/services/places_service.dart';
+import 'package:sarri_ride/features/package_delivery/controllers/package_delivery_controller.dart';
 
 class PackageBookingWidget extends StatelessWidget {
   final VoidCallback onBackPressed;
@@ -31,6 +33,7 @@ class PackageBookingWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
+    final packageDeliveryController = Get.find<PackageDeliveryController>();
     
     return Container(
       padding: const EdgeInsets.all(24),
@@ -181,13 +184,19 @@ class PackageBookingWidget extends StatelessWidget {
                       filled: true,
                       fillColor: dark ? TColors.darkerGrey.withOpacity(0.3) : Colors.white,
                     ),
+                    value: packageDeliveryController.packageTypeUi.value.isEmpty
+                        ? null
+                        : packageDeliveryController.packageTypeUi.value,
                     items: ['Documents', 'Food', 'Electronics', 'Clothing', 'Other']
                         .map((String type) => DropdownMenuItem<String>(
                               value: type,
                               child: Text(type),
                             ))
                         .toList(),
-                    onChanged: (String? newValue) {},
+                    onChanged: (String? newValue) {
+                      packageDeliveryController.packageTypeUi.value =
+                          newValue ?? '';
+                    },
                   ),
                   
                   const SizedBox(height: 16),
@@ -206,6 +215,10 @@ class PackageBookingWidget extends StatelessWidget {
                             fillColor: dark ? TColors.darkerGrey.withOpacity(0.3) : Colors.white,
                           ),
                           keyboardType: TextInputType.number,
+                          onChanged: (String v) {
+                            packageDeliveryController.weightKg.value =
+                                double.tryParse(v) ?? 0.0;
+                          },
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -225,6 +238,8 @@ class PackageBookingWidget extends StatelessWidget {
                                     child: Text(size),
                                   ))
                               .toList(),
+                          // Backend currently validates `packageType`, so we
+                          // keep size purely informational for now.
                           onChanged: (String? newValue) {},
                         ),
                       ),
@@ -236,6 +251,8 @@ class PackageBookingWidget extends StatelessWidget {
                   // Special instructions
                   TextFormField(
                     maxLines: 3,
+                    onChanged: (String v) =>
+                        packageDeliveryController.specialInstructions.value = v,
                     decoration: InputDecoration(
                       labelText: 'Special Instructions (Optional)',
                       border: OutlineInputBorder(
@@ -262,6 +279,8 @@ class PackageBookingWidget extends StatelessWidget {
                     children: [
                       Expanded(
                         child: TextFormField(
+                          onChanged: (String v) =>
+                              packageDeliveryController.receiverName.value = v,
                           decoration: InputDecoration(
                             labelText: 'Recipient Name',
                             border: OutlineInputBorder(
@@ -275,6 +294,9 @@ class PackageBookingWidget extends StatelessWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: TextFormField(
+                          onChanged: (String v) =>
+                              packageDeliveryController.receiverPhoneNumber.value =
+                                  v,
                           decoration: InputDecoration(
                             labelText: 'Phone Number',
                             border: OutlineInputBorder(

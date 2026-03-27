@@ -451,7 +451,21 @@ class Vehicle {
   String get displayName => '${year ?? ''} ${make ?? ''} ${model ?? ''}'.trim();
 
   factory Vehicle.fromJson(Map<String, dynamic> json) {
+    String typeStr = (json['type'] ?? 'sedan').toString().toLowerCase();
     VehicleType determinedType = VehicleType.sedan;
+
+    if (typeStr.contains('suv')) {
+      determinedType = VehicleType.suv;
+    } else if (typeStr.contains('hatchback')) {
+      determinedType = VehicleType.hatchback;
+    } else if (typeStr.contains('motorcycle') || typeStr.contains('bike')) {
+      determinedType = VehicleType.motorcycle;
+    } else if (typeStr.contains('van')) {
+      determinedType = VehicleType.van;
+    } else if (typeStr.contains('truck')) {
+      determinedType = VehicleType.truck;
+    }
+
     return Vehicle(
       make: json['make'],
       model: json['model'],

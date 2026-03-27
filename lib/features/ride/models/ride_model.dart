@@ -352,6 +352,10 @@ class DriverReconnectData {
   final int seats;
   final String riderId;
   final String riderName;
+  // Optional fields returned by the reconnect API (used to restore payment UI correctly).
+  final String? paymentStatus; // e.g. "pending" | "completed"
+  final String? paymentMethod; // e.g. "cash" | "card" | "transfer"
+  final double? cashAmount; // When payment is pending via cash (if provided)
 
   DriverReconnectData({
     required this.tripId,
@@ -365,6 +369,9 @@ class DriverReconnectData {
     required this.seats,
     required this.riderId,
     required this.riderName,
+    this.paymentStatus,
+    this.paymentMethod,
+    this.cashAmount,
   });
 
   factory DriverReconnectData.fromJson(Map<String, dynamic> json) {
@@ -388,6 +395,10 @@ class DriverReconnectData {
       seats: (json['seats'] as num?)?.toInt() ?? 4,
       riderId: json['rider']?['_id'] ?? '',
       riderName: json['rider']?['name'] ?? 'Rider',
+      paymentStatus: json['paymentStatus'] as String?,
+      paymentMethod: json['paymentMethod'] as String?,
+      cashAmount: (json['cashAmount'] as num?)?.toDouble() ??
+          (json['amount'] as num?)?.toDouble(),
     );
   }
 }
@@ -404,6 +415,10 @@ class RiderReconnectData {
   final double price;
   final int seats;
   final RideDriverDetails? driver; // Driver is not in 'pending' response
+  // Optional fields returned by the reconnect API (used to restore payment UI correctly).
+  final String? paymentStatus; // e.g. "pending" | "completed"
+  final String? paymentMethod; // e.g. "cash" | "card" | "transfer"
+  final double? cashAmount; // When payment is pending via cash (if provided)
 
   RiderReconnectData({
     required this.tripId,
@@ -416,6 +431,9 @@ class RiderReconnectData {
     required this.price,
     required this.seats,
     this.driver,
+    this.paymentStatus,
+    this.paymentMethod,
+    this.cashAmount,
   });
 
   factory RiderReconnectData.fromJson(Map<String, dynamic> json) {
@@ -440,6 +458,10 @@ class RiderReconnectData {
       driver: json['driver'] != null
           ? RideDriverDetails.fromJson(json['driver'])
           : null,
+      paymentStatus: json['paymentStatus'] as String?,
+      paymentMethod: json['paymentMethod'] as String?,
+      cashAmount: (json['cashAmount'] as num?)?.toDouble() ??
+          (json['amount'] as num?)?.toDouble(),
     );
   }
 }

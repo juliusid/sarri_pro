@@ -19,6 +19,8 @@ import 'package:sarri_ride/config/api_config.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/ride/controllers/ride_controller.dart';
 import 'package:sarri_ride/features/driver/controllers/trip_management_controller.dart';
+import 'package:sarri_ride/features/driver/controllers/package_delivery_driver_controller.dart';
+import 'package:sarri_ride/features/driver/screens/package_delivery_driver_request_screen.dart';
 import 'package:sarri_ride/features/authentication/screens/login/login_screen_getx.dart';
 
 import 'package:sarri_ride/features/ride/widgets/driver_info_card.dart'
@@ -314,6 +316,7 @@ class WebSocketService extends GetxService {
     String? tripId,
     double? heading,
     double? speed,
+    String? category,
   }) {
     // Payload must match the documentation
     final payload = {
@@ -324,7 +327,7 @@ class WebSocketService extends GetxService {
       if (tripId != null) 'tripId': tripId,
       if (heading != null) 'heading': heading,
       if (speed != null) 'speed': speed,
-      'category': 'luxury',
+      'category': category ?? 'car',
     };
 
     // Use emitWithAck to get the server response
@@ -549,11 +552,6 @@ class WebSocketService extends GetxService {
       print('[WebSocket Received] auth_error -> $data');
       // Payload example: { "message": "Authentication required", "code": "AUTH_REQUIRED" }
 
-      String message = "Authentication error";
-      if (data is Map) {
-        message = data['message'] ?? "Session expired";
-      }
-
       // Handle logout logic
       _handleAuthError();
       // Note: _handleAuthError already disconnects and redirects to login
@@ -719,6 +717,24 @@ class WebSocketService extends GetxService {
           // Block new ride requests if the driver just completed a ride and is actively waiting for payment or already has an active request
           if (tripController.isWaitingForCash.value || tripController.hasActiveTrip || tripController.hasNewRequest.value) {
             print("WS: Ignored incoming ride:request because driver lies in an active payment or trip flow.");
+            return;
+          }
+
+          // Package delivery request payloads include `pickupCode`, `packageType`,
+          // `ReceiverName`, etc. Route them to a dedicated driver flow.
+          final bool isPackageDeliveryRequest =
+              data['pickupCode'] != null ||
+              data['packageType'] != null ||
+              data['ReceiverName'] != null;
+
+          if (isPackageDeliveryRequest) {
+            if (!Get.isRegistered<PackageDeliveryDriverController>()) {
+              Get.put(PackageDeliveryDriverController(), permanent: false);
+            }
+            final pkgController =
+                Get.find<PackageDeliveryDriverController>();
+            pkgController.setFromRideRequestPayload(data);
+            Get.to(() => const PackageDeliveryDriverRequestScreen());
             return;
           }
 
@@ -1004,6 +1020,61 @@ class WebSocketService extends GetxService {
       }
     });
 
+    // Package delivery arrived at dropoff
+    _listen('package:arrived', (data) {
+      print('[WS Rcvd] package:arrived -> $data');
+      if (data is Map<String, dynamic>) {
+        try {
+          if (Get.isRegistered<RideController>()) {
+            Get.find<RideController>().handlePackageArrived(data);
+          }
+        } catch (e) {
+          print("WS Error handling package:arrived : $e");
+        }
+      }
+    });
+
+    // Package picked up by driver
+    _listen('package:picked_up', (data) {
+      print('[WS Rcvd] package:picked_up -> $data');
+      if (data is Map<String, dynamic>) {
+        try {
+          if (Get.isRegistered<RideController>()) {
+            Get.find<RideController>().handlePackagePickedUp(data);
+          }
+        } catch (e) {
+          print("WS Error handling package:picked_up : $e");
+        }
+      }
+    });
+
+    // Package delivery completion (rider + driver should be routed to payment UI
+    // when payment is still pending).
+    _listen('package:delivered', (data) {
+      print('[WS Rcvd] package:delivered -> $data');
+      if (data is Map<String, dynamic>) {
+        try {
+          if (Get.isRegistered<RideController>()) {
+            Get.find<RideController>().handlePackageDelivered(data);
+          }
+        } catch (e) {
+          print("WS Error handling package:delivered for rider: $e");
+        }
+
+        try {
+          if (Get.isRegistered<TripManagementController>()) {
+            Get.find<TripManagementController>()
+                .handlePackageDelivered(data);
+          }
+        } catch (e) {
+          print(
+              "WS Error handling package:delivered for driver: $e");
+        }
+      } else {
+        print("WS: Invalid data format for package:delivered");
+      }
+    });
+
     _listen('cash_payment:pending', (data) {
       print('[WS Rcvd] cash_payment:pending -> $data');
       // This event is primarily for the DRIVER
@@ -1012,6 +1083,60 @@ class WebSocketService extends GetxService {
           listener(data);
         } catch (e) {
           print("WS Error in cash_payment:pending listener: $e");
+        }
+      }
+    });
+
+    _listen('package:disputed', (data) {
+      print('[WS Rcvd] package:disputed -> $data');
+      if (data is Map<String, dynamic>) {
+        if (Get.isRegistered<RideController>()) {
+          Get.find<RideController>().handlePackageDisputed(data);
+        }
+        if (Get.isRegistered<TripManagementController>()) {
+          Get.find<TripManagementController>().handlePackageDisputed(data);
+        }
+      }
+    });
+
+    _listen('dispute:resolved', (data) {
+      print('[WS Rcvd] dispute:resolved -> $data');
+      if (data is Map<String, dynamic>) {
+        if (Get.isRegistered<RideController>()) {
+          Get.find<RideController>().handleDisputeResolved(data);
+        }
+        if (Get.isRegistered<TripManagementController>()) {
+          Get.find<TripManagementController>().handleDisputeResolved(data);
+        }
+      }
+    });
+
+    _listen('debt:paid', (data) {
+      print('[WS Rcvd] debt:paid -> $data');
+      if (data is Map<String, dynamic>) {
+        if (Get.isRegistered<TripManagementController>()) {
+          Get.find<TripManagementController>().handleDebtPaid(data);
+        }
+      }
+    });
+
+    _listen('loyalty:reduction_applied', (data) {
+      print('[WS Rcvd] loyalty:reduction_applied -> $data');
+      if (data is Map<String, dynamic>) {
+        if (Get.isRegistered<TripManagementController>()) {
+          Get.find<TripManagementController>().handleLoyaltyReduction(data);
+        }
+      }
+    });
+
+    _listen('transfer:completed', (data) {
+      print('[WS Rcvd] transfer:completed -> $data');
+      if (data is Map<String, dynamic>) {
+        if (Get.isRegistered<RideController>()) {
+          Get.find<RideController>().handleTransferCompleted(data);
+        }
+        if (Get.isRegistered<TripManagementController>()) {
+          Get.find<TripManagementController>().handleTransferCompleted(data);
         }
       }
     });

@@ -225,6 +225,7 @@ class TripManagementController extends GetxController {
   final RxBool isWaitingForCash = false.obs;
   final RxDouble cashAmountToReceive = 0.0.obs;
   final RxBool isCompletingTrip = false.obs; // ADDED: Loading state for Complete Trip button
+  bool _waitingForPaymentScreenOpened = false; // Prevent stacking the same waiting screen repeatedly.
 
   /// Helper to check if there is an ongoing trip
   bool get hasActiveTrip =>
@@ -232,6 +233,67 @@ class TripManagementController extends GetxController {
       tripStatus.value != TripStatus.none &&
       tripStatus.value != TripStatus.completed &&
       tripStatus.value != TripStatus.cancelled;
+
+  void _showWaitingForPaymentScreenOnce() {
+    if (_waitingForPaymentScreenOpened) return;
+    _waitingForPaymentScreenOpened = true;
+    Get.to(() => const WaitingForPaymentScreen());
+  }
+
+  void _restoreWaitingForPaymentFromStorage() {
+    final shouldWait =
+        _storage.read('driver_waiting_for_payment') == true;
+    final tripId = (_storage.read('driver_waiting_trip_id')?.toString() ??
+        '');
+
+    if (!shouldWait || tripId.isEmpty) return;
+
+    final isPackageWaiting =
+        _storage.read('driver_waiting_is_package') == true;
+    if (isPackageWaiting) {
+      _storage.write('active_ride_mode', 'package_delivery');
+    } else {
+      _storage.remove('active_ride_mode');
+    }
+
+    // Ensure we can correlate incoming socket events to this trip.
+    // Waiting screen itself does not require the full trip details.
+    final fallbackLoc = driverLocation.value ?? const LatLng(0, 0);
+    activeTrip.value ??= ActiveTrip(
+      id: tripId,
+      riderId: _storage.read('driver_waiting_rider_id')?.toString() ?? '',
+      riderName: _storage.read('driver_waiting_rider_name')?.toString() ??
+          'Rider',
+      riderPhone: '',
+      riderRating: 0.0,
+      pickupLocation: fallbackLoc,
+      destinationLocation: fallbackLoc,
+      pickupAddress: '',
+      destinationAddress: '',
+      fare: (_storage.read('driver_waiting_fare') as num?)?.toDouble() ?? 0.0,
+      distance: (_storage.read('driver_waiting_distance') as num?)?.toDouble() ??
+          0.0,
+      estimatedDuration:
+          (_storage.read('driver_waiting_eta') as num?)?.toInt() ?? 0,
+      rideType: _storage.read('driver_waiting_category')?.toString() ?? '',
+      startTime: DateTime.now(),
+      status: TripStatus.none,
+      chatId: '',
+    );
+
+    // We are waiting for payment, so keep tripStatus as non-completed.
+    tripStatus.value = TripStatus.none;
+
+    isWaitingForCash.value =
+        _storage.read('driver_waiting_for_cash') == true;
+    cashAmountToReceive.value =
+        (_storage.read('driver_waiting_cash_amount') as num?)?.toDouble() ??
+            0.0;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showWaitingForPaymentScreenOnce();
+    });
+  }
 
   /// User-friendly string representation of current trip status
   String get currentTripStatusDisplay {
@@ -269,6 +331,10 @@ class TripManagementController extends GetxController {
       _handleCashPaymentPending,
     );
     _webSocketService.registerPaymentConfirmedListener(_handlePaymentConfirmed);
+
+    // Restore the "waiting for payment" UX after app restart when a trip
+    // was completed but the backend payment is still pending.
+    _restoreWaitingForPaymentFromStorage();
   }
 
   @override
@@ -636,8 +702,29 @@ class TripManagementController extends GetxController {
           'Success',
           'Trip completed! Waiting for payment.',
         );
-        // ROUTE TO NEW SCREEN natively
-        Get.to(() => const WaitingForPaymentScreen());
+
+        // Persist state so we can restore the waiting screen after restart
+        // even though `reconnectToTrip` does not support `status=completed`.
+        _storage.write('driver_waiting_is_package', false);
+        _storage.write('driver_waiting_for_payment', true);
+        _storage.write('driver_waiting_trip_id', activeTrip.value!.id);
+        _storage.write('driver_waiting_fare', finalPrice);
+        _storage.write('driver_waiting_distance', activeTrip.value!.distance);
+        _storage.write(
+          'driver_waiting_eta',
+          activeTrip.value!.estimatedDuration,
+        );
+        _storage.write('driver_waiting_category', activeTrip.value!.rideType);
+        _storage.write('driver_waiting_rider_id', activeTrip.value!.riderId);
+        _storage.write('driver_waiting_rider_name', activeTrip.value!.riderName);
+
+        // Default until we receive a `cash_payment:pending` socket event.
+        isWaitingForCash.value = false;
+        cashAmountToReceive.value = 0.0;
+        _storage.write('driver_waiting_for_cash', false);
+        _storage.remove('driver_waiting_cash_amount');
+
+        _showWaitingForPaymentScreenOnce();
       } else {
         throw Exception(responseData['message']);
       }
@@ -652,9 +739,15 @@ class TripManagementController extends GetxController {
     if (activeTrip.value == null) return false;
     isCompletingTrip.value = true;
     try {
-      final responseData = await _driverTripService.confirmCashPayment(
-        activeTrip.value!.id,
-      );
+      final isPackageDelivery =
+          _storage.read('active_ride_mode') == 'package_delivery';
+      final responseData = isPackageDelivery
+          ? await _driverTripService.confirmPackageCashPayment(
+              activeTrip.value!.id,
+            )
+          : await _driverTripService.confirmCashPayment(
+              activeTrip.value!.id,
+            );
       if (responseData['status'] == 'success') {
         THelperFunctions.showSuccessSnackBar(
           'Success',
@@ -831,6 +924,36 @@ class TripManagementController extends GetxController {
       statusToSend = currentTaskStatus;
     }
 
+    String? category;
+    if (activeTrip.value != null) {
+      final rt = activeTrip.value!.rideType.toLowerCase();
+      if (rt.contains('bike') || rt.contains('courier')) {
+        category = 'bike_courier';
+      } else if (rt.contains('van')) {
+        category = 'Van_delivery';
+      } else {
+        category = 'car_delivery';
+      }
+    } else {
+      // Fallback to driver's default vehicle type
+      final vType =
+          _dashboardController?.currentDriver.value?.driverProfile
+              ?.vehicleDetails.type ??
+          VehicleType.sedan;
+      switch (vType) {
+        case VehicleType.motorcycle:
+          category = 'bike_courier';
+          break;
+        case VehicleType.van:
+        case VehicleType.truck:
+          category = 'Van_delivery';
+          break;
+        default:
+          category = 'car_delivery';
+          break;
+      }
+    }
+
     String? currentTripId;
     if (activeTrip.value != null) {
       currentTripId = activeTrip.value!.id;
@@ -844,6 +967,7 @@ class TripManagementController extends GetxController {
       tripId: currentTripId,
       heading: position.heading,
       speed: position.speed,
+      category: category,
     );
   }
 
@@ -944,6 +1068,7 @@ class TripManagementController extends GetxController {
   }
   // --- RE-ROUTING ---
 
+  // ignore: unused_element
   bool _isOffRoute(LatLng driverLoc, List<LatLng> routePoints) {
     if (routePoints.isEmpty) return false;
     double minDistance = double.infinity;
@@ -954,6 +1079,7 @@ class TripManagementController extends GetxController {
     return minDistance > 0.05; // 50 meters
   }
 
+  // ignore: unused_element
   Future<void> _recalculateRoute() async {
     if (isRecalculating.value ||
         activeTrip.value == null ||
@@ -1143,6 +1269,13 @@ class TripManagementController extends GetxController {
       cashAmountToReceive.value =
           (data['amount'] as num?)?.toDouble() ?? activeTrip.value!.fare;
       isWaitingForCash.value = true;
+
+      // Persist cash-pending state so we can restore after restart.
+      _storage.write('driver_waiting_for_payment', true);
+      _storage.write('driver_waiting_trip_id', activeTrip.value!.id);
+      _storage.write('driver_waiting_for_cash', true);
+      _storage.write('driver_waiting_cash_amount', cashAmountToReceive.value);
+
       update();
     }
   }
@@ -1161,8 +1294,108 @@ class TripManagementController extends GetxController {
     }
   }
 
+  /// Backend emits `package:delivered` when a package delivery is confirmed.
+  /// At this point payment is not yet completed, so we route the driver
+  /// to `WaitingForPaymentScreen` (and keep it there until `payment:confirmed`).
+  void handlePackageDelivered(Map<String, dynamic> data) {
+    final tripId = data['tripId']?.toString() ?? '';
+    if (tripId.isEmpty) return;
+
+    final fallbackLoc = driverLocation.value ?? const LatLng(0, 0);
+    final prev = activeTrip.value;
+
+    // Ensure `activeTrip.id` matches so `cash_payment:pending` can be correlated.
+    activeTrip.value = ActiveTrip(
+      id: tripId,
+      riderId: prev?.riderId ?? '',
+      riderName: prev?.riderName ?? 'Rider',
+      riderPhone: prev?.riderPhone ?? '',
+      riderRating: prev?.riderRating ?? 0.0,
+      pickupLocation: prev?.pickupLocation ?? fallbackLoc,
+      destinationLocation: prev?.destinationLocation ?? fallbackLoc,
+      pickupAddress: prev?.pickupAddress ?? '',
+      destinationAddress: prev?.destinationAddress ?? '',
+      fare: prev?.fare ?? 0.0,
+      distance: prev?.distance ?? 0.0,
+      estimatedDuration: prev?.estimatedDuration ?? 0,
+      rideType: prev?.rideType ?? '',
+      startTime: prev?.startTime ?? DateTime.now(),
+      status: TripStatus.none,
+      chatId: prev?.chatId ?? '',
+    );
+
+    tripStatus.value = TripStatus.none;
+    isWaitingForCash.value = false;
+    cashAmountToReceive.value = 0.0;
+
+    // Persist so the waiting screen survives app restart.
+    _storage.write('driver_waiting_is_package', true);
+    _storage.write('active_ride_mode', 'package_delivery');
+    _storage.write('driver_waiting_for_payment', true);
+    _storage.write('driver_waiting_trip_id', tripId);
+    _storage.write('driver_waiting_for_cash', false);
+    _storage.remove('driver_waiting_cash_amount');
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showWaitingForPaymentScreenOnce();
+    });
+    update();
+  }
+
+  void handlePackageDisputed(Map<String, dynamic> data) {
+    if (data['tripId'] == activeTrip.value?.id) {
+      THelperFunctions.showWarningSnackBar(
+        'Dispute Opened',
+        data['reason'] ?? 'A dispute has been raised for this delivery.',
+      );
+      update();
+    }
+  }
+
+  void handleDisputeResolved(Map<String, dynamic> data) {
+    if (data['tripId'] == activeTrip.value?.id) {
+      final res = data['resolution'] == 'resolved' ? 'Settled' : 'Rejected';
+      THelperFunctions.showSuccessSnackBar(
+        'Dispute Resolved',
+        'The dispute has been $res. ${data['adminNote'] ?? ''}',
+      );
+      update();
+    }
+  }
+
+  void handleDebtPaid(Map<String, dynamic> data) {
+    THelperFunctions.showSuccessSnackBar(
+      'Debt Paid',
+      'Your commission debt has been cleared successfully.',
+    );
+    // Optionally refresh earnings or profile
+    _dashboardController?.fetchTodayStats();
+    update();
+  }
+
+  void handleLoyaltyReduction(Map<String, dynamic> data) {
+    if (data['tripId'] == activeTrip.value?.id) {
+      THelperFunctions.showSuccessSnackBar(
+        'Loyalty Applied',
+        'Commission reduction of ₦${data['reductionAmount']} applied.',
+      );
+      update();
+    }
+  }
+
+  void handleTransferCompleted(Map<String, dynamic> data) {
+    if (data['tripId'] == activeTrip.value?.id) {
+      _handlePaymentConfirmed(data);
+      THelperFunctions.showSuccessSnackBar(
+        'Payment Success',
+        'Bank transfer confirmed.',
+      );
+    }
+  }
+
   void _resetTripState() {
     _storage.remove('active_ride_id');
+    _storage.remove('active_ride_mode');
     // Clear persisted coordinates
     _storage.remove('trip_pickup_lat');
     _storage.remove('trip_pickup_lng');
@@ -1181,6 +1414,20 @@ class TripManagementController extends GetxController {
       (m) => m.markerId.value == 'pickup' || m.markerId.value == 'destination',
     );
     _dashboardController?.checkDriverStatus();
+    _waitingForPaymentScreenOpened = false;
+
+    // Clear persisted "waiting for payment" flags.
+    _storage.remove('driver_waiting_for_payment');
+    _storage.remove('driver_waiting_is_package');
+    _storage.remove('driver_waiting_trip_id');
+    _storage.remove('driver_waiting_for_cash');
+    _storage.remove('driver_waiting_cash_amount');
+    _storage.remove('driver_waiting_fare');
+    _storage.remove('driver_waiting_distance');
+    _storage.remove('driver_waiting_eta');
+    _storage.remove('driver_waiting_category');
+    _storage.remove('driver_waiting_rider_id');
+    _storage.remove('driver_waiting_rider_name');
     update();
   }
 
@@ -1290,6 +1537,14 @@ class TripManagementController extends GetxController {
         await _startNavigationToDestination();
         _fitMapToCurrentRoute();
         break;
+      case 'completed':
+        // Some flows may request reconnect for already completed trips.
+        // `reconnectToTrip` currently doesn't provide paymentStatus, so we
+        // rely on persisted local state and show the waiting UI.
+        tripStatus.value = TripStatus.none;
+        _restoreWaitingForPaymentFromStorage();
+        update();
+        return;
       default:
         _resetTripState();
         return; // Exit early if no valid status

@@ -1,9 +1,9 @@
 import 'package:get/get.dart';
 import 'package:sarri_ride/config/api_config.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
-import 'package:sarri_ride/features/ride/controllers/ride_controller.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/payment/screens/paystack_webview_screen.dart';
+import 'package:get_storage/get_storage.dart';
 
 /// Model for a saved payment card
 class PaymentCardModel {
@@ -43,11 +43,6 @@ class PaymentCardModel {
 
 class PaymentController extends GetxController {
   static PaymentController get instance => Get.find();
-
-  // --- FIX: Use a getter so it doesn't crash on app start ---
-  // RideController is not available in main(), only on the map screen.
-  RideController get _rideController => Get.find<RideController>();
-  // ----------------------------------------------------------
 
   final HttpService _httpService = HttpService.instance;
 
@@ -149,6 +144,10 @@ class PaymentController extends GetxController {
     isPaying.value = true;
 
     try {
+      final storage = GetStorage();
+      final bool isPackageDelivery =
+          storage.read('active_ride_mode') == 'package_delivery';
+
       // Construct body based on documentation
       // req: { "tripId": "...", "paymentMethod": "card", "cardId": "..." }
       final Map<String, dynamic> requestBody = {
@@ -161,9 +160,13 @@ class PaymentController extends GetxController {
         requestBody["cardId"] = cardId;
       }
 
-      // Use the correct endpoint: /payment/trip/init
+      // Use the correct endpoint based on ride type.
+      final String endpoint = isPackageDelivery
+          ? ApiConfig.packagePaymentInitEndpoint
+          : ApiConfig.initiateTripPaymentEndpoint;
+
       final response = await _httpService.post(
-        ApiConfig.initiateTripPaymentEndpoint,
+        endpoint,
         body: requestBody,
       );
 

@@ -17,8 +17,6 @@ import 'package:sliding_up_panel/sliding_up_panel.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:sarri_ride/config/api_config.dart'; // IMPORTED FOR API CONFIG
 
-import 'package:sarri_ride/features/location/services/location_service.dart';
-import 'package:sarri_ride/features/location/services/places_service.dart';
 import 'package:sarri_ride/features/location/services/route_service.dart';
 import 'package:sarri_ride/features/ride/widgets/driver_info_card.dart';
 import 'package:sarri_ride/features/ride/widgets/ride_selection_widget.dart';
@@ -27,6 +25,8 @@ import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/ride/widgets/pickup_location_modal.dart';
 import 'package:sarri_ride/features/ride/widgets/no_drivers_available_widget.dart';
+import 'package:sarri_ride/features/package_delivery/controllers/package_delivery_controller.dart';
+import 'package:sarri_ride/features/package_delivery/services/package_delivery_service.dart';
 
 // Enums
 enum BookingState {
@@ -205,6 +205,14 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
     rideTypes.clear();
     WidgetsBinding.instance.addObserver(this);
 
+    // Package delivery booking (rider) state.
+    if (!Get.isRegistered<PackageDeliveryController>()) {
+      Get.put(PackageDeliveryController());
+    }
+    if (!Get.isRegistered<PackageDeliveryService>()) {
+      Get.put(PackageDeliveryService(), permanent: false);
+    }
+
     // 1. Initialize Controller (Keep this)
     driverAnimationController = AnimationController(
       duration: const Duration(
@@ -302,6 +310,21 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
 
   // --- STATE RESTORATION ---
   Future<void> _checkCurrentRideStatus() async {
+    // If the rider already reached `rideCompleted` but payment is still pending,
+    // the backend `reconnectToTrip` rejects `status=completed`. In that case we
+    // restore the payment-pending UI from local storage.
+    final isPaymentPending =
+        _storage.read('rider_waiting_for_payment') == true;
+    final waitingTripId = _storage.read<String>('rider_waiting_trip_id');
+    if (isPaymentPending && waitingTripId != null && waitingTripId.isNotEmpty) {
+      print(
+        "RideController: Restoring payment-pending UI for trip $waitingTripId from storage.",
+      );
+      rideId.value = waitingTripId;
+      await restorePaymentPendingFromStorage();
+      return;
+    }
+
     final storedRideId = _storage.read('active_ride_id');
     if (storedRideId != null && storedRideId.toString().isNotEmpty) {
       print(
@@ -332,6 +355,33 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
         print("Error checking ride status: $e");
       }
     }
+  }
+
+  /// Restore the rider's "trip completed, payment pending" UI after an app restart.
+  /// This does not call the backend because `reconnectToTrip` rejects `status=completed`.
+  Future<void> restorePaymentPendingFromStorage() async {
+    final tripId = _storage.read<String>('rider_waiting_trip_id') ?? rideId.value;
+    if (tripId.isEmpty) return;
+
+    final category = _storage.read<String>('rider_waiting_category') ?? '';
+    final fare = (_storage.read('rider_waiting_fare') as num?)?.toInt() ?? 0;
+    final eta = _storage.read<String>('rider_waiting_eta') ?? '...';
+    final seats = (_storage.read('rider_waiting_seats') as num?)?.toInt() ?? 4;
+
+    rideId.value = tripId;
+    selectedRideType.value = RideType(
+      name: category,
+      price: fare,
+      eta: eta,
+      icon: _getIconForCategory(category),
+      seats: seats,
+    );
+
+    currentState.value = BookingState.tripCompleted;
+    isPaymentCompleted.value = false;
+
+    panelController.open();
+    update();
   }
 
   double _calculateBearing(LatLng start, LatLng end) {
@@ -773,43 +823,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
     }
   }
 
-  void _updateRideTypesWithCalculatedPrice() {
-    List<RideType> updatedRideTypes = [];
-    final currentTypes = currentState.value == BookingState.packageBooking
-        ? _packageRideTypes
-        : currentState.value == BookingState.freightBooking
-        ? _freightRideTypes
-        : _defaultRideTypes;
-
-    final estimatedEtaMinutes = (totalDuration.value / 60).round() + 5;
-
-    for (RideType baseType in currentTypes) {
-      final multiplier = _getRideTypeMultiplier(baseType.name);
-      final finalPrice = math
-          .max(totalPrice.value * multiplier, 1000.0)
-          .round();
-
-      updatedRideTypes.add(
-        RideType(
-          name: baseType.name,
-          price: finalPrice,
-          eta: '$estimatedEtaMinutes min',
-          icon: baseType.icon,
-          seats: baseType.seats,
-        ),
-      );
-    }
-
-    rideTypes.assignAll(updatedRideTypes);
-    if (selectedRideType.value != null) {
-      final updatedSelection = updatedRideTypes.firstWhereOrNull(
-        (rt) => rt.name == selectedRideType.value!.name,
-      );
-      if (updatedSelection != null) selectedRideType.value = updatedSelection;
-    }
-    update();
-  }
-
+  // ignore: unused_element
   double _getRideTypeMultiplier(String rideTypeName) {
     final nameLower = rideTypeName.toLowerCase();
     if (nameLower.contains('luxury')) return 1.5;
@@ -1483,6 +1497,67 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
     panelController.close();
 
     try {
+      final isPackageDelivery =
+          _packageRideTypes.any((rt) => rt.name == selectedRideType.value!.name);
+
+      if (isPackageDelivery) {
+        final packageDeliveryController =
+            Get.find<PackageDeliveryController>();
+        if (!packageDeliveryController.validateOrShowErrors()) {
+          currentState.value = BookingState.selectRide;
+          if (!panelController.isPanelOpen) panelController.open();
+          return;
+        }
+
+        if (pickupLocation.value == null || destinationLocation.value == null) {
+          THelperFunctions.showSnackBar('Pickup or destination is missing.');
+          currentState.value = BookingState.selectRide;
+          if (!panelController.isPanelOpen) panelController.open();
+          return;
+        }
+
+        final packageRequest = packageDeliveryController.buildBookPackageRequest(
+          currentLocationName: pickupName.value,
+          destinationName: destinationName.value,
+          currentLocation: pickupLocation.value!,
+          destination: destinationLocation.value!,
+          state: pickupState.value,
+          selectedRideType: selectedRideType.value!,
+        );
+
+        final response = await PackageDeliveryService.instance
+            .bookPackageDelivery(packageRequest);
+
+        if (response.status == 'success' && response.tripId != null) {
+          rideId.value = response.tripId!;
+          _storage.write('active_ride_id', rideId.value);
+          _storage.write('active_ride_mode', 'package_delivery');
+
+          final price = response.price ?? selectedRideType.value!.price;
+          selectedRideType.value = RideType(
+            name: selectedRideType.value!.name,
+            price: price.toInt(),
+            eta: selectedRideType.value!.eta,
+            icon: selectedRideType.value!.icon,
+            seats: selectedRideType.value!.seats,
+          );
+
+          pickupName.value = pickupName.value;
+          pickupController.text = pickupName.value;
+
+          THelperFunctions.showSnackBar('Finding your driver...');
+          return;
+        }
+
+        THelperFunctions.showErrorSnackBar(
+          'Booking Failed',
+          response.message,
+        );
+        currentState.value = BookingState.selectRide;
+        if (!panelController.isPanelOpen) panelController.open();
+        return;
+      }
+
       final response = await _rideService.bookRide(
         pickupName: finalPickupName,
         destinationName: destinationName.value,
@@ -1647,7 +1722,10 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
         break;
       case 'completed':
         currentState.value = BookingState.tripCompleted;
-        isPaymentCompleted.value = true;
+        final paymentStatus = rideData.paymentStatus?.toLowerCase();
+        // Default to "pending" if the backend didn't provide paymentStatus.
+        isPaymentCompleted.value = paymentStatus == 'completed' ||
+            paymentStatus == 'paid';
         break;
       case 'pending':
         currentState.value = BookingState.searchingDriver;
@@ -1660,8 +1738,12 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
   }
 
   IconData _getIconForCategory(String category) {
-    if (category.toLowerCase().contains('xl')) return Icons.airport_shuttle;
-    if (category.toLowerCase().contains('comfort')) return Icons.car_rental;
+    final lower = category.toLowerCase();
+    if (lower.contains('van')) return Icons.local_shipping;
+    if (lower.contains('bike') || lower.contains('courier')) return Icons.directions_bike;
+    if (lower.contains('delivery')) return Icons.local_post_office;
+    if (lower.contains('xl')) return Icons.airport_shuttle;
+    if (lower.contains('comfort')) return Icons.car_rental;
     return Icons.directions_car;
   }
 
@@ -1742,7 +1824,15 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
             onPressed: () async {
               Get.back();
               THelperFunctions.showSnackBar('Cancelling ride...');
-              bool success = await _rideService.cancelRide(rideId.value);
+              final isPackageDelivery =
+                  _storage.read('active_ride_mode') == 'package_delivery';
+              bool success;
+              if (isPackageDelivery) {
+                success = await PackageDeliveryService.instance
+                    .cancelPackageDelivery(rideId.value);
+              } else {
+                success = await _rideService.cancelRide(rideId.value);
+              }
               if (!success) {
                 THelperFunctions.showErrorSnackBar(
                   'Error',
@@ -1775,6 +1865,16 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
     activeRideChatId.value = '';
     rideId.value = '';
     _storage.remove('active_ride_id');
+    _storage.remove('active_ride_mode');
+
+    // Clear persisted payment-pending restoration state.
+    _storage.remove('rider_waiting_for_payment');
+    _storage.remove('rider_waiting_trip_id');
+    _storage.remove('rider_waiting_category');
+    _storage.remove('rider_waiting_fare');
+    _storage.remove('rider_waiting_eta');
+    _storage.remove('rider_waiting_seats');
+
     markers.removeWhere(
       (m) => m.markerId.value == 'destination' || m.markerId.value == 'driver',
     );
@@ -1791,6 +1891,11 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
         duration: const Duration(milliseconds: 300),
       );
     }
+
+    // Clear package form state (rider package booking flow).
+    if (Get.isRegistered<PackageDeliveryController>()) {
+      Get.find<PackageDeliveryController>().clearPackageForm();
+    }
     update();
   }
 
@@ -1805,6 +1910,14 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
 
   void onPaymentSuccess() {
     isPaymentCompleted.value = true;
+
+    // Payment completed; stop forcing the payment-pending UI restoration.
+    _storage.remove('rider_waiting_for_payment');
+    _storage.remove('rider_waiting_trip_id');
+    _storage.remove('rider_waiting_category');
+    _storage.remove('rider_waiting_fare');
+    _storage.remove('rider_waiting_eta');
+    _storage.remove('rider_waiting_seats');
     update();
   }
 
@@ -1995,7 +2108,8 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
         (data['finalPrice'] as num?)?.toDouble() ??
         selectedRideType.value?.price.toDouble() ??
         0.0;
-    final paymentStatus = data['paymentStatus'] as String? ?? 'pending';
+    final paymentStatusRaw = data['paymentStatus'] as String? ?? 'pending';
+    final paymentStatus = paymentStatusRaw.toLowerCase();
     if (currentState.value == BookingState.tripInProgress ||
         currentState.value == BookingState.driverArrived ||
         currentState.value == BookingState.driverAssigned) {
@@ -2011,12 +2125,121 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
       }
       driverLocationTimer?.cancel();
       currentState.value = BookingState.tripCompleted;
-      isPaymentCompleted.value = (paymentStatus.toLowerCase() == 'completed');
+
+      // Backend uses: pending, pending_confirmation, paid.
+      final isPaid = paymentStatus == 'paid' || paymentStatus == 'completed';
+      final isPending = paymentStatus == 'pending' ||
+          paymentStatus == 'pending_confirmation';
+      isPaymentCompleted.value = isPaid;
+
+      // Persist payment-pending state so we can restore the payment UI after
+      // restart when backend reconnect rejects `status=completed`.
+      if (isPending && rideId.value.isNotEmpty) {
+        _storage.write('rider_waiting_for_payment', true);
+        _storage.write('rider_waiting_trip_id', rideId.value);
+        _storage.write('rider_waiting_category',
+            selectedRideType.value?.name ?? rideId.value);
+        _storage.write('rider_waiting_fare', finalFare.toInt());
+        _storage.write('rider_waiting_eta', selectedRideType.value?.eta ?? '...');
+        _storage.write('rider_waiting_seats', selectedRideType.value?.seats ?? 4);
+      }
+
       THelperFunctions.showSuccessSnackBar(
         'Trip Completed',
         'You have arrived at your destination!',
       );
       panelController.open();
+      update();
+    }
+  }
+
+  /// Backend emits `package:delivered` when delivery is confirmed.
+  /// At that moment the package payment is not yet completed, so we send
+  /// the rider to the payment UI (same UI as ride completion).
+  void handlePackageDelivered(Map<String, dynamic> data) {
+    final tripId = data['tripId']?.toString() ?? '';
+    if (tripId.isEmpty) return;
+
+    rideId.value = tripId;
+    _storage.write('active_ride_mode', 'package_delivery');
+    currentState.value = BookingState.tripCompleted;
+    isPaymentCompleted.value = false;
+
+    // Persist so we can restore this UI after app restart.
+    _storage.write('rider_waiting_for_payment', true);
+    _storage.write('rider_waiting_trip_id', tripId);
+    _storage.write(
+      'rider_waiting_category',
+      selectedRideType.value?.name ?? 'Car Delivery',
+    );
+    _storage.write(
+      'rider_waiting_fare',
+      (selectedRideType.value?.price ?? 0).toInt(),
+    );
+    _storage.write(
+      'rider_waiting_eta',
+      selectedRideType.value?.eta ?? '...',
+    );
+    _storage.write(
+      'rider_waiting_seats',
+      selectedRideType.value?.seats ?? 4,
+    );
+
+    panelController.open();
+    update();
+  }
+
+  void handlePackageArrived(Map<String, dynamic> data) {
+    if (data['tripId'] == rideId.value) {
+      currentState.value = BookingState.driverArrived; // Or a specific 'arrivedAtDropoff' if we had one
+      THelperFunctions.showSuccessSnackBar(
+        'Arrived',
+        'Your package has arrived at the destination.',
+      );
+      update();
+    }
+  }
+
+  void handlePackagePickedUp(Map<String, dynamic> data) {
+    if (data['tripId'] == rideId.value) {
+      currentState.value = BookingState.tripInProgress;
+      THelperFunctions.showSuccessSnackBar(
+        'Picked Up',
+        'Your package has been picked up by the driver.',
+      );
+      update();
+    }
+  }
+
+  void handlePackageDisputed(Map<String, dynamic> data) {
+    if (data['tripId'] == rideId.value) {
+      THelperFunctions.showWarningSnackBar(
+        'Dispute Opened',
+        data['reason'] ?? 'A dispute has been raised for this delivery.',
+      );
+      update();
+    }
+  }
+
+  void handleDisputeResolved(Map<String, dynamic> data) {
+    if (data['tripId'] == rideId.value) {
+      final res = data['resolution'] == 'resolved' ? 'Settled' : 'Rejected';
+      THelperFunctions.showSuccessSnackBar(
+        'Dispute Resolved',
+        'The dispute has been $res. ${data['adminNote'] ?? ''}',
+      );
+      update();
+    }
+  }
+
+  void handleTransferCompleted(Map<String, dynamic> data) {
+    if (data['tripId'] == rideId.value) {
+      isPaymentCompleted.value = true;
+      _storage.write('rider_waiting_for_payment', false);
+      THelperFunctions.showSuccessSnackBar(
+        'Payment Success',
+        'Bank transfer confirmed.',
+      );
       update();
     }
   }

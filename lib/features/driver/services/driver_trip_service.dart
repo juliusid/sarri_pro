@@ -73,4 +73,13 @@ class DriverTripService extends GetxService {
     );
     return _httpService.handleResponse(response);
   }
+
+  /// Confirm cash payment for a package delivery trip.
+  Future<Map<String, dynamic>> confirmPackageCashPayment(String tripId) async {
+    final response = await _httpService.post(
+      ApiConfig.packagePaymentCashConfirmEndpoint,
+      body: {'tripId': tripId},
+    );
+    return _httpService.handleResponse(response);
+  }
 }
