@@ -3,21 +3,23 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>21448281203-h3pdin61q71kfvg79q6e5e0mj7umg7nk.apps.googleusercontent.com</string>
+	<string>566802818676-af50fhe86j05gsf22vcrpu5o25re8g0h.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.21448281203-h3pdin61q71kfvg79q6e5e0mj7umg7nk</string>
+	<string>com.googleusercontent.apps.566802818676-af50fhe86j05gsf22vcrpu5o25re8g0h</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>566802818676-39hq76nlgjm52m90gv76dief0alqouc8.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
-	<string>AIzaSyCHjrwKL4YABrtSB2OBWAUCfmp4rNdJO-Y</string>
+	<string>AIzaSyAOcGWJwmFU43ydECj-musq59uE5Wtnx-w</string>
 	<key>GCM_SENDER_ID</key>
-	<string>21448281203</string>
+	<string>566802818676</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.sarriRide</string>
+	<string>com.sarri.sarri-ride</string>
 	<key>PROJECT_ID</key>
-	<string>sarriride-9c8d1</string>
+	<string>sarri-ride-7aced</string>
 	<key>STORAGE_BUCKET</key>
-	<string>sarriride-9c8d1.firebasestorage.app</string>
+	<string>sarri-ride-7aced.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -29,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:21448281203:ios:6db747b9a76cfae899ee06</string>
+	<string>1:566802818676:ios:ab316fe512256646169321</string>
 </dict>
 </plist>
