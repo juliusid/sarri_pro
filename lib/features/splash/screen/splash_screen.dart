@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:get/get.dart';
@@ -85,9 +87,9 @@ class _SplashScreenState extends State<SplashScreen>
     // By doing this here, we ensure it's evaluated sequentially before location
     await NotificationService.instance.init();
 
-    // 5. NOW request location permissions.
-    // This avoids the conflict where two permission dialogs try to show at once.
-    await locationService.initialize();
+    // 5. Start location without blocking navigation (App Store 5.1.1(iv)).
+    // Avoids permission / Settings UI feeling tied to splash; map and ride flows still call ensureLocationAvailable.
+    unawaited(locationService.initialize());
 
     if (mounted) {
       if (AuthService.instance.isAuthenticated) {

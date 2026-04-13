@@ -80,6 +80,7 @@ class ApiConfig {
   // Removed verifyEndpoint as verifyOtpEndpoint covers it
   static String get googleAuthEndpoint =>
       '$baseUrl/client/google'; // Assuming correct path
+  static String get appleAuthEndpoint => '$baseUrl/auth/client/apple';
   static String get logoutEndpoint =>
       '$baseUrl/auth/logout'; // Assuming correct path
 

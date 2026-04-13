@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/features/authentication/controllers/rider_signup_controller.dart';
 import 'package:sarri_ride/features/authentication/widgets/google_button.dart'; // ADDED
+import 'package:sarri_ride/features/authentication/widgets/apple_button.dart';
 import 'package:sarri_ride/utils/constants/colors.dart'; // ADDED
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/constants/text_strings.dart';
@@ -95,6 +96,15 @@ class RiderEmailStep extends StatelessWidget {
             onPressed: () => controller.handleGoogleSignup(),
           ),
         ),
+        const SizedBox(height: TSizes.spaceBtwItems),
+        // Show Apple only on iOS
+        if (GetPlatform.isIOS)
+          Obx(
+            () => AppleSignInButton(
+              isLoading: controller.isAppleLoading.value,
+              onPressed: () => controller.handleAppleSignup(),
+            ),
+          ),
         const SizedBox(height: TSizes.spaceBtwItems),
       ],
     );

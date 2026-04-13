@@ -7,6 +7,7 @@ import 'package:sarri_ride/common/styles/spacing_styles.dart';
 import 'package:sarri_ride/features/authentication/controllers/login_controller.dart';
 import 'package:sarri_ride/features/authentication/screens/user_type_selection/user_type_selection_screen.dart';
 import 'package:sarri_ride/features/authentication/widgets/google_button.dart';
+import 'package:sarri_ride/features/authentication/widgets/apple_button.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
@@ -255,6 +256,16 @@ class _LoginScreenGetXState extends State<LoginScreenGetX> {
                         onPressed: () => controller.handleSocialLogin('google'),
                       ),
                     ),
+                    const SizedBox(height: TSizes.spaceBtwItems),
+                    // Show Apple Sign-In only on iOS
+                    if (GetPlatform.isIOS)
+                      Obx(
+                        () => AppleSignInButton(
+                          isLoading: controller.isAppleLoading.value,
+                          onPressed: () =>
+                              controller.handleSocialLogin('apple'),
+                        ),
+                      ),
                     // const SizedBox(height: TSizes.spaceBtwItems),
                     // Obx(
                     //   () => SocialButton(

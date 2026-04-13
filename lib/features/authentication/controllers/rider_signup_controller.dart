@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
 import 'package:sarri_ride/core/services/websocket_service.dart';
 import 'package:sarri_ride/features/authentication/models/auth_model.dart';
@@ -26,6 +27,7 @@ class RiderSignupController extends GetxController {
   final RxBool obscurePassword = true.obs;
   final RxBool isGoogleLoading = false.obs;
   final RxBool privacyPolicy = false.obs;
+  final RxBool isAppleLoading = false.obs;
 
   // --- NEW: TIMER VARIABLES ---
   Timer? _timer;
@@ -287,6 +289,92 @@ class RiderSignupController extends GetxController {
       );
     } finally {
       if (!isClosed) isGoogleLoading.value = false;
+    }
+  }
+
+  Future<void> handleAppleSignup() async {
+    isAppleLoading.value = true;
+    try {
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      final identityToken = credential.identityToken;
+
+      if (identityToken != null) {
+        final givenName = credential.givenName;
+        final familyName = credential.familyName;
+        final email = credential.email;
+
+        final loginResult = await AuthService.instance.loginWithApple(
+          identityToken,
+          user: {
+            'name': {
+              'firstName': givenName ?? '',
+              'lastName': familyName ?? '',
+            },
+            'email': email ?? '',
+          },
+        );
+
+        if (loginResult.success && loginResult.client != null) {
+          if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
+            Get.delete<ClientData>(tag: 'currentUser', force: true);
+          }
+
+          Get.put<ClientData>(
+            loginResult.client!,
+            tag: 'currentUser',
+            permanent: true,
+          );
+
+          final drawerController = Get.find<MapDrawerController>();
+          await drawerController.refreshUserData();
+
+          final storage = GetStorage();
+          storage.write('user_role', loginResult.client!.role);
+
+          final String userId = loginResult.client!.id;
+          bool refreshSuccess = await HttpService.instance
+              .refreshTokenImmediately(isDriver: false, userId: userId);
+
+          if (!refreshSuccess) {
+            isAppleLoading.value = false;
+            return;
+          }
+
+          WebSocketService.instance.connect();
+
+          final profile = drawerController.fullProfile.value;
+          if (profile != null && profile.phoneNumberVerified == false) {
+            Get.offAll(() => const PhoneNumberScreen());
+            THelperFunctions.showSnackBar('Please verify your phone number.');
+          } else {
+            Get.offAll(() => const MapScreenGetX());
+            THelperFunctions.showSuccessSnackBar('Success', 'Welcome!');
+          }
+        } else {
+          THelperFunctions.showErrorSnackBar(
+            'Error',
+            loginResult.error ?? 'Apple signup failed.',
+          );
+        }
+      } else {
+        THelperFunctions.showErrorSnackBar(
+          'Error',
+          'Could not get Apple identity token.',
+        );
+      }
+    } catch (e) {
+      THelperFunctions.showErrorSnackBar(
+        'Error',
+        'Apple signup failed: ${e.toString()}',
+      );
+    } finally {
+      if (!isClosed) isAppleLoading.value = false;
     }
   }
 }

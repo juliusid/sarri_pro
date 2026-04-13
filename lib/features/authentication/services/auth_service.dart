@@ -270,6 +270,47 @@ class AuthService extends GetxService {
     }
   }
 
+  // Add Sign in with Apple
+  Future<AuthResult> loginWithApple(
+    String identityToken, {
+    Map<String, dynamic>? user,
+  }) async {
+    try {
+      final body = {'idToken': identityToken};
+
+      if (user != null) {
+        body['user'] = user;
+      }
+
+      final response = await _httpService.post(
+        ApiConfig.appleAuthEndpoint,
+        body: body,
+      );
+
+      final responseData = _httpService.handleResponse(response);
+      final loginResponse = LoginResponse.fromJson(responseData);
+
+      if (loginResponse.status == 'success' &&
+          loginResponse.accessToken != null) {
+        await _httpService.storeTokens(
+          loginResponse.accessToken!,
+          loginResponse.refreshToken,
+        );
+        return AuthResult.success(
+          message: loginResponse.message,
+          client: loginResponse.client,
+        );
+      } else {
+        return AuthResult.error(loginResponse.message);
+      }
+    } catch (e) {
+      if (e is ApiException) {
+        return AuthResult.error(e.message);
+      }
+      return AuthResult.error('An unknown error occurred: ${e.toString()}');
+    }
+  }
+
   // ---------- VERIFY OTP ----------
   Future<AuthResult> verifyEmail(String email, String otp, String role) async {
     try {

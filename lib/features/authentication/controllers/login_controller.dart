@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
 import 'package:sarri_ride/core/services/notification_service.dart';
 import 'package:sarri_ride/core/services/websocket_service.dart';
@@ -31,6 +32,7 @@ class LoginController extends GetxController {
   final RxBool isEmailLoading = false.obs;
   final RxBool isGoogleLoading = false.obs;
   final RxBool isFacebookLoading = false.obs;
+  final RxBool isAppleLoading = false.obs;
   final selectedRole = UserType.rider.obs;
 
   @override
@@ -300,10 +302,100 @@ class LoginController extends GetxController {
     }
   }
 
+  // Handle Sign in with Apple (iOS only)
+  Future<void> handleAppleSignIn() async {
+    if (selectedRole.value != UserType.rider) {
+      THelperFunctions.showErrorSnackBar(
+        'Error',
+        'Apple Sign-In is currently only available for Riders.',
+      );
+      return;
+    }
+
+    isAppleLoading.value = true;
+    try {
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      final identityToken = credential.identityToken;
+
+      if (identityToken != null) {
+        // Prepare optional user object if provided
+        final givenName = credential.givenName;
+        final familyName = credential.familyName;
+        final email = credential.email;
+
+        final userPayload = {
+          'name': {'firstName': givenName ?? '', 'lastName': familyName ?? ''},
+          'email': email ?? '',
+        };
+
+        final loginResult = await AuthService.instance.loginWithApple(
+          identityToken,
+          user: userPayload,
+        );
+
+        if (loginResult.success && loginResult.client != null) {
+          if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
+            Get.delete<ClientData>(tag: 'currentUser', force: true);
+          }
+
+          Get.put<ClientData>(
+            loginResult.client!,
+            tag: 'currentUser',
+            permanent: true,
+          );
+
+          final storage = GetStorage();
+          storage.write('user_role', loginResult.client!.role);
+          storage.write('current_user_data', loginResult.client!.toJson());
+
+          WebSocketService.instance.connect();
+          await NotificationService.instance.updateTokenOnBackend();
+
+          final drawerController = Get.find<MapDrawerController>();
+          await drawerController.refreshUserData();
+
+          final profile = drawerController.fullProfile.value;
+          if (profile != null && profile.phoneNumberVerified == false) {
+            Get.offAll(() => const PhoneNumberScreen());
+          } else {
+            Get.offAll(() => const MapScreenGetX());
+            THelperFunctions.showSuccessSnackBar('Success', 'Welcome!');
+          }
+        } else {
+          THelperFunctions.showErrorSnackBar(
+            'Login Failed',
+            loginResult.error ?? 'Server rejected the login.',
+          );
+        }
+      } else {
+        THelperFunctions.showErrorSnackBar(
+          'Error',
+          'Apple did not return a token.',
+        );
+      }
+    } catch (e) {
+      THelperFunctions.showErrorSnackBar(
+        'Error',
+        'Apple login failed: ${e.toString()}',
+      );
+      print('Apple Sign-In Error: $e');
+    } finally {
+      isAppleLoading.value = false;
+    }
+  }
+
   // Placeholder for other social logins
   void handleSocialLogin(String provider) async {
     if (provider.toLowerCase() == 'google') {
       await handleGoogleLogin();
+    } else if (provider.toLowerCase() == 'apple') {
+      await handleAppleSignIn();
     } else if (provider.toLowerCase() == 'facebook') {
       isFacebookLoading.value = true;
       await Future.delayed(const Duration(seconds: 2));

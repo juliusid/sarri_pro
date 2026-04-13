@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:sarri_ride/config/api_config.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
 import 'package:sarri_ride/features/driver/controllers/trip_management_controller.dart';
+import 'package:sarri_ride/features/notifications/controllers/notification_controller.dart';
 import 'package:sarri_ride/features/ride/controllers/ride_controller.dart';
 
 class NotificationService extends GetxService {
@@ -46,6 +47,12 @@ class NotificationService extends GetxService {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       print("🔔 Foreground Notification: ${message.data['type']}");
       _handleNavigationLogic(message);
+      if (Get.isRegistered<NotificationController>()) {
+        final inbox = Get.find<NotificationController>();
+        if (inbox.appendFromRemoteMessage(message)) {
+          inbox.unreadCount.value++;
+        }
+      }
     });
 
     // B. App is in Background -> User Taps Notification

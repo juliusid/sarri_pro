@@ -4,9 +4,14 @@ import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
+
+/// Persists that the user saw the in-app location explanation and chose to continue
+/// (so we only show it once before the first system permission prompt).
+const String _kLocationEducationComplete = 'location_education_complete_v1';
 
 class LocationService extends GetxController {
   static LocationService get instance => Get.find();
@@ -41,6 +46,107 @@ class LocationService extends GetxController {
   void onInit() {
     super.onInit();
     _currentPosition.value = _defaultPosition;
+  }
+
+  /// In-app explanation before the first system location prompt (App Store 5.1.1).
+  /// Returns false if the user chooses not to continue (no system dialog).
+  Future<bool> _showForegroundLocationEducationIfNeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_kLocationEducationComplete) == true) {
+      return true;
+    }
+    final context = Get.context;
+    if (context == null || !context.mounted) {
+      return true;
+    }
+    final accepted = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Location'),
+        content: const Text(
+          'Sarri Ride uses your location to show the map, set pickups and destinations, and match you with rides. You can change this anytime in Settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Not now'),
+          ),
+          ElevatedButton(
+            onPressed: () => Get.back(result: true),
+            style: ElevatedButton.styleFrom(backgroundColor: TColors.primary),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
+    if (accepted != true) {
+      return false;
+    }
+    await prefs.setBool(_kLocationEducationComplete, true);
+    return true;
+  }
+
+  Future<void> _offerOpenLocationServicesSettings(String message) async {
+    final context = Get.context;
+    if (context == null || !context.mounted) {
+      THelperFunctions.showSnackBar(
+        'Please enable Location Services (GPS) in Settings when you’re ready.',
+      );
+      return;
+    }
+    await Get.dialog<void>(
+      AlertDialog(
+        title: const Text('Location Services off'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Not now'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              Geolocator.openLocationSettings();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: TColors.primary),
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _offerOpenAppSettings({
+    required String title,
+    required String message,
+  }) async {
+    final context = Get.context;
+    if (context == null || !context.mounted) {
+      THelperFunctions.showSnackBar(
+        'Location is turned off for this app. You can enable it in Settings when you’re ready.',
+      );
+      return;
+    }
+    await Get.dialog<void>(
+      AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Not now'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              Geolocator.openAppSettings();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: TColors.primary),
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// --- 1. GET POSITION STREAM (THE GOOGLE REQUIREMENT) ---
@@ -90,14 +196,20 @@ class LocationService extends GetxController {
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       _locationStatus.value = 'GPS is turned off.';
-      THelperFunctions.showSnackBar('Please enable Location Services (GPS).');
-      await Geolocator.openLocationSettings();
+      await _offerOpenLocationServicesSettings(
+        'Turn on Location Services in Settings to use maps, pickups, and ride features.',
+      );
       return false;
     }
 
     // B. Check Foreground Permission (Basic)
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
+      final proceed = await _showForegroundLocationEducationIfNeeded();
+      if (!proceed) {
+        _locationStatus.value = 'Location not enabled.';
+        return false;
+      }
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
         _locationStatus.value = 'Permission denied.';
@@ -108,8 +220,11 @@ class LocationService extends GetxController {
 
     if (permission == LocationPermission.deniedForever) {
       _locationStatus.value = 'Permission permanently denied.';
-      THelperFunctions.showSnackBar('Please enable location in App Settings.');
-      await Geolocator.openAppSettings();
+      await _offerOpenAppSettings(
+        title: 'Location access needed',
+        message:
+            'Sarri Ride needs location for maps and rides. You can enable it in Settings when you’re ready.',
+      );
       return false;
     }
 
@@ -212,10 +327,11 @@ class LocationService extends GetxController {
           var status = await Permission.locationAlways.request();
 
           if (!status.isGranted) {
-            THelperFunctions.showSnackBar(
-              'Please select "Allow all the time" in Settings.',
+            await _offerOpenAppSettings(
+              title: 'Allow all the time',
+              message:
+                  'To track trips in the background, choose "Allow all the time" for location in Settings.',
             );
-            await Geolocator.openAppSettings();
           }
         }
 

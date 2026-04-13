@@ -11,7 +11,6 @@ import 'package:sarri_ride/core/services/http_service.dart';
 import 'package:sarri_ride/core/services/websocket_service.dart';
 import 'package:sarri_ride/features/settings/controllers/settings_controller.dart';
 import 'package:sarri_ride/features/shared/models/user_model.dart';
-import 'package:sarri_ride/features/shared/services/demo_data.dart'; // Kept for type refs, but usage minimized
 import 'package:sarri_ride/features/location/services/location_service.dart';
 import 'package:sarri_ride/features/rating/services/rating_service.dart'; // <--- IMPORT RATING SERVICE
 
@@ -36,7 +35,6 @@ class DriverDashboardController extends GetxController with WidgetsBindingObserv
 
   // Services
   final LocationService _locationService = LocationService.instance;
-  final DemoDataService _demoDataService = DemoDataService.instance;
   final HttpService _httpService = HttpService.instance;
   final WebSocketService _webSocketService = WebSocketService.instance;
 

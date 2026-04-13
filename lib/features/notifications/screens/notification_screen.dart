@@ -1,73 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart';
 import 'package:sarri_ride/features/notifications/controllers/notification_controller.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
-import 'package:intl/intl.dart'; // For date formatting
 
-// Placeholder Model - Replace with actual model if backend provides more details
-class AppNotification {
-  final String id;
-  final String message;
-  final String type; // e.g., 'ride_update', 'promo', 'system'
-  final DateTime timestamp;
-  final bool isRead;
+class NotificationScreen extends StatefulWidget {
+  const NotificationScreen({super.key});
 
-  AppNotification({
-    required this.id,
-    required this.message,
-    required this.type,
-    required this.timestamp,
-    this.isRead = false,
-  });
+  @override
+  State<NotificationScreen> createState() => _NotificationScreenState();
 }
 
-class NotificationScreen extends StatelessWidget {
-  const NotificationScreen({super.key});
+class _NotificationScreenState extends State<NotificationScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Get.find<NotificationController>().markAsRead();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final notificationController = Get.find<NotificationController>();
     final dark = THelperFunctions.isDarkMode(context);
-
-    // --- Placeholder Data ---
-    // TODO: Replace this with actual notifications fetched or stored by NotificationController
-    final RxList<AppNotification> notifications = <AppNotification>[
-      AppNotification(
-        id: '1',
-        message: 'Your driver John Doe has arrived!',
-        type: 'ride_update',
-        timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-      ),
-      AppNotification(
-        id: '2',
-        message: 'Ride completed. Fare: ₦3200',
-        type: 'ride_update',
-        timestamp: DateTime.now().subtract(const Duration(hours: 1)),
-        isRead: true,
-      ),
-      AppNotification(
-        id: '3',
-        message: 'Get 20% off your next 3 rides! Use code RIDE20.',
-        type: 'promo',
-        timestamp: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-      AppNotification(
-        id: '4',
-        message: 'System maintenance scheduled for Sunday 2 AM.',
-        type: 'system',
-        timestamp: DateTime.now().subtract(const Duration(days: 2)),
-        isRead: true,
-      ),
-    ].obs;
-    // --- End Placeholder ---
-
-    // Mark as read when screen is opened (can be moved to onInit if using StatefulWidget/GetxController for screen)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      notificationController.markAsRead();
-    });
 
     return Scaffold(
       appBar: AppBar(
@@ -80,101 +40,99 @@ class NotificationScreen extends StatelessWidget {
           onPressed: () => Get.back(),
         ),
         actions: [
-          IconButton(
-            icon: Icon(
-              Iconsax.trash,
-              color: dark ? TColors.white : TColors.black,
-            ),
-            tooltip: 'Clear All',
-            onPressed: () {
-              // TODO: Implement clear all logic
-              notifications.clear(); // Placeholder action
-              THelperFunctions.showSnackBar(
-                'Cleared all notifications (placeholder)',
-              );
-            },
-          ),
+          Obx(() {
+            final empty = notificationController.items.isEmpty;
+            return IconButton(
+              icon: Icon(
+                Iconsax.trash,
+                color: empty
+                    ? Colors.grey
+                    : (dark ? TColors.white : TColors.black),
+              ),
+              tooltip: 'Clear All',
+              onPressed: empty
+                  ? null
+                  : () {
+                      notificationController.clearAll();
+                      THelperFunctions.showSnackBar('All notifications cleared');
+                    },
+            );
+          }),
           const SizedBox(width: TSizes.sm),
         ],
       ),
-      body: Obx(
-        // Use Obx to rebuild list when notifications change (if they become reactive)
-        () {
-          if (notifications.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Iconsax.notification_bing, size: 60, color: Colors.grey),
-                  const SizedBox(height: TSizes.spaceBtwItems),
-                  Text(
-                    'No Notifications Yet',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: TSizes.xs),
-                  Text(
-                    'Important updates will appear here.',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: TSizes.md),
-            itemCount: notifications.length,
-            separatorBuilder: (_, __) => Divider(
-              height: 0,
-              indent: 70,
-              color: dark ? TColors.darkGrey : TColors.grey,
-            ),
-            itemBuilder: (context, index) {
-              final notification = notifications[index];
-              return ListTile(
-                leading: _getNotificationIcon(notification.type),
-                title: Text(
-                  notification.message,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: notification.isRead
-                        ? FontWeight.normal
-                        : FontWeight.bold,
-                  ),
+      body: Obx(() {
+        final notifications = notificationController.items;
+        if (notifications.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Iconsax.notification_bing, size: 60, color: Colors.grey),
+                const SizedBox(height: TSizes.spaceBtwItems),
+                Text(
+                  'No Notifications Yet',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
                 ),
-                subtitle: Text(
-                  _formatTimestamp(notification.timestamp),
+                const SizedBox(height: TSizes.xs),
+                Text(
+                  'Ride updates and alerts will appear here.',
                   style: Theme.of(
                     context,
-                  ).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                  ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                  textAlign: TextAlign.center,
                 ),
-                trailing: !notification.isRead
-                    ? Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: TColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                      )
-                    : null,
-                onTap: () {
-                  // TODO: Handle notification tap (e.g., navigate to linked content)
-                  print("Tapped notification: ${notification.id}");
-                  // Mark as read visually (update actual state in controller later)
-                  // notifications[index] = AppNotification(... notification.copyWith(isRead: true) ...);
-                  // notificationController.markSingleAsRead(notification.id); // Example controller method
-                },
-              );
-            },
+              ],
+            ),
           );
-        },
-      ),
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(vertical: TSizes.md),
+          itemCount: notifications.length,
+          separatorBuilder: (_, __) => Divider(
+            height: 0,
+            indent: 70,
+            color: dark ? TColors.darkGrey : TColors.grey,
+          ),
+          itemBuilder: (context, index) {
+            final notification = notifications[index];
+            return ListTile(
+              leading: _getNotificationIcon(notification.type),
+              title: Text(
+                notification.message,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: notification.isRead
+                      ? FontWeight.normal
+                      : FontWeight.bold,
+                ),
+              ),
+              subtitle: Text(
+                _formatTimestamp(notification.timestamp),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: Colors.grey),
+              ),
+              trailing: !notification.isRead
+                  ? Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: TColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    )
+                  : null,
+              onTap: () {
+                notificationController.markSingleRead(notification.id);
+              },
+            );
+          },
+        );
+      }),
     );
   }
 
@@ -183,6 +141,10 @@ class NotificationScreen extends StatelessWidget {
     Color color;
     switch (type.toLowerCase()) {
       case 'ride_update':
+      case 'ride_booking':
+      case 'ride_accepted':
+      case 'ride_started':
+      case 'ride_ended':
         iconData = Iconsax.location;
         color = TColors.primary;
         break;
@@ -212,7 +174,6 @@ class NotificationScreen extends StatelessWidget {
     if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
     if (difference.inHours < 24) return '${difference.inHours}h ago';
     if (difference.inDays == 1) return 'Yesterday';
-    // Use intl package for more robust date formatting
     return DateFormat('dd MMM yyyy').format(timestamp);
   }
 }

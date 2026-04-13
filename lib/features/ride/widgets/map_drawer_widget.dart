@@ -10,7 +10,8 @@ import 'package:sarri_ride/features/location/services/location_service.dart';
 import 'package:sarri_ride/features/profile/screens/profile_screen.dart';
 import 'package:sarri_ride/features/ride/screens/history/ride_history_screen.dart';
 import 'package:sarri_ride/features/payment/screens/payment_methods_screen.dart';
-import 'package:sarri_ride/features/payment/screens/wallet_screen.dart';
+// PRODUCTION: Sarri Points (payment wallet_screen) has no client API yet — restore import + drawer row when backend exists.
+// import 'package:sarri_ride/features/payment/screens/wallet_screen.dart';
 import 'package:sarri_ride/features/settings/screens/settings_screen.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/features/settings/controllers/settings_controller.dart';
@@ -164,16 +165,17 @@ class MapDrawerWidget extends StatelessWidget {
                   dark: dark,
                   textColor: textColor,
                 ),
-                _buildDrawerItem(
-                  icon: Iconsax.wallet_money,
-                  title: 'My Wallet',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Get.to(() => const WalletScreen());
-                  },
-                  dark: dark,
-                  textColor: textColor,
-                ),
+                // PRODUCTION: Sarri Points — see commented import above.
+                // _buildDrawerItem(
+                //   icon: Iconsax.wallet_money,
+                //   title: 'My Wallet',
+                //   onTap: () {
+                //     Navigator.pop(context);
+                //     Get.to(() => const WalletScreen());
+                //   },
+                //   dark: dark,
+                //   textColor: textColor,
+                // ),
 
                 const SizedBox(height: 8),
                 Divider(
