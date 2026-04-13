@@ -40,7 +40,7 @@ class AppleSignInButton extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(
-                    CupertinoIcons.apple_logo,
+                    Icons.apple,
                     size: 24,
                     color: Colors.white,
                   ),

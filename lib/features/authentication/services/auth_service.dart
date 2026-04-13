@@ -276,7 +276,7 @@ class AuthService extends GetxService {
     Map<String, dynamic>? user,
   }) async {
     try {
-      final body = {'idToken': identityToken};
+      final body = <String, dynamic>{'idToken': identityToken};
 
       if (user != null) {
         body['user'] = user;
