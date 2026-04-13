@@ -67,11 +67,13 @@ class LocationService extends GetxController {
         ),
         actions: [
           TextButton(
-            onPressed: () => Get.back(result: false),
+            // onPressed: () => Get.back(result: false),
+            onPressed: () =>  Navigator.of(Get.context!).pop(false),
             child: const Text('Not now'),
           ),
           ElevatedButton(
-            onPressed: () => Get.back(result: true),
+            onPressed: () =>  Navigator.of(Get.context!).pop(true),
+            // onPressed: () => Get.back(result: true),
             style: ElevatedButton.styleFrom(backgroundColor: TColors.primary),
             child: const Text('Continue'),
           ),
