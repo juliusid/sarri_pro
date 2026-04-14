@@ -3,19 +3,19 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>566802818676-af50fhe86j05gsf22vcrpu5o25re8g0h.apps.googleusercontent.com</string>
+	<string>566802818676-pbshbacp73849r122i47d1r1l0s4r9et.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.566802818676-af50fhe86j05gsf22vcrpu5o25re8g0h</string>
+	<string>com.googleusercontent.apps.566802818676-pbshbacp73849r122i47d1r1l0s4r9et</string>
 	<key>ANDROID_CLIENT_ID</key>
 	<string>566802818676-39hq76nlgjm52m90gv76dief0alqouc8.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
-	<string>AIzaSyAOcGWJwmFU43ydECj-musq59uE5Wtnx-w</string>
+	<string>AIzaSyAqWSwIX40Koh8trh_qAgxotnWUhVJ06ZA</string>
 	<key>GCM_SENDER_ID</key>
 	<string>566802818676</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.sarri.sarri-ride</string>
+	<string>com.sarri.sarriRide</string>
 	<key>PROJECT_ID</key>
 	<string>sarri-ride-7aced</string>
 	<key>STORAGE_BUCKET</key>
@@ -31,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:566802818676:ios:ab316fe512256646169321</string>
+	<string>1:566802818676:ios:8b42e0bdb5ed9684169321</string>
 </dict>
 </plist>
