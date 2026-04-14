@@ -421,6 +421,8 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
       print("RideController: App resumed, automatically syncing ride status...");
       // Re-fetch the ride state from the server silently so the UI updates to the latest step
       _checkCurrentRideStatus();
+      // Auto-refresh the location after permission might have been granted
+      refreshCurrentLocation();
     }
   }
 

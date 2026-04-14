@@ -212,6 +212,7 @@ class LoginController extends GetxController {
       // I extracted this ID from the google-services.json you sent me.
       // It is the "Web client (auto created by Google Service)"
       final googleSignIn = GoogleSignIn(
+        clientId: GetPlatform.isIOS ? '566802818676-af50fhe86j05gsf22vcrpu5o25re8g0h.apps.googleusercontent.com' : null,
         serverClientId:
             '566802818676-kuc13au4v6ifp3oe6qimcdp78s84fnnd.apps.googleusercontent.com',
         scopes: ['email', 'profile'],
@@ -380,10 +381,15 @@ class LoginController extends GetxController {
         );
       }
     } catch (e) {
-      THelperFunctions.showErrorSnackBar(
-        'Error',
-        'Apple login failed: ${e.toString()}',
-      );
+      if (e is SignInWithAppleAuthorizationException &&
+          e.code == AuthorizationErrorCode.canceled) {
+        print('Apple Sign-In canceled by user.');
+      } else {
+        THelperFunctions.showErrorSnackBar(
+          'Error',
+          'Apple login failed: ${e.toString()}',
+        );
+      }
       print('Apple Sign-In Error: $e');
     } finally {
       isAppleLoading.value = false;

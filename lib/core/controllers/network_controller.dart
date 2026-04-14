@@ -38,7 +38,7 @@ class NetworkController extends GetxController {
     } else {
       // If we previously showed the snackbar, close it now
       if (Get.isSnackbarOpen) {
-        Get.closeCurrentSnackbar();
+        Get.closeAllSnackbars();
       }
     }
   }
@@ -49,14 +49,20 @@ class NetworkController extends GetxController {
         'You are offline. Please check your internet connection.',
         style: TextStyle(color: Colors.white, fontSize: 14),
       ),
-      isDismissible: false, // User cannot swipe it away
-      duration: const Duration(
-        days: 1,
-      ), // Keeps it open indefinitely until internet returns
+      isDismissible: true, // Allow dismiss by swiping
+      duration: const Duration(days: 1), // Keeps it open indefinitely until internet returns
       backgroundColor: Colors.red[900]!,
       icon: const Icon(Icons.wifi_off, color: Colors.white, size: 35),
       margin: EdgeInsets.zero,
       snackStyle: SnackStyle.GROUNDED, // Sticks to bottom of screen
+      mainButton: TextButton(
+        onPressed: () {
+          if (Get.isSnackbarOpen) {
+             Get.closeCurrentSnackbar();
+          }
+        },
+        child: const Text('Dismiss', style: TextStyle(color: Colors.white)),
+      ),
     );
   }
 
