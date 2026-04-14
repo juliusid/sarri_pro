@@ -30,7 +30,7 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.sarri.sarriRide</string>
+			<string>com.sarri.sarri-ride</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>sarriride</string>
