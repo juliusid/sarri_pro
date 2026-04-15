@@ -210,8 +210,9 @@ class RiderSignupController extends GetxController {
     isGoogleLoading.value = true;
     try {
       final googleSignIn = GoogleSignIn(
+        clientId: GetPlatform.isIOS ? '566802818676-af50fhe86j05gsf22vcrpu5o25re8g0h.apps.googleusercontent.com' : null,
         serverClientId:
-            '145756377096-e0lc455dkoda47a1sfj9thkefnf5q8pr.apps.googleusercontent.com',
+            '566802818676-kuc13au4v6ifp3oe6qimcdp78s84fnnd.apps.googleusercontent.com',
         scopes: ['email', 'profile'],
       );
 
@@ -309,16 +310,32 @@ class RiderSignupController extends GetxController {
         final familyName = credential.familyName;
         final email = credential.email;
 
-        final loginResult = await AuthService.instance.loginWithApple(
-          identityToken,
-          user: {
+        print('APPLE SIGNUP: identityToken received: ${identityToken.substring(0, 20)}...');
+        print('APPLE SIGNUP: givenName: $givenName');
+        print('APPLE SIGNUP: familyName: $familyName');
+        print('APPLE SIGNUP: email: $email');
+
+        // Only send user object if we have actual data (Apple only provides name/email on first sign-in)
+        Map<String, dynamic>? userPayload;
+        if (givenName != null || familyName != null || email != null) {
+          userPayload = {
             'name': {
               'firstName': givenName ?? '',
               'lastName': familyName ?? '',
             },
             'email': email ?? '',
-          },
+          };
+          print('APPLE SIGNUP: Sending user payload: $userPayload');
+        } else {
+          print('APPLE SIGNUP: No user data provided (subsequent sign-in)');
+        }
+
+        final loginResult = await AuthService.instance.loginWithApple(
+          identityToken,
+          user: userPayload,
         );
+
+        print('APPLE SIGNUP: Backend response - success: ${loginResult.success}, error: ${loginResult.error}');
 
         if (loginResult.success && loginResult.client != null) {
           if (Get.isRegistered<ClientData>(tag: 'currentUser')) {

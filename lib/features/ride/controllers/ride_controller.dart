@@ -27,6 +27,8 @@ import 'package:sarri_ride/features/ride/widgets/pickup_location_modal.dart';
 import 'package:sarri_ride/features/ride/widgets/no_drivers_available_widget.dart';
 import 'package:sarri_ride/features/package_delivery/controllers/package_delivery_controller.dart';
 import 'package:sarri_ride/features/package_delivery/services/package_delivery_service.dart';
+import 'package:sarri_ride/features/ride/controllers/drawer_controller.dart';
+import 'package:sarri_ride/features/authentication/screens/phone_verification/phone_number_screen.dart';
 
 // Enums
 enum BookingState {
@@ -1518,6 +1520,27 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
           return;
         }
 
+        // Check phone verification before booking package delivery
+        try {
+          final drawerController = Get.find<MapDrawerController>();
+          await drawerController.refreshUserData();
+          final profile = drawerController.fullProfile.value;
+          
+          if (profile == null || profile.phoneNumberVerified == false) {
+            THelperFunctions.showSnackBar('Phone verification required before booking a package delivery.');
+            Get.to(() => const PhoneNumberScreen());
+            currentState.value = BookingState.selectRide;
+            if (!panelController.isPanelOpen) panelController.open();
+            return;
+          }
+        } catch (e) {
+          print('Error checking phone verification: $e');
+          THelperFunctions.showErrorSnackBar('Error', 'Could not verify phone status. Please try again.');
+          currentState.value = BookingState.selectRide;
+          if (!panelController.isPanelOpen) panelController.open();
+          return;
+        }
+
         final packageRequest = packageDeliveryController.buildBookPackageRequest(
           currentLocationName: pickupName.value,
           destinationName: destinationName.value,
@@ -1555,6 +1578,27 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
           'Booking Failed',
           response.message,
         );
+        currentState.value = BookingState.selectRide;
+        if (!panelController.isPanelOpen) panelController.open();
+        return;
+      }
+
+      // Check phone verification before booking
+      try {
+        final drawerController = Get.find<MapDrawerController>();
+        await drawerController.refreshUserData();
+        final profile = drawerController.fullProfile.value;
+        
+        if (profile == null || profile.phoneNumberVerified == false) {
+          THelperFunctions.showSnackBar('Phone verification required before booking a ride.');
+          Get.to(() => const PhoneNumberScreen());
+          currentState.value = BookingState.selectRide;
+          if (!panelController.isPanelOpen) panelController.open();
+          return;
+        }
+      } catch (e) {
+        print('Error checking phone verification: $e');
+        THelperFunctions.showErrorSnackBar('Error', 'Could not verify phone status. Please try again.');
         currentState.value = BookingState.selectRide;
         if (!panelController.isPanelOpen) panelController.open();
         return;

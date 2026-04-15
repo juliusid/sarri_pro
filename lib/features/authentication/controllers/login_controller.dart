@@ -330,15 +330,32 @@ class LoginController extends GetxController {
         final familyName = credential.familyName;
         final email = credential.email;
 
-        final userPayload = {
-          'name': {'firstName': givenName ?? '', 'lastName': familyName ?? ''},
-          'email': email ?? '',
-        };
+        print('APPLE SIGN-IN: identityToken received: ${identityToken.substring(0, 20)}...');
+        print('APPLE SIGN-IN: givenName: $givenName');
+        print('APPLE SIGN-IN: familyName: $familyName');
+        print('APPLE SIGN-IN: email: $email');
+
+        // Only send user object if we have actual data (Apple only provides name/email on first sign-in)
+        Map<String, dynamic>? userPayload;
+        if (givenName != null || familyName != null || email != null) {
+          userPayload = {
+            'name': {
+              'firstName': givenName ?? '',
+              'lastName': familyName ?? '',
+            },
+            'email': email ?? '',
+          };
+          print('APPLE SIGN-IN: Sending user payload: $userPayload');
+        } else {
+          print('APPLE SIGN-IN: No user data provided (subsequent sign-in)');
+        }
 
         final loginResult = await AuthService.instance.loginWithApple(
           identityToken,
           user: userPayload,
         );
+
+        print('APPLE SIGN-IN: Backend response - success: ${loginResult.success}, error: ${loginResult.error}');
 
         if (loginResult.success && loginResult.client != null) {
           if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
