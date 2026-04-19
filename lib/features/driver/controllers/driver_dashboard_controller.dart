@@ -546,6 +546,7 @@ class DriverDashboardController extends GetxController with WidgetsBindingObserv
       // This triggers the Prominent Disclosure Dialog from LocationService
       bool locationReady = await _locationService.ensureLocationAvailable(
         isDriver: true,
+        isUserInitiated: true,
       );
 
       if (!locationReady) {
