@@ -190,7 +190,16 @@ class LocationService extends GetxController {
   }
 
   /// --- 2. ENSURE LOCATION AVAILABLE ---
-  Future<bool> ensureLocationAvailable({bool isDriver = false}) async {
+  ///
+  /// [isUserInitiated] – set to `true` when the user **actively** taps a
+  /// feature that requires location (e.g. "Book a Ride", "Go Online").
+  /// When `false` (the default, used during app startup / background refresh),
+  /// a denied-forever permission will only show a lightweight snackbar instead
+  /// of a dialog that links to Settings — satisfying App Store Guideline 5.1.1(iv).
+  Future<bool> ensureLocationAvailable({
+    bool isDriver = false,
+    bool isUserInitiated = false,
+  }) async {
     bool serviceEnabled;
     LocationPermission permission;
 
@@ -198,6 +207,8 @@ class LocationService extends GetxController {
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       _locationStatus.value = 'GPS is turned off.';
+      // Offering to open *Location Services* (the device-level GPS toggle) is
+      // allowed by Apple — it is NOT the same as opening the app's permission page.
       await _offerOpenLocationServicesSettings(
         'Turn on Location Services in Settings to use maps, pickups, and ride features.',
       );
@@ -220,13 +231,29 @@ class LocationService extends GetxController {
       }
     }
 
+    // C. Handle permanently-denied permission (App Store 5.1.1(iv) compliant).
+    //
+    // Apple's rule: you must NOT redirect users to Settings **immediately**
+    // after they tap "Don't Allow". You MAY offer a Settings link only when
+    // the user later *actively tries* to use a feature that requires location.
     if (permission == LocationPermission.deniedForever) {
       _locationStatus.value = 'Permission permanently denied.';
-      await _offerOpenAppSettings(
-        title: 'Location access needed',
-        message:
-            'Sarri Ride needs location for maps and rides. You can enable it in Settings when you’re ready.',
-      );
+
+      if (isUserInitiated) {
+        // The user tapped a button that needs location (e.g. "Book a Ride").
+        // Showing an explanatory dialog with a Settings link is allowed here
+        // because the user initiated the action — Apple permits this.
+        await _offerOpenAppSettings(
+          title: 'Location access needed',
+          message:
+              'This feature requires location access. You can enable it in Settings > Privacy > Location Services > Sarri Ride.',
+        );
+      } else {
+        // Automatic / startup check — only show a non-intrusive snackbar.
+        THelperFunctions.showSnackBar(
+          'Location is turned off. Enable it in Settings when you\'re ready.',
+        );
+      }
       return false;
     }
 
@@ -351,13 +378,13 @@ class LocationService extends GetxController {
   }
 
   /// --- 3. INITIALIZATION ---
-  Future<void> initialize({bool isDriver = false}) async {
+  Future<void> initialize({bool isDriver = false, bool isUserInitiated = false}) async {
     _isLocationLoading.value = true;
     _locationStatus.value = 'Verifying GPS...';
     update();
 
     try {
-      bool isReady = await ensureLocationAvailable(isDriver: isDriver);
+      bool isReady = await ensureLocationAvailable(isDriver: isDriver, isUserInitiated: isUserInitiated);
       if (!isReady) {
         _isLocationLoading.value = false;
         update();
@@ -392,8 +419,8 @@ class LocationService extends GetxController {
   }
 
   /// --- 4. GET CURRENT LOCATION ---
-  Future<Position?> getCurrentLocation({bool isDriver = false}) async {
-    bool isReady = await ensureLocationAvailable(isDriver: isDriver);
+  Future<Position?> getCurrentLocation({bool isDriver = false, bool isUserInitiated = false}) async {
+    bool isReady = await ensureLocationAvailable(isDriver: isDriver, isUserInitiated: isUserInitiated);
     if (!isReady) return _currentPosition.value ?? _defaultPosition;
 
     try {
@@ -416,8 +443,8 @@ class LocationService extends GetxController {
     return _currentPosition.value ?? _defaultPosition;
   }
 
-  Future<bool> requestLocationPermission() async {
-    return await ensureLocationAvailable();
+  Future<bool> requestLocationPermission({bool isUserInitiated = false}) async {
+    return await ensureLocationAvailable(isUserInitiated: isUserInitiated);
   }
 
   double calculateDistance(Position start, Position end) {
