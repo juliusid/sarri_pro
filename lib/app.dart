@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:get/get.dart';
 import 'package:sarri_ride/core/services/notification_service.dart'; // <--- IMPORT
+import 'package:sarri_ride/core/controllers/network_controller.dart';
 import 'package:sarri_ride/features/authentication/screens/user_type_selection/user_type_selection_screen.dart';
 import 'package:sarri_ride/features/splash/screen/splash_screen.dart';
 import 'package:sarri_ride/utils/theme/theme.dart';
@@ -37,6 +38,10 @@ class _MyAppState extends State<App> {
         theme: TAppTheme.lightTheme,
         darkTheme: TAppTheme.darkTheme,
         home: const SplashScreen(),
+        builder: (context, child) {
+          if (child == null) return const SizedBox.shrink();
+          return ConnectivityBanner(child: child);
+        },
         getPages: [
           GetPage(name: '/', page: () => const SplashScreen()),
           GetPage(name: '/signup', page: () => const UserTypeSelectionScreen()),

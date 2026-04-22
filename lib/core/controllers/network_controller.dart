@@ -10,14 +10,15 @@ class NetworkController extends GetxController {
   late StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
   final RxBool isConnected = true.obs;
 
+  /// Debounce timer to avoid acting on brief connectivity flickers.
+  Timer? _debounceTimer;
+
   @override
   void onInit() {
     super.onInit();
-    // Subscribe to connection changes
     _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
       _updateConnectionStatus,
     );
-    // Check initial status
     _checkInitialConnection();
   }
 
@@ -27,48 +28,91 @@ class NetworkController extends GetxController {
   }
 
   void _updateConnectionStatus(List<ConnectivityResult> results) {
-    // If the list contains 'none', we are disconnected
     bool hasConnection = !results.contains(ConnectivityResult.none);
 
-    // Update reactive variable
-    isConnected.value = hasConnection;
+    _debounceTimer?.cancel();
 
     if (!hasConnection) {
-      _showNoConnectionSnackbar();
+      // Wait 2s before declaring offline to avoid false positives.
+      _debounceTimer = Timer(const Duration(seconds: 2), () {
+        isConnected.value = false;
+      });
     } else {
-      // If we previously showed the snackbar, close it now
-      if (Get.isSnackbarOpen) {
-        Get.closeAllSnackbars();
-      }
+      isConnected.value = true;
     }
-  }
-
-  void _showNoConnectionSnackbar() {
-    Get.rawSnackbar(
-      messageText: const Text(
-        'You are offline. Please check your internet connection.',
-        style: TextStyle(color: Colors.white, fontSize: 14),
-      ),
-      isDismissible: true, // Allow dismiss by swiping
-      duration: const Duration(days: 1), // Keeps it open indefinitely until internet returns
-      backgroundColor: Colors.red[900]!,
-      icon: const Icon(Icons.wifi_off, color: Colors.white, size: 35),
-      margin: EdgeInsets.zero,
-      snackStyle: SnackStyle.GROUNDED, // Sticks to bottom of screen
-      mainButton: TextButton(
-        onPressed: () {
-          if (Get.isSnackbarOpen) {
-             Get.closeCurrentSnackbar();
-          }
-        },
-        child: const Text('Dismiss', style: TextStyle(color: Colors.white)),
-      ),
-    );
   }
 
   @override
   void onClose() {
+    _debounceTimer?.cancel();
     _connectivitySubscription.cancel();
     super.onClose();
+  }
+}
+
+/// A slim, non-intrusive connectivity banner.
+/// Wrap your app content with this in GetMaterialApp's builder.
+class ConnectivityBanner extends StatelessWidget {
+  final Widget child;
+  const ConnectivityBanner({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Stack(
+        children: [
+          // The actual app content
+          child,
+
+          // The offline banner — slides down from top when offline
+          Obx(() {
+            final isConnected = NetworkController.instance.isConnected.value;
+            return AnimatedPositioned(
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeInOut,
+              top: isConnected ? -60 : 0,
+              left: 0,
+              right: 0,
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.only(
+                    top: MediaQuery.of(context).padding.top,
+                    bottom: 8,
+                    left: 16,
+                    right: 16,
+                  ),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE53935), // Material Red 600
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.wifi_off_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'No internet connection',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
   }
 }
