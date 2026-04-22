@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
+import 'package:sarri_ride/features/location/screens/location_permission_screen.dart';
 
 /// Persists that the user saw the in-app location explanation and chose to continue
 /// (so we only show it once before the first system permission prompt).
@@ -59,27 +60,9 @@ class LocationService extends GetxController {
     if (context == null || !context.mounted) {
       return true;
     }
-    final accepted = await Get.dialog<bool>(
-      AlertDialog(
-        title: const Text('Location'),
-        content: const Text(
-          'Sarri Ride uses your location to show the map, set pickups and destinations, and match you with rides. You can change this anytime in Settings.',
-        ),
-        actions: [
-          TextButton(
-            // onPressed: () => Get.back(result: false),
-            onPressed: () =>  Navigator.of(Get.context!).pop(false),
-            child: const Text('Not now'),
-          ),
-          ElevatedButton(
-            onPressed: () =>  Navigator.of(Get.context!).pop(true),
-            // onPressed: () => Get.back(result: true),
-            style: ElevatedButton.styleFrom(backgroundColor: TColors.primary),
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
-      barrierDismissible: false,
+    final accepted = await Get.to<bool>(
+      () => const LocationPermissionScreen(),
+      transition: Transition.fadeIn,
     );
     if (accepted != true) {
       return false;
