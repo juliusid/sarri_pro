@@ -1485,6 +1485,21 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
       return;
     }
     if (isBooking.value) return; // FIX: Prevent double clicks
+    
+    // Ensure we have location access since the user is actively initiating a booking
+    bool hasLocation = await _locationService.ensureLocationAvailable(isUserInitiated: true);
+    if (!hasLocation) {
+      return; // The service handles showing the error/settings dialog
+    }
+
+    // Refresh accurate location just before booking if using 'Current Location'
+    if (pickupName.value.toLowerCase().contains("current location")) {
+      final pos = await _locationService.getCurrentLocation(isUserInitiated: true);
+      if (pos != null) {
+        pickupLocation.value = LatLng(pos.latitude, pos.longitude);
+      }
+    }
+
     if (pickupLocation.value == null || destinationLocation.value == null) {
       THelperFunctions.showSnackBar('Pickup or destination is missing.');
       return;
