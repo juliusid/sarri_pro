@@ -27,6 +27,19 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+
+    plugins.configureEach {
+        if (this is com.android.build.gradle.api.AndroidBasePlugin) {
+            val android = project.extensions.getByName("android") as com.android.build.gradle.BaseExtension
+            
+            // Fix missing namespaces for AGP 8.0+
+            if (android.namespace == null) {
+                val group = project.group.toString()
+                val name = project.name
+                android.namespace = if (group.isNotEmpty()) "$group.$name" else "com.sarri.$name"
+            }
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {

@@ -78,7 +78,7 @@ class _SplashScreenState extends State<SplashScreen>
     final minimumSplashDuration = Future.delayed(const Duration(seconds: 3));
 
     // 2. Inject LocationService (but do not initialize/request permission yet)
-    Get.put(LocationService());
+    final locationService = Get.put(LocationService());
 
     // 3. Wait for the splash duration to finish.
     await minimumSplashDuration;
@@ -86,6 +86,10 @@ class _SplashScreenState extends State<SplashScreen>
     // 4. Await notification permission first
     // By doing this here, we ensure it's evaluated sequentially before location
     await NotificationService.instance.init();
+
+    // 5. Start location without blocking navigation (App Store 5.1.1(iv)).
+    // Avoids permission / Settings UI feeling tied to splash; map and ride flows still call ensureLocationAvailable.
+    unawaited(locationService.initialize());
 
     if (mounted) {
       if (AuthService.instance.isAuthenticated) {

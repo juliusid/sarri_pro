@@ -1,14 +1,66 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sarri_ride/features/location/services/location_service.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
-class LocationPermissionScreen extends StatelessWidget {
-  const LocationPermissionScreen({super.key});
+class LocationPermissionScreen extends StatefulWidget {
+  /// If true, will request permission immediately and navigate after user decides
+  /// If false, just shows the educational screen
+  final bool autoRequestPermission;
+
+  const LocationPermissionScreen({
+    super.key,
+    this.autoRequestPermission = false,
+  });
+
+  @override
+  State<LocationPermissionScreen> createState() =>
+      _LocationPermissionScreenState();
+}
+
+class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
+  bool _isProcessing = false;
+
+  Future<void> _handleAllowAccess() async {
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
+
+    try {
+      // Request the permission directly
+      final permission = await Geolocator.requestPermission();
+      debugPrint('Location permission result: $permission');
+      
+      // Simple tap feedback delay
+      await Future.delayed(const Duration(milliseconds: 200));
+      
+      if (mounted) {
+        // Navigate back to previous screen
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      debugPrint('Error requesting location permission: $e');
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleMaybeLater() async {
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
+
+    // Simple tap feedback delay
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    if (mounted) {
+      // Navigate back without requesting permission
+      Navigator.of(context).pop();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,8 +117,8 @@ class LocationPermissionScreen extends StatelessWidget {
               Text(
                 'Enable Location Access',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                  fontWeight: FontWeight.w600,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: TSizes.spaceBtwItems),
@@ -76,9 +128,9 @@ class LocationPermissionScreen extends StatelessWidget {
                 child: Text(
                   'Enable location services to allow the app to find rides near you and navigate efficiently.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: dark ? Colors.grey.shade400 : Colors.grey.shade600,
-                        height: 1.5,
-                      ),
+                    color: dark ? Colors.grey.shade400 : Colors.grey.shade600,
+                    height: 1.5,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -88,43 +140,44 @@ class LocationPermissionScreen extends StatelessWidget {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: () async {
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.setBool('location_education_complete_v1', true);
-                    Get.back();
-                    await Future.delayed(const Duration(milliseconds: 300));
-                    final permission = await Geolocator.requestPermission();
-                    if (permission == LocationPermission.denied ||
-                        permission == LocationPermission.deniedForever) {
-                      THelperFunctions.showSnackBar('Location permissions are denied');
-                    } else {
-                      await LocationService.instance.initialize(isUserInitiated: true);
-                    }
-                  },
+                  onPressed: _isProcessing ? null : _handleAllowAccess,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade50,
-                    foregroundColor: Colors.blue.shade900,
-                    elevation: 0,
+                    backgroundColor: TColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 3,
+                    disabledBackgroundColor: Colors.grey.shade400,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  child: const Text(
-                    'Allow access',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: _isProcessing
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          'Allow access',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: TSizes.spaceBtwItems),
               SizedBox(
                 width: double.infinity,
                 child: TextButton(
-                  onPressed: () => Get.back(),
+                  onPressed: _isProcessing ? null : _handleMaybeLater,
                   style: TextButton.styleFrom(
                     foregroundColor: dark ? Colors.white70 : Colors.black54,
+                    disabledForegroundColor: Colors.grey.shade400,
                   ),
                   child: const Text(
                     'Maybe later',

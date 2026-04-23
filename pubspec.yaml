@@ -67,9 +67,7 @@ dependencies:
   mime: any
   firebase_auth: ^6.3.0
   firebase_core: ^4.6.0
-  sign_in_with_apple: ^4.1.0
-flutter_inappwebview: ^6.0.0
-share_plus: ^10.1.4
+  sign_in_with_apple: ^6.1.1
 
 dependency_overrides:
   flutter_webrtc: ^0.12.9

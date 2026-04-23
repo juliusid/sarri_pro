@@ -50,16 +50,36 @@ class LocationService extends GetxController {
   }
 
   /// In-app explanation before the first system location prompt (App Store 5.1.1).
+  /// Shows a full-screen educational page that handles the permission request.
   Future<bool> _showForegroundLocationEducationIfNeeded() async {
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getBool(_kLocationEducationComplete) == true) {
       return true;
     }
-    await Get.to(
-      () => const LocationPermissionScreen(),
-      transition: Transition.fadeIn,
-    );
-    return prefs.getBool(_kLocationEducationComplete) == true;
+    final context = Get.context;
+    if (context == null || !context.mounted) {
+      return true;
+    }
+
+    try {
+      // Navigate to the location permission screen as a full page
+      // The screen will handle the permission request internally
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (context) => const LocationPermissionScreen(),
+        ),
+      );
+      
+      // After the user returns from the screen, mark education as complete
+      // (whether they granted permission or not)
+      await prefs.setBool(_kLocationEducationComplete, true);
+      return true;
+    } catch (e) {
+      debugPrint('Error showing location permission screen: $e');
+      // If navigation fails, mark as complete anyway to avoid infinite loop
+      await prefs.setBool(_kLocationEducationComplete, true);
+      return true;
+    }
   }
 
   Future<void> _offerOpenLocationServicesSettings(String message) async {
@@ -70,26 +90,38 @@ class LocationService extends GetxController {
       );
       return;
     }
-    await Get.dialog<void>(
-      AlertDialog(
-        title: const Text('Location Services off'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Not now'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Get.back();
-              Geolocator.openLocationSettings();
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: TColors.primary),
-            child: const Text('Open Settings'),
-          ),
-        ],
-      ),
-    );
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (BuildContext dialogContext) {
+          return AlertDialog(
+            title: const Text('Location Services off'),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Not now'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  Geolocator.openLocationSettings();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: TColors.primary,
+                ),
+                child: const Text('Open Settings'),
+              ),
+            ],
+          );
+        },
+      );
+    } catch (e) {
+      debugPrint('Error showing location services dialog: $e');
+      THelperFunctions.showSnackBar(
+        'Please enable Location Services (GPS) in Settings when you\'re ready.',
+      );
+    }
   }
 
   Future<void> _offerOpenAppSettings({
@@ -103,26 +135,38 @@ class LocationService extends GetxController {
       );
       return;
     }
-    await Get.dialog<void>(
-      AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Not now'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Get.back();
-              Geolocator.openAppSettings();
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: TColors.primary),
-            child: const Text('Open Settings'),
-          ),
-        ],
-      ),
-    );
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (BuildContext dialogContext) {
+          return AlertDialog(
+            title: Text(title),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Not now'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  Geolocator.openAppSettings();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: TColors.primary,
+                ),
+                child: const Text('Open Settings'),
+              ),
+            ],
+          );
+        },
+      );
+    } catch (e) {
+      debugPrint('Error showing app settings dialog: $e');
+      THelperFunctions.showSnackBar(
+        'Location is turned off for this app. You can enable it in Settings when you\'re ready.',
+      );
+    }
   }
 
   /// --- 1. GET POSITION STREAM (THE GOOGLE REQUIREMENT) ---
@@ -352,13 +396,19 @@ class LocationService extends GetxController {
   }
 
   /// --- 3. INITIALIZATION ---
-  Future<void> initialize({bool isDriver = false, bool isUserInitiated = false}) async {
+  Future<void> initialize({
+    bool isDriver = false,
+    bool isUserInitiated = false,
+  }) async {
     _isLocationLoading.value = true;
     _locationStatus.value = 'Verifying GPS...';
     update();
 
     try {
-      bool isReady = await ensureLocationAvailable(isDriver: isDriver, isUserInitiated: isUserInitiated);
+      bool isReady = await ensureLocationAvailable(
+        isDriver: isDriver,
+        isUserInitiated: isUserInitiated,
+      );
       if (!isReady) {
         _isLocationLoading.value = false;
         update();
@@ -393,8 +443,14 @@ class LocationService extends GetxController {
   }
 
   /// --- 4. GET CURRENT LOCATION ---
-  Future<Position?> getCurrentLocation({bool isDriver = false, bool isUserInitiated = false}) async {
-    bool isReady = await ensureLocationAvailable(isDriver: isDriver, isUserInitiated: isUserInitiated);
+  Future<Position?> getCurrentLocation({
+    bool isDriver = false,
+    bool isUserInitiated = false,
+  }) async {
+    bool isReady = await ensureLocationAvailable(
+      isDriver: isDriver,
+      isUserInitiated: isUserInitiated,
+    );
     if (!isReady) return _currentPosition.value ?? _defaultPosition;
 
     try {
