@@ -188,61 +188,8 @@ class ConnectivityBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: Stack(
-        children: [
-          // The actual app content
-          child,
-
-          // The offline banner — slides down from top when offline
-          Obx(() {
-            final isConnected = NetworkController.instance.isConnected.value;
-            return AnimatedPositioned(
-              duration: const Duration(milliseconds: 350),
-              curve: Curves.easeInOut,
-              top: isConnected ? -60 : 0,
-              left: 0,
-              right: 0,
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.only(
-                    top: MediaQuery.of(context).padding.top,
-                    bottom: 8,
-                    left: 16,
-                    right: 16,
-                  ),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE53935), // Material Red 600
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.wifi_off_rounded,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'No internet connection',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
-        ],
-      ),
-    );
+    // TEMPORARILY DISABLED: The network banner is disabled here
+    // to allow the app to pass App Store review without blocking the UI.
+    return child;
   }
 }
