@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -30,8 +31,7 @@ class NetworkController extends GetxController {
     _setupConnectivityListener();
     _checkInitialConnection();
 
-    // Periodic verification every 5 seconds with HTTP validation
-    // This catches edge cases in Release builds where connectivity_plus fails
+    // Periodic verification every 5 seconds
     _periodicCheckTimer = Timer.periodic(
       const Duration(seconds: 5),
       (_) => _performPeriodicCheck(),
@@ -49,7 +49,6 @@ class NetworkController extends GetxController {
           debugPrint(
             '[NetworkController] Stream error: $error - assuming connected',
           );
-          // On stream error, assume we have connection (better UX)
           isConnected.value = true;
         },
       );
@@ -63,20 +62,14 @@ class NetworkController extends GetxController {
   Future<void> _checkInitialConnection() async {
     try {
       final results = await _connectivity.checkConnectivity();
-      _lastRawConnectivityStatus =
-          results.isNotEmpty && !results.contains(ConnectivityResult.none);
+      _lastRawConnectivityStatus = !results.contains(ConnectivityResult.none);
 
       debugPrint(
         '[NetworkController] Initial check: $_lastRawConnectivityStatus',
       );
 
-      if (_lastRawConnectivityStatus) {
-        // If raw connectivity says yes, validate with HTTP
-        await _validateWithHttpPing();
-      } else {
-        // If raw connectivity says no, update immediately
-        _updateConnectionStatus(false);
-      }
+      // Always validate on init
+      await _validateWithHttpPing();
     } catch (e) {
       debugPrint('[NetworkController] Initial check failed: $e');
       isConnected.value = true;
@@ -85,46 +78,34 @@ class NetworkController extends GetxController {
 
   /// Handle real-time connectivity changes from stream
   void _handleConnectivityChanged(List<ConnectivityResult> results) {
-    final hasRawConnection =
-        results.isNotEmpty && !results.contains(ConnectivityResult.none);
+    final hasRawConnection = !results.contains(ConnectivityResult.none);
 
     debugPrint(
       '[NetworkController] Raw connectivity changed: $hasRawConnection',
     );
     _lastRawConnectivityStatus = hasRawConnection;
 
-    if (!hasRawConnection) {
-      // If no connectivity, update immediately (no debounce needed)
-      _updateConnectionStatus(false);
-    } else {
-      // If connectivity available, validate before updating
-      _validateWithHttpPing();
-    }
+    // Do not blindly trust 'false' on iOS release due to known connectivity_plus bugs.
+    // Always validate actual internet access.
+    _validateWithHttpPing();
   }
 
   /// Periodic validation combining native connectivity + HTTP check
   Future<void> _performPeriodicCheck() async {
     try {
       final results = await _connectivity.checkConnectivity();
-      final hasRawConnection =
-          results.isNotEmpty && !results.contains(ConnectivityResult.none);
+      _lastRawConnectivityStatus = !results.contains(ConnectivityResult.none);
 
       _validationAttempts++;
 
-      // Log every 10th check to avoid spam
       if (_validationAttempts % 10 == 0) {
         debugPrint(
-          '[NetworkController] Periodic check #$_validationAttempts: Raw=$hasRawConnection, Current=${isConnected.value}',
+          '[NetworkController] Periodic check #$_validationAttempts: Raw=$_lastRawConnectivityStatus, Current=${isConnected.value}',
         );
       }
 
-      if (!hasRawConnection) {
-        _updateConnectionStatus(false);
-      } else if (isConnected.value == false) {
-        // If we thought we were offline but now have connectivity, validate
-        await _validateWithHttpPing();
-      }
-      // If both are true, no change needed
+      // Periodically validate to catch any missed stream events or state mismatches
+      await _validateWithHttpPing();
     } catch (e) {
       if (_validationAttempts % 10 == 0) {
         debugPrint('[NetworkController] Periodic check error: $e');
@@ -132,29 +113,36 @@ class NetworkController extends GetxController {
     }
   }
 
-  /// Validate actual internet connectivity via HTTP ping
-  /// Uses public endpoints as fallback (doesn't depend on your API)
+  /// Validate actual internet connectivity via DNS and HTTP fallback
   Future<void> _validateWithHttpPing() async {
-    try {
-      // Try a lightweight HTTP HEAD check to google.com
-      // Most reliable for detecting actual internet connectivity
-      final response = await http
-          .head(
-            Uri.parse('https://www.google.com'),
-            headers: {'User-Agent': 'SarriRide/1.0.0'},
-          )
-          .timeout(const Duration(seconds: 5));
+    bool isOnline = false;
 
-      final isOnline = response.statusCode < 500; // Any 2xx-4xx is online
-      debugPrint(
-        '[NetworkController] HTTP validation: $isOnline (${response.statusCode})',
-      );
-      _updateConnectionStatus(isOnline);
-    } catch (e) {
-      // If HTTP check times out or fails, fall back to raw connectivity
-      debugPrint(
-        '[NetworkController] HTTP validation failed: $e - using raw status',
-      );
+    try {
+      // 1. Try DNS lookup first - extremely fast and reliable for checking real internet
+      final result = await InternetAddress.lookup('google.com')
+          .timeout(const Duration(seconds: 3));
+      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+        isOnline = true;
+      }
+    } catch (_) {
+      // 2. Fallback to HTTP if DNS fails
+      try {
+        final response = await http
+            .head(
+              Uri.parse('https://www.google.com'),
+              headers: {'User-Agent': 'SarriRide/1.0.0'},
+            )
+            .timeout(const Duration(seconds: 3));
+        isOnline = response.statusCode < 500; // Any 2xx-4xx is online
+      } catch (e) {
+        debugPrint('[NetworkController] Validation checks failed: $e');
+      }
+    }
+
+    if (isOnline) {
+      _updateConnectionStatus(true);
+    } else {
+      // If validation fails entirely, fall back to raw status
       _updateConnectionStatus(_lastRawConnectivityStatus);
     }
   }
