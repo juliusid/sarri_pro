@@ -69,7 +69,7 @@ class LocationService extends GetxController {
           builder: (context) => const LocationPermissionScreen(),
         ),
       );
-      
+
       // After the user returns from the screen, mark education as complete
       // (whether they granted permission or not)
       await prefs.setBool(_kLocationEducationComplete, true);

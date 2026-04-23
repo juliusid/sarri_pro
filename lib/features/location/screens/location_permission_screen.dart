@@ -30,10 +30,10 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
       // Request the permission directly
       final permission = await Geolocator.requestPermission();
       debugPrint('Location permission result: $permission');
-      
+
       // Simple tap feedback delay
       await Future.delayed(const Duration(milliseconds: 200));
-      
+
       if (mounted) {
         // Navigate back to previous screen
         Navigator.of(context).pop();
@@ -42,9 +42,9 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
       debugPrint('Error requesting location permission: $e');
       if (mounted) {
         setState(() => _isProcessing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
