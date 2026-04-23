@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:http/http.dart' as http;
 
 class NetworkController extends GetxController {
   static NetworkController get instance => Get.find();
@@ -10,42 +12,182 @@ class NetworkController extends GetxController {
   late StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
   final RxBool isConnected = true.obs;
 
-  /// Debounce timer to avoid acting on brief connectivity flickers.
+  /// Debounce timer to avoid acting on brief connectivity flickers
   Timer? _debounceTimer;
+
+  /// Periodic check to ensure status stays accurate
+  Timer? _periodicCheckTimer;
+
+  /// Tracks last known raw connectivity status (before debounce)
+  bool _lastRawConnectivityStatus = true;
+
+  /// Debug: tracks validation attempts
+  int _validationAttempts = 0;
 
   @override
   void onInit() {
     super.onInit();
-    _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
-      _updateConnectionStatus,
-    );
+    _setupConnectivityListener();
     _checkInitialConnection();
+
+    // Periodic verification every 5 seconds with HTTP validation
+    // This catches edge cases in Release builds where connectivity_plus fails
+    _periodicCheckTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _performPeriodicCheck(),
+    );
+
+    debugPrint('[NetworkController] Initialized with 5-second periodic checks');
   }
 
+  /// Setup stream listener for real-time connectivity changes
+  void _setupConnectivityListener() {
+    try {
+      _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
+        _handleConnectivityChanged,
+        onError: (error) {
+          debugPrint(
+            '[NetworkController] Stream error: $error - assuming connected',
+          );
+          // On stream error, assume we have connection (better UX)
+          isConnected.value = true;
+        },
+      );
+    } catch (e) {
+      debugPrint('[NetworkController] Failed to setup listener: $e');
+      isConnected.value = true;
+    }
+  }
+
+  /// Check initial connection state
   Future<void> _checkInitialConnection() async {
-    final results = await _connectivity.checkConnectivity();
-    _updateConnectionStatus(results);
+    try {
+      final results = await _connectivity.checkConnectivity();
+      _lastRawConnectivityStatus =
+          results.isNotEmpty && !results.contains(ConnectivityResult.none);
+
+      debugPrint(
+        '[NetworkController] Initial check: $_lastRawConnectivityStatus',
+      );
+
+      if (_lastRawConnectivityStatus) {
+        // If raw connectivity says yes, validate with HTTP
+        await _validateWithHttpPing();
+      } else {
+        // If raw connectivity says no, update immediately
+        _updateConnectionStatus(false);
+      }
+    } catch (e) {
+      debugPrint('[NetworkController] Initial check failed: $e');
+      isConnected.value = true;
+    }
   }
 
-  void _updateConnectionStatus(List<ConnectivityResult> results) {
-    bool hasConnection = !results.contains(ConnectivityResult.none);
+  /// Handle real-time connectivity changes from stream
+  void _handleConnectivityChanged(List<ConnectivityResult> results) {
+    final hasRawConnection =
+        results.isNotEmpty && !results.contains(ConnectivityResult.none);
 
+    debugPrint(
+      '[NetworkController] Raw connectivity changed: $hasRawConnection',
+    );
+    _lastRawConnectivityStatus = hasRawConnection;
+
+    if (!hasRawConnection) {
+      // If no connectivity, update immediately (no debounce needed)
+      _updateConnectionStatus(false);
+    } else {
+      // If connectivity available, validate before updating
+      _validateWithHttpPing();
+    }
+  }
+
+  /// Periodic validation combining native connectivity + HTTP check
+  Future<void> _performPeriodicCheck() async {
+    try {
+      final results = await _connectivity.checkConnectivity();
+      final hasRawConnection =
+          results.isNotEmpty && !results.contains(ConnectivityResult.none);
+
+      _validationAttempts++;
+
+      // Log every 10th check to avoid spam
+      if (_validationAttempts % 10 == 0) {
+        debugPrint(
+          '[NetworkController] Periodic check #$_validationAttempts: Raw=$hasRawConnection, Current=${isConnected.value}',
+        );
+      }
+
+      if (!hasRawConnection) {
+        _updateConnectionStatus(false);
+      } else if (isConnected.value == false) {
+        // If we thought we were offline but now have connectivity, validate
+        await _validateWithHttpPing();
+      }
+      // If both are true, no change needed
+    } catch (e) {
+      if (_validationAttempts % 10 == 0) {
+        debugPrint('[NetworkController] Periodic check error: $e');
+      }
+    }
+  }
+
+  /// Validate actual internet connectivity via HTTP ping
+  /// Uses public endpoints as fallback (doesn't depend on your API)
+  Future<void> _validateWithHttpPing() async {
+    try {
+      // Try a lightweight HTTP HEAD check to google.com
+      // Most reliable for detecting actual internet connectivity
+      final response = await http
+          .head(
+            Uri.parse('https://www.google.com'),
+            headers: {'User-Agent': 'SarriRide/1.0.0'},
+          )
+          .timeout(const Duration(seconds: 5));
+
+      final isOnline = response.statusCode < 500; // Any 2xx-4xx is online
+      debugPrint(
+        '[NetworkController] HTTP validation: $isOnline (${response.statusCode})',
+      );
+      _updateConnectionStatus(isOnline);
+    } catch (e) {
+      // If HTTP check times out or fails, fall back to raw connectivity
+      debugPrint(
+        '[NetworkController] HTTP validation failed: $e - using raw status',
+      );
+      _updateConnectionStatus(_lastRawConnectivityStatus);
+    }
+  }
+
+  /// Update connection status with smart debounce logic
+  void _updateConnectionStatus(bool hasConnection) {
+    // Cancel any pending debounce timer
     _debounceTimer?.cancel();
 
     if (!hasConnection) {
-      // Wait 2s before declaring offline to avoid false positives.
-      _debounceTimer = Timer(const Duration(seconds: 2), () {
-        isConnected.value = false;
+      // Wait 3s before declaring offline to avoid false positives
+      // (handles network handovers, WiFi-to-cellular, etc.)
+      _debounceTimer = Timer(const Duration(seconds: 3), () {
+        if (isConnected.value != false) {
+          debugPrint('[NetworkController] ⚠️  Status changed: OFFLINE');
+          isConnected.value = false;
+        }
       });
     } else {
-      isConnected.value = true;
+      // Online: update immediately for better UX
+      if (isConnected.value != true) {
+        debugPrint('[NetworkController] ✅ Status changed: ONLINE');
+        isConnected.value = true;
+      }
     }
   }
 
   @override
   void onClose() {
     _debounceTimer?.cancel();
+    _periodicCheckTimer?.cancel();
     _connectivitySubscription.cancel();
+    debugPrint('[NetworkController] Disposed');
     super.onClose();
   }
 }
