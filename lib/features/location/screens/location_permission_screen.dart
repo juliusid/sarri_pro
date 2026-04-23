@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sarri_ride/features/location/services/location_service.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
@@ -85,7 +88,19 @@ class LocationPermissionScreen extends StatelessWidget {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: () => Get.back(result: true),
+                  onPressed: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setBool('location_education_complete_v1', true);
+                    Get.back();
+                    await Future.delayed(const Duration(milliseconds: 300));
+                    final permission = await Geolocator.requestPermission();
+                    if (permission == LocationPermission.denied ||
+                        permission == LocationPermission.deniedForever) {
+                      THelperFunctions.showSnackBar('Location permissions are denied');
+                    } else {
+                      await LocationService.instance.initialize(isUserInitiated: true);
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue.shade50,
                     foregroundColor: Colors.blue.shade900,
@@ -107,7 +122,7 @@ class LocationPermissionScreen extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: TextButton(
-                  onPressed: () => Get.back(result: false),
+                  onPressed: () => Get.back(),
                   style: TextButton.styleFrom(
                     foregroundColor: dark ? Colors.white70 : Colors.black54,
                   ),

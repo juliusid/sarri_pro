@@ -50,25 +50,16 @@ class LocationService extends GetxController {
   }
 
   /// In-app explanation before the first system location prompt (App Store 5.1.1).
-  /// Returns false if the user chooses not to continue (no system dialog).
   Future<bool> _showForegroundLocationEducationIfNeeded() async {
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getBool(_kLocationEducationComplete) == true) {
       return true;
     }
-    final context = Get.context;
-    if (context == null || !context.mounted) {
-      return true;
-    }
-    final accepted = await Get.to<bool>(
+    await Get.to(
       () => const LocationPermissionScreen(),
       transition: Transition.fadeIn,
     );
-    if (accepted != true) {
-      return false;
-    }
-    await prefs.setBool(_kLocationEducationComplete, true);
-    return true;
+    return prefs.getBool(_kLocationEducationComplete) == true;
   }
 
   Future<void> _offerOpenLocationServicesSettings(String message) async {
