@@ -1,5 +1,7 @@
 // lib/features/authentication/screens/login/login_screen_getx.dart
 
+import 'dart:io' show Platform;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -8,6 +10,7 @@ import 'package:sarri_ride/features/authentication/controllers/login_controller.
 import 'package:sarri_ride/features/authentication/screens/user_type_selection/user_type_selection_screen.dart';
 import 'package:sarri_ride/features/authentication/widgets/google_button.dart';
 import 'package:sarri_ride/features/authentication/widgets/apple_button.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
@@ -29,12 +32,36 @@ class LoginScreenGetX extends StatefulWidget {
 class _LoginScreenGetXState extends State<LoginScreenGetX> {
   // --- MANUALLY CREATE AND MANAGE THE CONTROLLER ---
   late final LoginController controller;
+  bool _isAppleSignInAvailable = false;
 
   @override
   void initState() {
     super.initState();
     // Create a fresh instance of the controller every time the screen is initialized
     controller = Get.put(LoginController());
+    // Check Apple Sign-In availability asynchronously
+    _checkAppleSignInAvailability();
+  }
+
+  Future<void> _checkAppleSignInAvailability() async {
+    if (Platform.isIOS) {
+      try {
+        final available = await SignInWithApple.isAvailable();
+        if (mounted) {
+          setState(() {
+            _isAppleSignInAvailable = available;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error checking Apple Sign-In availability: $e');
+        // On error, still show the button (let the handler deal with it)
+        if (mounted) {
+          setState(() {
+            _isAppleSignInAvailable = true;
+          });
+        }
+      }
+    }
   }
 
   @override
@@ -257,8 +284,8 @@ class _LoginScreenGetXState extends State<LoginScreenGetX> {
                       ),
                     ),
                     const SizedBox(height: TSizes.spaceBtwItems),
-                    // Show Apple Sign-In only on iOS
-                    if (GetPlatform.isIOS)
+                    // Show Apple Sign-In only on iOS when available
+                    if (_isAppleSignInAvailable)
                       Obx(
                         () => AppleSignInButton(
                           isLoading: controller.isAppleLoading.value,

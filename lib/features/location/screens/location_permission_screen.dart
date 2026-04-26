@@ -49,19 +49,6 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
     }
   }
 
-  Future<void> _handleMaybeLater() async {
-    if (_isProcessing) return;
-    setState(() => _isProcessing = true);
-
-    // Simple tap feedback delay
-    await Future.delayed(const Duration(milliseconds: 200));
-
-    if (mounted) {
-      // Navigate back without requesting permission
-      Navigator.of(context).pop();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
@@ -162,27 +149,12 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
                           ),
                         )
                       : const Text(
-                          'Allow access',
+                          'Continue',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                ),
-              ),
-              const SizedBox(height: TSizes.spaceBtwItems),
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: _isProcessing ? null : _handleMaybeLater,
-                  style: TextButton.styleFrom(
-                    foregroundColor: dark ? Colors.white70 : Colors.black54,
-                    disabledForegroundColor: Colors.grey.shade400,
-                  ),
-                  child: const Text(
-                    'Maybe later',
-                    style: TextStyle(fontSize: 16),
-                  ),
                 ),
               ),
               const SizedBox(height: TSizes.sm),

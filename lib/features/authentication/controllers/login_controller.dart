@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -212,7 +213,7 @@ class LoginController extends GetxController {
       // I extracted this ID from the google-services.json you sent me.
       // It is the "Web client (auto created by Google Service)"
       final googleSignIn = GoogleSignIn(
-        clientId: GetPlatform.isIOS ? '566802818676-af50fhe86j05gsf22vcrpu5o25re8g0h.apps.googleusercontent.com' : null,
+        clientId: Platform.isIOS ? '566802818676-af50fhe86j05gsf22vcrpu5o25re8g0h.apps.googleusercontent.com' : null,
         serverClientId:
             '566802818676-kuc13au4v6ifp3oe6qimcdp78s84fnnd.apps.googleusercontent.com',
         scopes: ['email', 'profile'],
@@ -291,6 +292,10 @@ class LoginController extends GetxController {
             'Google did not return a token.',
           );
         }
+      } else {
+        // googleUser is null, which typically means the user canceled the sign-in
+        debugPrint('Google Sign-In canceled by user or returned null.');
+        THelperFunctions.showSnackBar('Google Sign-In canceled.');
       }
     } catch (e) {
       THelperFunctions.showErrorSnackBar(
@@ -315,6 +320,17 @@ class LoginController extends GetxController {
 
     isAppleLoading.value = true;
     try {
+      // Check if Sign in with Apple is available on this device/build
+      final isAvailable = await SignInWithApple.isAvailable();
+      if (!isAvailable) {
+        THelperFunctions.showErrorSnackBar(
+          'Not Available',
+          'Sign in with Apple is not available on this device. Please use another sign-in method.',
+        );
+        isAppleLoading.value = false;
+        return;
+      }
+
       final credential = await SignInWithApple.getAppleIDCredential(
         scopes: [
           AppleIDAuthorizationScopes.email,
@@ -330,10 +346,8 @@ class LoginController extends GetxController {
         final familyName = credential.familyName;
         final email = credential.email;
 
-        print('APPLE SIGN-IN: identityToken received: ${identityToken.substring(0, 20)}...');
-        print('APPLE SIGN-IN: givenName: $givenName');
-        print('APPLE SIGN-IN: familyName: $familyName');
-        print('APPLE SIGN-IN: email: $email');
+        debugPrint('APPLE SIGN-IN: identityToken received: ${identityToken.substring(0, 20)}...');
+        debugPrint('APPLE SIGN-IN: givenName: $givenName, familyName: $familyName, email: $email');
 
         // Only send user object if we have actual data (Apple only provides name/email on first sign-in)
         Map<String, dynamic>? userPayload;
@@ -345,17 +359,12 @@ class LoginController extends GetxController {
             },
             'email': email ?? '',
           };
-          print('APPLE SIGN-IN: Sending user payload: $userPayload');
-        } else {
-          print('APPLE SIGN-IN: No user data provided (subsequent sign-in)');
         }
 
         final loginResult = await AuthService.instance.loginWithApple(
           identityToken,
           user: userPayload,
         );
-
-        print('APPLE SIGN-IN: Backend response - success: ${loginResult.success}, error: ${loginResult.error}');
 
         if (loginResult.success && loginResult.client != null) {
           if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
@@ -394,22 +403,49 @@ class LoginController extends GetxController {
       } else {
         THelperFunctions.showErrorSnackBar(
           'Error',
-          'Apple did not return a token.',
+          'Apple did not return a token. Please try again.',
         );
       }
-    } catch (e) {
-      if (e is SignInWithAppleAuthorizationException &&
-          e.code == AuthorizationErrorCode.canceled) {
-        print('Apple Sign-In canceled by user.');
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        // User cancelled - no error needed, just reset loading
+        debugPrint('Apple Sign-In: User cancelled.');
+      } else if (e.code == AuthorizationErrorCode.failed) {
+        THelperFunctions.showErrorSnackBar(
+          'Sign In Failed',
+          'Apple Sign-In failed. Please check that Sign in with Apple is enabled in your device Settings > [Your Name] > Password & Security.',
+        );
+        debugPrint('Apple Sign-In failed: ${e.message}');
+      } else if (e.code == AuthorizationErrorCode.notHandled) {
+        THelperFunctions.showErrorSnackBar(
+          'Sign In Error',
+          'The sign-in request was not handled. Please try again.',
+        );
+        debugPrint('Apple Sign-In not handled: ${e.message}');
+      } else if (e.code == AuthorizationErrorCode.notInteractive) {
+        THelperFunctions.showErrorSnackBar(
+          'Sign In Error',
+          'Apple Sign-In requires interaction. Please try again.',
+        );
+        debugPrint('Apple Sign-In not interactive: ${e.message}');
       } else {
         THelperFunctions.showErrorSnackBar(
-          'Error',
-          'Apple login failed: ${e.toString()}',
+          'Sign In Error',
+          'Apple Sign-In error: ${e.message}',
         );
+        debugPrint('Apple Sign-In unknown error: ${e.code} - ${e.message}');
       }
-      print('Apple Sign-In Error: $e');
+    } catch (e, stackTrace) {
+      THelperFunctions.showErrorSnackBar(
+        'Error',
+        'Apple login failed. Please try again or use another sign-in method.',
+      );
+      debugPrint('Apple Sign-In unexpected error: $e');
+      debugPrint('Stack trace: $stackTrace');
     } finally {
-      isAppleLoading.value = false;
+      if (!isClosed) {
+        isAppleLoading.value = false;
+      }
     }
   }
 
