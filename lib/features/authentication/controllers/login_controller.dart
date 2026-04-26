@@ -213,7 +213,9 @@ class LoginController extends GetxController {
       // I extracted this ID from the google-services.json you sent me.
       // It is the "Web client (auto created by Google Service)"
       final googleSignIn = GoogleSignIn(
-        clientId: Platform.isIOS ? '566802818676-af50fhe86j05gsf22vcrpu5o25re8g0h.apps.googleusercontent.com' : null,
+        clientId: Platform.isIOS
+            ? '566802818676-af50fhe86j05gsf22vcrpu5o25re8g0h.apps.googleusercontent.com'
+            : null,
         serverClientId:
             '566802818676-kuc13au4v6ifp3oe6qimcdp78s84fnnd.apps.googleusercontent.com',
         scopes: ['email', 'profile'],
@@ -346,8 +348,12 @@ class LoginController extends GetxController {
         final familyName = credential.familyName;
         final email = credential.email;
 
-        debugPrint('APPLE SIGN-IN: identityToken received: ${identityToken.substring(0, 20)}...');
-        debugPrint('APPLE SIGN-IN: givenName: $givenName, familyName: $familyName, email: $email');
+        debugPrint(
+          'APPLE SIGN-IN: identityToken received: ${identityToken.substring(0, 20)}...',
+        );
+        debugPrint(
+          'APPLE SIGN-IN: givenName: $givenName, familyName: $familyName, email: $email',
+        );
 
         // Only send user object if we have actual data (Apple only provides name/email on first sign-in)
         Map<String, dynamic>? userPayload;
@@ -361,12 +367,21 @@ class LoginController extends GetxController {
           };
         }
 
+        print("LOGIN_CONTROLLER: Calling AuthService.loginWithApple...");
         final loginResult = await AuthService.instance.loginWithApple(
           identityToken,
           user: userPayload,
         );
 
+        print(
+          "LOGIN_CONTROLLER: loginWithApple returned - Success: ${loginResult.success}, Error: ${loginResult.error}",
+        );
+
         if (loginResult.success && loginResult.client != null) {
+          print(
+            "LOGIN_CONTROLLER: Apple login successful - User email: ${loginResult.client!.email}",
+          );
+
           if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
             Get.delete<ClientData>(tag: 'currentUser', force: true);
           }
@@ -395,18 +410,27 @@ class LoginController extends GetxController {
             THelperFunctions.showSuccessSnackBar('Success', 'Welcome!');
           }
         } else {
-          THelperFunctions.showErrorSnackBar(
-            'Login Failed',
-            loginResult.error ?? 'Server rejected the login.',
+          print(
+            "LOGIN_CONTROLLER: Apple login failed - Error: ${loginResult.error}",
           );
+          final errorMessage =
+              loginResult.error ?? 'Apple Sign-In failed. Please try again.';
+
+          // Ensure error is visible
+          print("LOGIN_CONTROLLER: Showing error snackbar: $errorMessage");
+          THelperFunctions.showErrorSnackBar('Login Failed', errorMessage);
         }
       } else {
+        print("LOGIN_CONTROLLER: No identity token returned from Apple");
         THelperFunctions.showErrorSnackBar(
           'Error',
           'Apple did not return a token. Please try again.',
         );
       }
     } on SignInWithAppleAuthorizationException catch (e) {
+      print(
+        "LOGIN_CONTROLLER: SignInWithAppleAuthorizationException - Code: ${e.code}, Message: ${e.message}",
+      );
       if (e.code == AuthorizationErrorCode.canceled) {
         // User cancelled - no error needed, just reset loading
         debugPrint('Apple Sign-In: User cancelled.');
@@ -436,6 +460,8 @@ class LoginController extends GetxController {
         debugPrint('Apple Sign-In unknown error: ${e.code} - ${e.message}');
       }
     } catch (e, stackTrace) {
+      print("LOGIN_CONTROLLER: Unexpected Apple Sign-In error: $e");
+      print("LOGIN_CONTROLLER: Stack trace: $stackTrace");
       THelperFunctions.showErrorSnackBar(
         'Error',
         'Apple login failed. Please try again or use another sign-in method.',

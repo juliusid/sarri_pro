@@ -282,10 +282,21 @@ class AuthService extends GetxService {
         body['user'] = user;
       }
 
+      print("AUTH_SERVICE: Attempting Apple Sign-In...");
+      print("AUTH_SERVICE: Apple endpoint: ${ApiConfig.appleAuthEndpoint}");
+      print(
+        "AUTH_SERVICE: Sending identity token (first 20 chars): ${identityToken.substring(0, 20)}...",
+      );
+
       final response = await _httpService.post(
         ApiConfig.appleAuthEndpoint,
         body: body,
       );
+
+      print(
+        "AUTH_SERVICE: Apple Sign-In response received - Status: ${response.statusCode}",
+      );
+      print("AUTH_SERVICE: Apple Sign-In response body: ${response.body}");
 
       final responseData = _httpService.handleResponse(response);
       final loginResponse = LoginResponse.fromJson(responseData);
@@ -296,18 +307,53 @@ class AuthService extends GetxService {
           loginResponse.accessToken!,
           loginResponse.refreshToken,
         );
+        print(
+          "AUTH_SERVICE: Apple Sign-In successful - User: ${loginResponse.client?.email}",
+        );
         return AuthResult.success(
           message: loginResponse.message,
           client: loginResponse.client,
         );
       } else {
-        return AuthResult.error(loginResponse.message);
+        // Provide meaningful error message
+        String errorMsg = loginResponse.message;
+        if (errorMsg.isEmpty) {
+          errorMsg =
+              'Apple Sign-In failed. Please check your Apple ID account and try again.';
+        }
+        print("AUTH_SERVICE: Apple Sign-In failed - Error: $errorMsg");
+        return AuthResult.error(errorMsg);
       }
     } catch (e) {
       if (e is ApiException) {
-        return AuthResult.error(e.message);
+        print(
+          "AUTH_SERVICE: Apple Sign-In - ApiException: ${e.message} (Status: ${e.statusCode})",
+        );
+
+        // Provide context-specific error messages
+        String errorMsg = e.message;
+        if (errorMsg.isEmpty || errorMsg.contains('Unknown error')) {
+          if (e.statusCode == 401 || e.statusCode == 403) {
+            errorMsg =
+                'Apple ID authentication failed. Please verify your Apple ID settings.';
+          } else if (e.statusCode == 500) {
+            errorMsg = 'Server error. Please try again later.';
+          } else if (e.statusCode == 503) {
+            errorMsg =
+                'Service temporarily unavailable. Please check your internet connection.';
+          } else {
+            errorMsg = 'Apple Sign-In failed. Please try again.';
+          }
+        }
+        return AuthResult.error(errorMsg);
       }
-      return AuthResult.error('An unknown error occurred: ${e.toString()}');
+
+      print("AUTH_SERVICE: Apple Sign-In - Unknown error: $e");
+      String errorMsg = e.toString();
+      if (errorMsg.isEmpty) {
+        errorMsg = 'An unexpected error occurred during Apple Sign-In.';
+      }
+      return AuthResult.error(errorMsg);
     }
   }
 

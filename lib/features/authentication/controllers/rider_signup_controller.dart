@@ -211,7 +211,9 @@ class RiderSignupController extends GetxController {
     isGoogleLoading.value = true;
     try {
       final googleSignIn = GoogleSignIn(
-        clientId: Platform.isIOS ? '566802818676-af50fhe86j05gsf22vcrpu5o25re8g0h.apps.googleusercontent.com' : null,
+        clientId: Platform.isIOS
+            ? '566802818676-af50fhe86j05gsf22vcrpu5o25re8g0h.apps.googleusercontent.com'
+            : null,
         serverClientId:
             '566802818676-kuc13au4v6ifp3oe6qimcdp78s84fnnd.apps.googleusercontent.com',
         scopes: ['email', 'profile'],
@@ -325,8 +327,12 @@ class RiderSignupController extends GetxController {
         final familyName = credential.familyName;
         final email = credential.email;
 
-        debugPrint('APPLE SIGNUP: identityToken received: ${identityToken.substring(0, 20)}...');
-        debugPrint('APPLE SIGNUP: givenName: $givenName, familyName: $familyName, email: $email');
+        debugPrint(
+          'APPLE SIGNUP: identityToken received: ${identityToken.substring(0, 20)}...',
+        );
+        debugPrint(
+          'APPLE SIGNUP: givenName: $givenName, familyName: $familyName, email: $email',
+        );
 
         // Only send user object if we have actual data (Apple only provides name/email on first sign-in)
         Map<String, dynamic>? userPayload;
@@ -340,12 +346,21 @@ class RiderSignupController extends GetxController {
           };
         }
 
+        print("RIDER_SIGNUP_CONTROLLER: Calling AuthService.loginWithApple...");
         final loginResult = await AuthService.instance.loginWithApple(
           identityToken,
           user: userPayload,
         );
 
+        print(
+          "RIDER_SIGNUP_CONTROLLER: loginWithApple returned - Success: ${loginResult.success}, Error: ${loginResult.error}",
+        );
+
         if (loginResult.success && loginResult.client != null) {
+          print(
+            "RIDER_SIGNUP_CONTROLLER: Apple signup successful - User email: ${loginResult.client!.email}",
+          );
+
           if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
             Get.delete<ClientData>(tag: 'currentUser', force: true);
           }
@@ -367,6 +382,7 @@ class RiderSignupController extends GetxController {
               .refreshTokenImmediately(isDriver: false, userId: userId);
 
           if (!refreshSuccess) {
+            print("RIDER_SIGNUP_CONTROLLER: Token refresh failed");
             isAppleLoading.value = false;
             return;
           }
@@ -382,18 +398,26 @@ class RiderSignupController extends GetxController {
             THelperFunctions.showSuccessSnackBar('Success', 'Welcome!');
           }
         } else {
-          THelperFunctions.showErrorSnackBar(
-            'Error',
-            loginResult.error ?? 'Apple signup failed.',
+          print(
+            "RIDER_SIGNUP_CONTROLLER: Apple signup failed - Error: ${loginResult.error}",
           );
+          final errorMessage = loginResult.error ?? 'Apple signup failed.';
+          print(
+            "RIDER_SIGNUP_CONTROLLER: Showing error snackbar: $errorMessage",
+          );
+          THelperFunctions.showErrorSnackBar('Error', errorMessage);
         }
       } else {
+        print("RIDER_SIGNUP_CONTROLLER: No identity token returned from Apple");
         THelperFunctions.showErrorSnackBar(
           'Error',
           'Could not get Apple identity token. Please try again.',
         );
       }
     } on SignInWithAppleAuthorizationException catch (e) {
+      print(
+        "RIDER_SIGNUP_CONTROLLER: SignInWithAppleAuthorizationException - Code: ${e.code}, Message: ${e.message}",
+      );
       if (e.code == AuthorizationErrorCode.canceled) {
         debugPrint('Apple Sign-In: User cancelled.');
       } else if (e.code == AuthorizationErrorCode.failed) {
