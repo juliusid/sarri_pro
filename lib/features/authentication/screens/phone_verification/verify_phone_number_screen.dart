@@ -84,12 +84,12 @@ class VerifyPhoneNumberScreen extends StatelessWidget {
               const SizedBox(height: TSizes.spaceBtwItems),
 
               // Resend OTP
-              TextButton(
+              Obx(() => TextButton(
                 onPressed: controller.isLoading.value
                     ? null
                     : () => controller.resendOtp(),
                 child: const Text('Resend OTP'),
-              ),
+              )),
             ],
           ),
         ),

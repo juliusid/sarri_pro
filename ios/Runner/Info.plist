@@ -44,7 +44,6 @@
 				<string>com.googleusercontent.apps.566802818676-af50fhe86j05gsf22vcrpu5o25re8g0h</string>
 			</array>
 		</dict>
-		<dict/>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
@@ -58,13 +57,6 @@
 	<string>This app needs location access to provide accurate pickup locations and navigation services.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app needs location access to show your current position and help you book rides.</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>This app needs local network access to detect network connectivity.</string>
-	<key>NSBonjourServices</key>
-	<array>
-		<string>_http._tcp</string>
-		<string>_https._tcp</string>
-	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>We need access to your photo library to select a profile picture.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

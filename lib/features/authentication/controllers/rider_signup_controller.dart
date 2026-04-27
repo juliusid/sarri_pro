@@ -419,7 +419,8 @@ class RiderSignupController extends GetxController {
         "RIDER_SIGNUP_CONTROLLER: SignInWithAppleAuthorizationException - Code: ${e.code}, Message: ${e.message}",
       );
       if (e.code == AuthorizationErrorCode.canceled) {
-        debugPrint('Apple Sign-In: User cancelled.');
+        THelperFunctions.showSnackBar('Apple Sign-In Canceled (or OS aborted).');
+        debugPrint('Apple Sign-In: User cancelled or OS aborted.');
       } else if (e.code == AuthorizationErrorCode.failed) {
         THelperFunctions.showErrorSnackBar(
           'Sign In Failed',

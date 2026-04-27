@@ -282,11 +282,15 @@ class LoginController extends GetxController {
             }
           } else {
             // Backend rejected the token
-            await googleSignIn.signOut();
             THelperFunctions.showErrorSnackBar(
               'Login Failed',
               loginResult.error ?? 'Server rejected the login.',
             );
+            try {
+              await googleSignIn.signOut();
+            } catch (e) {
+              print("LOGIN_CONTROLLER: Ignoring signOut error: $e");
+            }
           }
         } else {
           THelperFunctions.showErrorSnackBar(
@@ -432,8 +436,9 @@ class LoginController extends GetxController {
         "LOGIN_CONTROLLER: SignInWithAppleAuthorizationException - Code: ${e.code}, Message: ${e.message}",
       );
       if (e.code == AuthorizationErrorCode.canceled) {
-        // User cancelled - no error needed, just reset loading
-        debugPrint('Apple Sign-In: User cancelled.');
+        // User cancelled or OS aborted - show snackbar for debugging
+        THelperFunctions.showSnackBar('Sign-In cancelled.');
+        debugPrint('Apple Sign-In: User cancelled or OS aborted.');
       } else if (e.code == AuthorizationErrorCode.failed) {
         THelperFunctions.showErrorSnackBar(
           'Sign In Failed',
