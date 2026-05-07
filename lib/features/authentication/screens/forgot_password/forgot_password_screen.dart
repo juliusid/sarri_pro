@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/features/authentication/controllers/forgot_password_controller.dart';
-import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/constants/text_strings.dart';
-import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/utils/validators/validation.dart';
 
 class ForgotPasswordScreen extends StatelessWidget {
@@ -14,19 +12,8 @@ class ForgotPasswordScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.put(ForgotPasswordController());
-    final dark = THelperFunctions.isDarkMode(context);
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Get.back(),
-          icon: Icon(
-            Iconsax.arrow_left_2,
-            color: dark ? TColors.white : TColors.black,
-          ),
-        ),
-      ),
+      appBar: AppBar(),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(TSizes.defaultSpace),

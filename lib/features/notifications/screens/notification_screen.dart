@@ -32,12 +32,23 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Notifications'),
-        leading: IconButton(
-          icon: Icon(
-            Iconsax.arrow_left_2,
-            color: dark ? TColors.white : TColors.black,
+        leading: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Get.back();
+            }
+          },
+          child: Container(
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Icon(
+              Iconsax.arrow_left_2,
+              color: dark ? TColors.white : TColors.black,
+            ),
           ),
-          onPressed: () => Get.back(),
         ),
         actions: [
           Obx(() {

@@ -20,6 +20,20 @@ class RideType {
     required this.seats,
   });
 
+  /// Maps backend category names to localized UI names.
+  String get displayName {
+    switch (name.toLowerCase()) {
+      case 'comfort':
+        return 'Basic';
+      case 'xl':
+        return 'E-Vehicle';
+      case 'luxury':
+        return 'Luxury';
+      default:
+        return name;
+    }
+  }
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -170,7 +184,7 @@ class RideSelectionWidget extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      rideType.name,
+                                      rideType.displayName,
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 16,
@@ -299,7 +313,7 @@ class RideSelectionWidget extends StatelessWidget {
                         elevation: 0,
                       ),
                       child: Text(
-                        'Select ${selectedRideType!.name}',
+                        'Select ${selectedRideType!.displayName}',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,

@@ -39,12 +39,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('Settings'),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          onPressed: () => Get.back(),
-          icon: Icon(
-            Iconsax.arrow_left_2,
-            color: dark ? TColors.light : TColors.dark,
-            size: TSizes.iconLg,
+        leading: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Get.back();
+            }
+          },
+          child: Container(
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Icon(
+              Iconsax.arrow_left_2,
+              color: dark ? TColors.light : TColors.dark,
+            ),
           ),
         ),
       ),
