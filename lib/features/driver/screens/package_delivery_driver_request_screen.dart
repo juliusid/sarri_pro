@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/features/driver/controllers/package_delivery_driver_controller.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
+import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
 class PackageDeliveryDriverRequestScreen extends StatelessWidget {
   const PackageDeliveryDriverRequestScreen({super.key});
@@ -10,10 +11,20 @@ class PackageDeliveryDriverRequestScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<PackageDeliveryDriverController>();
+    final dark = THelperFunctions.isDarkMode(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Package Delivery'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          onPressed: () => Get.back(),
+          icon: Icon(
+            Iconsax.arrow_left_2,
+            color: dark ? TColors.white : TColors.black,
+          ),
+        ),
       ),
       body: Obx(() {
         final step = controller.step.value;
@@ -204,8 +215,9 @@ class PackageDeliveryDriverRequestScreen extends StatelessWidget {
               label: const Text('Confirm Delivery'),
               style: ElevatedButton.styleFrom(backgroundColor: TColors.success),
               onPressed: () async {
-                await controller
-                    .confirmDeliveryWithCode(deliveryCodeController.text);
+                await controller.confirmDeliveryWithCode(
+                  deliveryCodeController.text,
+                );
               },
             ),
           ),
@@ -214,4 +226,3 @@ class PackageDeliveryDriverRequestScreen extends StatelessWidget {
     );
   }
 }
-

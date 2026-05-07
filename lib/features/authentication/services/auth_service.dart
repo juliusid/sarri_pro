@@ -251,6 +251,8 @@ class AuthService extends GetxService {
 
       if (loginResponse.status == "success" &&
           loginResponse.accessToken != null) {
+        // email is normalized in ClientData model
+
         await _httpService.storeTokens(
           loginResponse.accessToken!,
           loginResponse.refreshToken,
@@ -303,6 +305,8 @@ class AuthService extends GetxService {
 
       if (loginResponse.status == 'success' &&
           loginResponse.accessToken != null) {
+        // email is normalized in ClientData model
+
         await _httpService.storeTokens(
           loginResponse.accessToken!,
           loginResponse.refreshToken,
@@ -360,7 +364,9 @@ class AuthService extends GetxService {
   // ---------- VERIFY OTP ----------
   Future<AuthResult> verifyEmail(String email, String otp, String role) async {
     try {
-      final request = VerifyRequest(email: email, otp: otp, role: role);
+      // Normalize email to match backend processing
+      final normalizedEmail = email.trim().toLowerCase();
+      final request = VerifyRequest(email: normalizedEmail, otp: otp, role: role);
 
       final response = await _httpService.post(
         ApiConfig.verifyOtpEndpoint,
@@ -388,7 +394,9 @@ class AuthService extends GetxService {
   // ---------- LOGIN ----------
   Future<AuthResult> login(String email, String password) async {
     try {
-      final request = LoginRequest(email: email, password: password);
+      // Normalize email to match backend processing
+      final normalizedEmail = email.trim().toLowerCase();
+      final request = LoginRequest(email: normalizedEmail, password: password);
 
       final response = await _httpService.post(
         ApiConfig.loginEndpoint,
@@ -421,8 +429,10 @@ class AuthService extends GetxService {
   // ---------- DRIVER LOGIN ----------
   Future<AuthResult> loginDriver(String email, String password) async {
     try {
+      // Normalize email to match backend processing
+      final normalizedEmail = email.trim().toLowerCase();
       final request = LoginRequest(
-        email: email,
+        email: normalizedEmail,
         password: password,
       ); // Reuse the client LoginRequest model
 
@@ -530,9 +540,11 @@ class AuthService extends GetxService {
   // ---------- NEW: SEND REGISTRATION OTP (Unified) ----------
   Future<AuthResult> sendRegistrationOtp(String email, String role) async {
     try {
+      // Normalize email to match backend processing (trim + lowercase)
+      final normalizedEmail = email.trim().toLowerCase();
       final response = await _httpService.post(
         ApiConfig.verifyUserEmailEndpoint,
-        body: {'email': email, 'role': role},
+        body: {'email': normalizedEmail, 'role': role},
       );
       final responseData = _httpService.handleResponse(response);
       if (response.statusCode == 200) {
@@ -559,9 +571,11 @@ class AuthService extends GetxService {
     String role,
   ) async {
     try {
+      // Normalize email to match backend processing (trim + lowercase)
+      final normalizedEmail = email.trim().toLowerCase();
       final response = await _httpService.post(
         ApiConfig.verifyOtpEndpoint,
-        body: {'email': email, 'otp': otp, 'role': role},
+        body: {'email': normalizedEmail, 'otp': otp, 'role': role},
       );
       final responseData = _httpService.handleResponse(response);
       if (responseData['status'] == 'success') {

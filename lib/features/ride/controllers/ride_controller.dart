@@ -137,14 +137,14 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
       seats: 4,
     ),
     const RideType(
-      name: 'Comfort',
+      name: 'Basic',
       price: 3200,
       eta: '5 min',
       icon: Icons.car_rental,
       seats: 4,
     ),
     const RideType(
-      name: 'XL',
+      name: 'E-Vehicle',
       price: 4500,
       eta: '7 min',
       icon: Icons.airport_shuttle,
@@ -790,7 +790,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
         if (prices.comfort != null) {
           newRideTypes.add(
             RideType(
-              name: 'Comfort',
+              name: 'Basic',
               price: prices.comfort!.price,
               eta: '$estimatedEtaMinutes min',
               icon: Icons.car_rental,
@@ -801,7 +801,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
         if (prices.xl != null) {
           newRideTypes.add(
             RideType(
-              name: 'XL',
+              name: 'E-Vehicle',
               price: prices.xl!.price,
               eta: '${estimatedEtaMinutes + 5} min',
               icon: Icons.airport_shuttle,
@@ -1226,7 +1226,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
         if (prices.comfort != null) {
           newRideTypes.add(
             RideType(
-              name: 'Comfort',
+              name: 'Basic',
               price: prices.comfort!.price,
               eta: '$estimatedEtaMinutes min',
               icon: Icons.car_rental,
@@ -1237,7 +1237,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
         if (prices.xl != null) {
           newRideTypes.add(
             RideType(
-              name: 'XL',
+              name: 'E-Vehicle',
               price: prices.xl!.price,
               eta: '${estimatedEtaMinutes + 5} min',
               icon: Icons.airport_shuttle,

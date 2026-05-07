@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/features/driver/controllers/document_upload_controller.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
+import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
 class DocumentUploadScreen extends StatelessWidget {
   const DocumentUploadScreen({super.key});
@@ -12,9 +14,21 @@ class DocumentUploadScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     // Use Get.put to make sure controller is created
     final controller = Get.put(DocumentUploadController());
+    final dark = THelperFunctions.isDarkMode(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Verify Your Documents')),
+      appBar: AppBar(
+        title: const Text('Verify Your Documents'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          onPressed: () => Get.back(),
+          icon: Icon(
+            Iconsax.arrow_left_2,
+            color: dark ? TColors.white : TColors.black,
+          ),
+        ),
+      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(TSizes.defaultSpace),

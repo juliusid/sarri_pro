@@ -133,7 +133,7 @@ class ClientData {
   factory ClientData.fromJson(Map<String, dynamic> json) {
     return ClientData(
       id: json["_id"] ?? "",
-      email: json["email"] ?? "",
+      email: (json["email"] ?? "").toString().toLowerCase(),
       role: json["role"] ?? "",
       isVerified: json["isVerified"] ?? false,
       firstName: json["FirstName"] ?? "",
@@ -157,7 +157,7 @@ class ClientData {
   factory ClientData.fromStorage(Map<String, dynamic> json) {
     return ClientData(
       id: json["_id"] ?? "",
-      email: json["email"] ?? "",
+      email: (json["email"] ?? "").toString().toLowerCase(),
       role: json["role"] ?? "",
       isVerified: json["isVerified"] ?? false,
       firstName: json["FirstName"] ?? "", // Read saved name

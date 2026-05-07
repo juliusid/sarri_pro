@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
@@ -15,6 +17,10 @@ class PlaceholderScreen extends StatelessWidget {
         title: Text(title),
         backgroundColor: dark ? TColors.dark : TColors.primary,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          onPressed: () => Get.back(),
+          icon: const Icon(Iconsax.arrow_left_2),
+        ),
       ),
       body: Center(
         child: Text(
@@ -25,4 +31,4 @@ class PlaceholderScreen extends StatelessWidget {
       ),
     );
   }
-} 
+}

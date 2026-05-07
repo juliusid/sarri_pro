@@ -21,8 +21,10 @@ class PhoneVerificationController extends GetxController {
   // --- NEW: Helper to get the logged-in user's email ---
   String get userEmail {
     final drawerController = Get.find<MapDrawerController>();
-    // Access the email from the fullProfile model
-    return drawerController.fullProfile.value?.email ?? '';
+    // Access the email from the userEmail reactive variable (fallback to user data if needed)
+    return drawerController.userEmail.value.isNotEmpty
+        ? drawerController.userEmail.value
+        : (drawerController.user.value?.email ?? '');
   }
 
   String get formattedPhoneNumber {

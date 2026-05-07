@@ -31,6 +31,7 @@ class DriverDashboardScreen extends StatelessWidget {
         //
         backgroundColor: Colors.transparent, //
         elevation: 0, //
+        automaticallyImplyLeading: false,
         title: Text(
           //
           'Dashboard', //
