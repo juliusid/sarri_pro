@@ -198,6 +198,18 @@ class DriverSignupController extends GetxController {
     }
   }
 
+  // --- NEW: Email Initialization ---
+  void setInitialEmail(String email) {
+    emailController.text = email.trim().toLowerCase();
+  }
+
+  // --- HELPER: Format Name ---
+  String _formatName(String name) {
+    if (name.isEmpty) return name;
+    final trimmed = name.trim();
+    return trimmed[0].toUpperCase() + trimmed.substring(1).toLowerCase();
+  }
+
   Future<void> verifyOtp() async {
     if (!otpFormKey.currentState!.validate()) return;
     isLoading.value = true;
@@ -349,6 +361,10 @@ class DriverSignupController extends GetxController {
     if (!detailsFormKey.currentState!.validate()) return;
     isLoading.value = true;
     try {
+      final firstName = _formatName(firstNameController.text);
+      final lastName = _formatName(lastNameController.text);
+      final email = emailController.text.trim().toLowerCase();
+
       String finalPhoneNumber = _verifiedPhoneNumber ?? formattedPhoneNumber;
 
       String finalPermanentState = permanentStateController.text.trim().isEmpty
@@ -364,9 +380,9 @@ class DriverSignupController extends GetxController {
       );
 
       final request = DriverRegistrationRequest(
-        email: emailController.text.trim(),
-        FirstName: firstNameController.text.trim(),
-        LastName: lastNameController.text.trim(),
+        email: email,
+        FirstName: firstName,
+        LastName: lastName,
         password: passwordController.text.trim(),
         phoneNumber: finalPhoneNumber,
         DateOfBirth: dobController.text.trim(),

@@ -9,12 +9,20 @@ import 'widgets/rider_otp_step.dart';
 import 'widgets/rider_details_step.dart';
 
 class RiderSignupScreen extends StatelessWidget {
-  const RiderSignupScreen({super.key});
+  final String? email;
+  const RiderSignupScreen({super.key, this.email});
 
   @override
   Widget build(BuildContext context) {
     // Initialize the controller for the rider signup flow
     final controller = Get.put(RiderSignupController());
+
+    // Pre-fill email if provided
+    if (email != null && email!.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        controller.setInitialEmail(email!);
+      });
+    }
 
     return Scaffold(
       // Use PageView to manage the different steps

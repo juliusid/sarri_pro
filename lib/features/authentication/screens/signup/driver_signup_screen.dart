@@ -11,12 +11,20 @@ import 'widgets/driver_phone_otp_step.dart'; // <--- Added
 import 'widgets/driver_details_step.dart';
 
 class DriverSignupScreen extends StatelessWidget {
-  const DriverSignupScreen({super.key});
+  final String? email;
+  const DriverSignupScreen({super.key, this.email});
 
   @override // Good practice to add override
   Widget build(BuildContext context) {
     // Ensure controller is initialized
     final controller = Get.put(DriverSignupController());
+
+    // Pre-fill email if provided
+    if (email != null && email!.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        controller.setInitialEmail(email!);
+      });
+    }
 
     return Scaffold(
       body: PageView(

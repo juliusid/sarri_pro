@@ -15,6 +15,8 @@ import 'package:sarri_ride/features/authentication/services/auth_service.dart';
 import 'package:sarri_ride/features/driver/screens/driver_dashboard_screen.dart';
 import 'package:sarri_ride/features/ride/controllers/drawer_controller.dart';
 import 'package:sarri_ride/features/ride/widgets/map_screen_getx.dart';
+import 'package:sarri_ride/features/authentication/screens/signup/driver_signup_screen.dart';
+import 'package:sarri_ride/features/authentication/screens/signup/rider_signup_screen.dart';
 import 'package:sarri_ride/utils/constants/enums.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
@@ -172,11 +174,33 @@ class LoginController extends GetxController {
           Get.offAll(() => const MapScreenGetX());
         }
       } else {
-        THelperFunctions.showErrorSnackBar(
-          'Login Failed',
-          loginResult.error ??
-              'Please check your credentials and selected role.',
-        );
+        final String error = loginResult.error ?? 'Please check your credentials and selected role.';
+        
+        // Detect incomplete registration (missing password / social sign-in prompt)
+        if (error.toLowerCase().contains('social sign-in') || 
+            error.toLowerCase().contains('complete your registration')) {
+          
+          Get.snackbar(
+            'Incomplete Registration',
+            'It looks like you haven\'t finished setting up your account.',
+            mainButton: TextButton(
+              onPressed: () {
+                if (isDriverLogin) {
+                  Get.to(() => DriverSignupScreen(email: email));
+                } else {
+                  Get.to(() => RiderSignupScreen(email: email));
+                }
+              },
+              child: const Text('Complete Signup'),
+            ),
+            duration: const Duration(seconds: 8),
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.orange.withOpacity(0.9),
+            colorText: Colors.white,
+          );
+        } else {
+          THelperFunctions.showErrorSnackBar('Login Failed', error);
+        }
       }
     } catch (e) {
       print("LOGIN_CONTROLLER: Error during login process: $e");

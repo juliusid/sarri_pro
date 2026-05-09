@@ -150,6 +150,18 @@ class RiderSignupController extends GetxController {
     }
   }
 
+  // --- NEW: Email Initialization ---
+  void setInitialEmail(String email) {
+    emailController.text = email.trim().toLowerCase();
+  }
+
+  // --- HELPER: Format Name ---
+  String _formatName(String name) {
+    if (name.isEmpty) return name;
+    final trimmed = name.trim();
+    return trimmed[0].toUpperCase() + trimmed.substring(1).toLowerCase();
+  }
+
   Future<void> verifyOtp() async {
     if (!otpFormKey.currentState!.validate()) return;
     isLoading.value = true;
@@ -181,11 +193,15 @@ class RiderSignupController extends GetxController {
     if (!detailsFormKey.currentState!.validate()) return;
     isLoading.value = true;
     try {
+      final firstName = _formatName(firstNameController.text);
+      final lastName = _formatName(lastNameController.text);
+      final email = emailController.text.trim().toLowerCase();
+
       final authResult = await AuthService.instance.signup(
-        emailController.text.trim(),
+        email,
         passwordController.text.trim(),
-        firstNameController.text.trim(),
-        lastNameController.text.trim(),
+        firstName,
+        lastName,
       );
 
       if (authResult.success) {
