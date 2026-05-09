@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/features/authentication/controllers/forgot_password_controller.dart';
@@ -42,7 +43,8 @@ class ResetPasswordScreen extends StatelessWidget {
                   children: [
                     TextFormField(
                       controller: controller.resetCodeController,
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(signed: false, decimal: false),
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       validator: (value) => TValidator.validateEmptyText('Reset Code', value),
                       decoration: const InputDecoration(labelText: 'Reset Code', prefixIcon: Icon(Iconsax.code)),
                     ),

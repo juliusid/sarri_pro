@@ -1,6 +1,7 @@
 // File Path: features/authentication/screens/otp/otp_screen_getx.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:sarri_ride/common/styles/spacing_styles.dart';
 import 'package:sarri_ride/features/authentication/controllers/otp_controller.dart';
@@ -58,7 +59,8 @@ class OTPScreen extends StatelessWidget {
                   children: [
                     TextFormField(
                       controller: controller.otpController,
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(signed: false, decimal: false),
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       textAlign: TextAlign.center,
                       maxLength: 6,
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(letterSpacing: 10),

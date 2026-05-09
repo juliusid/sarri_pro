@@ -1,6 +1,7 @@
 // lib/features/authentication/screens/signup/widgets/rider_otp_step.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/features/authentication/controllers/rider_signup_controller.dart';
@@ -37,7 +38,9 @@ class RiderOtpStep extends StatelessWidget {
           key: controller.otpFormKey,
           child: TextFormField(
             controller: controller.otpController,
-            keyboardType: TextInputType.number,
+            // Use signed=false, decimal=false to prevent unicode superscript injection on Android
+            keyboardType: const TextInputType.numberWithOptions(signed: false, decimal: false),
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             textAlign: TextAlign.center,
             maxLength: 6,
             style: Theme.of(

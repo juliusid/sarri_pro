@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/common/styles/spacing_styles.dart';
@@ -54,7 +55,8 @@ class VerifyPhoneNumberScreen extends StatelessWidget {
                       controller: controller.otpController,
                       validator: (value) =>
                           TValidator.validateEmptyText('OTP', value),
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(signed: false, decimal: false),
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       textAlign: TextAlign.center,
                       maxLength: 6,
                       style: Theme.of(
