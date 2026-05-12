@@ -175,7 +175,13 @@ class DriverSignupController extends GetxController {
         }
       } else {
         final errorMsg = result.error?.toLowerCase() ?? '';
-        if (errorMsg.contains('already verified')) {
+        if (errorMsg.contains('already registered') || errorMsg.contains('please login')) {
+          THelperFunctions.showErrorSnackBar(
+            'Account Already Exists',
+            'This email is already registered. Please login.',
+          );
+          Get.offAll(() => const LoginScreenGetX());
+        } else if (errorMsg.contains('already verified')) {
           THelperFunctions.showSuccessSnackBar(
             'Welcome Back',
             'Email verified. Resuming registration...',
@@ -248,27 +254,53 @@ class DriverSignupController extends GetxController {
       );
 
       if (result.success) {
-        THelperFunctions.showSuccessSnackBar(
-          'Success',
-          result.message ?? 'OTP sent to phone!',
-        );
-        startResendTimer(); // Start timer
-        nextStep();
-      } else {
-        final errorMsg = result.error?.toLowerCase() ?? '';
-        if (errorMsg.contains('verified phone number') ||
-            errorMsg.contains('already has a verified')) {
+        debugPrint('SendPhoneOtp Success: alreadyVerified = ${result.alreadyVerified}');
+        if (result.alreadyVerified) {
           THelperFunctions.showSuccessSnackBar(
             'Verified',
-            'Phone number already verified. Proceeding...',
+            'Phone number already verified. Proceeding to details...',
           );
           _verifiedPhoneNumber = formattedPhoneNumber;
           currentStep.value = DriverSignupStep.details;
-          pageController.animateToPage(
-            DriverSignupStep.details.index,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.ease,
+          
+          // Use a small delay to ensure UI is ready
+          Future.delayed(const Duration(milliseconds: 100), () {
+            pageController.animateToPage(
+              DriverSignupStep.details.index,
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOut,
+            );
+          });
+          return;
+        }
+
+        THelperFunctions.showSuccessSnackBar(
+          'OTP Sent',
+          result.message ?? 'Please check your phone for the verification code.',
+        );
+        startResendTimer();
+        nextStep();
+      } else {
+        final errorMsg = result.error?.toLowerCase() ?? '';
+        debugPrint('SendPhoneOtp Error: $errorMsg');
+        
+        if (errorMsg.contains('verified') ||
+            errorMsg.contains('already has a verified') ||
+            errorMsg.contains('already verified')) {
+          THelperFunctions.showSuccessSnackBar(
+            'Verified',
+            'Phone number already verified. Proceeding to details...',
           );
+          _verifiedPhoneNumber = formattedPhoneNumber;
+          currentStep.value = DriverSignupStep.details;
+          
+          Future.delayed(const Duration(milliseconds: 100), () {
+            pageController.animateToPage(
+              DriverSignupStep.details.index,
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOut,
+            );
+          });
         } else {
           THelperFunctions.showErrorSnackBar(
             'Error',
@@ -288,6 +320,7 @@ class DriverSignupController extends GetxController {
       final result = await AuthService.instance.resendPhoneOtp(
         formattedPhoneNumber,
         'driver',
+        emailController.text.trim(),
       );
 
       if (result.success) {

@@ -65,15 +65,10 @@ class AuthService extends GetxService {
         },
       );
       final responseData = _httpService.handleResponse(response);
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return AuthResult.success(
-          message: responseData['message'] ?? 'OTP sent successfully',
-        );
-      } else {
-        return AuthResult.error(
-          responseData['message'] ?? 'Failed to send OTP',
-        );
-      }
+      return AuthResult.success(
+        message: responseData['message'] ?? 'OTP sent successfully',
+        alreadyVerified: responseData['alreadyVerified'] ?? false,
+      );
     } catch (e) {
       if (e is ApiException) {
         return AuthResult.error(e.message);
@@ -114,22 +109,16 @@ class AuthService extends GetxService {
   }
 
   /// Resends a verification OTP to a phone number.
-  Future<AuthResult> resendPhoneOtp(String phoneNumber, String userType) async {
+  Future<AuthResult> resendPhoneOtp(String phoneNumber, String userType, String email) async {
     try {
       final response = await _httpService.post(
         ApiConfig.resendPhoneOtpEndpoint,
-        body: {'phoneNumber': phoneNumber, 'userType': userType},
+        body: {'phoneNumber': phoneNumber, 'userType': userType, 'email': email},
       );
       final responseData = _httpService.handleResponse(response);
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return AuthResult.success(
-          message: responseData['message'] ?? 'OTP resent successfully',
-        );
-      } else {
-        return AuthResult.error(
-          responseData['message'] ?? 'Failed to resend OTP',
-        );
-      }
+      return AuthResult.success(
+        message: responseData['message'] ?? 'OTP resent successfully',
+      );
     } catch (e) {
       if (e is ApiException) {
         return AuthResult.error(e.message);
@@ -251,8 +240,6 @@ class AuthService extends GetxService {
 
       if (loginResponse.status == "success" &&
           loginResponse.accessToken != null) {
-        // email is normalized in ClientData model
-
         await _httpService.storeTokens(
           loginResponse.accessToken!,
           loginResponse.refreshToken,
@@ -305,8 +292,6 @@ class AuthService extends GetxService {
 
       if (loginResponse.status == 'success' &&
           loginResponse.accessToken != null) {
-        // email is normalized in ClientData model
-
         await _httpService.storeTokens(
           loginResponse.accessToken!,
           loginResponse.refreshToken,
@@ -364,9 +349,7 @@ class AuthService extends GetxService {
   // ---------- VERIFY OTP ----------
   Future<AuthResult> verifyEmail(String email, String otp, String role) async {
     try {
-      // Normalize email to match backend processing
-      final normalizedEmail = email.trim().toLowerCase();
-      final request = VerifyRequest(email: normalizedEmail, otp: otp, role: role);
+      final request = VerifyRequest(email: email, otp: otp, role: role);
 
       final response = await _httpService.post(
         ApiConfig.verifyOtpEndpoint,
@@ -394,9 +377,7 @@ class AuthService extends GetxService {
   // ---------- LOGIN ----------
   Future<AuthResult> login(String email, String password) async {
     try {
-      // Normalize email to match backend processing
-      final normalizedEmail = email.trim().toLowerCase();
-      final request = LoginRequest(email: normalizedEmail, password: password);
+      final request = LoginRequest(email: email, password: password);
 
       final response = await _httpService.post(
         ApiConfig.loginEndpoint,
@@ -429,10 +410,8 @@ class AuthService extends GetxService {
   // ---------- DRIVER LOGIN ----------
   Future<AuthResult> loginDriver(String email, String password) async {
     try {
-      // Normalize email to match backend processing
-      final normalizedEmail = email.trim().toLowerCase();
       final request = LoginRequest(
-        email: normalizedEmail,
+        email: email,
         password: password,
       ); // Reuse the client LoginRequest model
 
@@ -540,22 +519,14 @@ class AuthService extends GetxService {
   // ---------- NEW: SEND REGISTRATION OTP (Unified) ----------
   Future<AuthResult> sendRegistrationOtp(String email, String role) async {
     try {
-      // Normalize email to match backend processing (trim + lowercase)
-      final normalizedEmail = email.trim().toLowerCase();
       final response = await _httpService.post(
         ApiConfig.verifyUserEmailEndpoint,
-        body: {'email': normalizedEmail, 'role': role},
+        body: {'email': email, 'role': role},
       );
       final responseData = _httpService.handleResponse(response);
-      if (response.statusCode == 200) {
-        return AuthResult.success(
-          message: responseData['message'] ?? 'OTP sent successfully',
-        );
-      } else {
-        return AuthResult.error(
-          responseData['message'] ?? 'Failed to send OTP',
-        );
-      }
+      return AuthResult.success(
+        message: responseData['message'] ?? 'OTP sent successfully',
+      );
     } catch (e) {
       if (e is ApiException) {
         return AuthResult.error(e.message);
@@ -571,11 +542,9 @@ class AuthService extends GetxService {
     String role,
   ) async {
     try {
-      // Normalize email to match backend processing (trim + lowercase)
-      final normalizedEmail = email.trim().toLowerCase();
       final response = await _httpService.post(
         ApiConfig.verifyOtpEndpoint,
-        body: {'email': normalizedEmail, 'otp': otp, 'role': role},
+        body: {'email': email, 'otp': otp, 'role': role},
       );
       final responseData = _httpService.handleResponse(response);
       if (responseData['status'] == 'success') {
@@ -599,17 +568,19 @@ class AuthService extends GetxService {
         body: request.toJson(),
       );
       final responseData = _httpService.handleResponse(response);
-      if (response.statusCode == 201) {
-        return AuthResult.success(
-          message: responseData['message'] ?? 'Registration successful',
-        );
-      } else {
-        return AuthResult.error(
-          responseData['message'] ?? 'Registration failed',
-        );
-      }
+      return AuthResult.success(
+        message: responseData['message'] ?? 'Registration successful',
+      );
     } catch (e) {
       if (e is ApiException) {
+        final errors = (e.data['data'] as Map?)?['errors'];
+        if (errors is List && errors.isNotEmpty) {
+          final first = errors.first as Map?;
+          final fieldMsg = first?['msg'] ?? first?['message'];
+          if (fieldMsg is String && fieldMsg.isNotEmpty) {
+            return AuthResult.error(fieldMsg);
+          }
+        }
         return AuthResult.error(e.message);
       }
       return AuthResult.error("An unknown error occurred: ${e.toString()}");
@@ -681,11 +652,27 @@ class AuthResult {
   final ClientData? client;
   final String? message;
   final String? error;
+  final bool alreadyVerified;
 
-  AuthResult._({required this.success, this.client, this.message, this.error});
+  AuthResult._({
+    required this.success,
+    this.client,
+    this.message,
+    this.error,
+    this.alreadyVerified = false,
+  });
 
-  factory AuthResult.success({ClientData? client, String? message}) {
-    return AuthResult._(success: true, client: client, message: message);
+  factory AuthResult.success({
+    ClientData? client,
+    String? message,
+    bool alreadyVerified = false,
+  }) {
+    return AuthResult._(
+      success: true,
+      client: client,
+      message: message,
+      alreadyVerified: alreadyVerified,
+    );
   }
 
   factory AuthResult.error(String error) {

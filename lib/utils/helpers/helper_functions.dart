@@ -53,68 +53,63 @@ class THelperFunctions {
   // }
   // --- END OLD ---
 
-  // --- NEW: SUCCESS SNACKBAR ---
+  // --- REBUILT SNACKBARS WITH SCAFFOLDMESSENGER FOR IOS STABILITY ---
+  static void _showCustomSnackBar({
+    required String title,
+    required String message,
+    required Color backgroundColor,
+    required IconData icon,
+    Duration duration = const Duration(seconds: 3),
+  }) {
+    Get.snackbar(
+      title.isEmpty ? '' : title,
+      message,
+      snackPosition: SnackPosition.TOP,
+      backgroundColor: backgroundColor,
+      colorText: Colors.white,
+      icon: Icon(icon, color: Colors.white),
+      margin: const EdgeInsets.all(15),
+      borderRadius: 10,
+      duration: duration,
+      isDismissible: true,
+      forwardAnimationCurve: Curves.easeOutBack,
+    );
+  }
+
   static void showSuccessSnackBar(String title, String message) {
-    Get.snackbar(
-      title,
-      message,
-      isDismissible: true,
-      shouldIconPulse: true,
-      colorText: TColors.white,
-      backgroundColor: TColors.success.withOpacity(0.9), //
-      snackPosition: SnackPosition.TOP,
-      duration: const Duration(seconds: 3),
-      margin: const EdgeInsets.all(15),
-      icon: const Icon(Iconsax.tick_circle, color: TColors.white),
+    _showCustomSnackBar(
+      title: title,
+      message: message,
+      backgroundColor: TColors.success.withOpacity(0.9),
+      icon: Iconsax.tick_circle,
     );
   }
 
-  // --- NEW: ERROR SNACKBAR ---
   static void showErrorSnackBar(String title, String message) {
-    Get.snackbar(
-      title,
-      message,
-      isDismissible: true,
-      shouldIconPulse: true,
-      colorText: TColors.white,
-      backgroundColor: TColors.error.withOpacity(0.9), //
-      snackPosition: SnackPosition.TOP,
-      duration: const Duration(seconds: 10),
-      margin: const EdgeInsets.all(15),
-      icon: const Icon(Iconsax.warning_2, color: TColors.white),
+    _showCustomSnackBar(
+      title: title,
+      message: message,
+      backgroundColor: TColors.error.withOpacity(0.9),
+      icon: Iconsax.warning_2,
+      duration: const Duration(seconds: 5), // slightly longer for errors
     );
   }
 
-  // --- NEW: WARNING SNACKBAR ---
   static void showWarningSnackBar(String title, String message) {
-    Get.snackbar(
-      title,
-      message,
-      isDismissible: true,
-      shouldIconPulse: true,
-      colorText: TColors.white,
+    _showCustomSnackBar(
+      title: title,
+      message: message,
       backgroundColor: Colors.orange.withOpacity(0.9),
-      snackPosition: SnackPosition.TOP,
-      duration: const Duration(seconds: 3),
-      margin: const EdgeInsets.all(15),
-      icon: const Icon(Iconsax.warning_2, color: TColors.white),
+      icon: Iconsax.warning_2,
     );
   }
 
-  // --- NEW: INFO SNACKBAR ---
   static void showSnackBar(String message) {
-    // This will be for general info/notices
-    Get.snackbar(
-      'Notice',
-      message,
-      isDismissible: true,
-      shouldIconPulse: false,
-      colorText: TColors.white,
-      backgroundColor: TColors.info.withOpacity(0.9), //
-      snackPosition: SnackPosition.TOP,
-      duration: const Duration(seconds: 3),
-      margin: const EdgeInsets.all(15),
-      icon: const Icon(Iconsax.info_circle, color: TColors.white),
+    _showCustomSnackBar(
+      title: '', // Empty title for simple info
+      message: message,
+      backgroundColor: TColors.info.withOpacity(0.9),
+      icon: Iconsax.info_circle,
     );
   }
   // --- END NEW ---

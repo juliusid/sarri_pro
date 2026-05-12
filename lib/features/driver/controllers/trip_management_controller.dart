@@ -924,35 +924,10 @@ class TripManagementController extends GetxController {
       statusToSend = currentTaskStatus;
     }
 
+    // Removed frontend-driven category override logic.
+    // Setting this to null allows the backend to retain the driver's true category (e.g., 'comfort', 'luxury')
+    // from the database, preventing ride-hailing drivers from being incorrectly placed in the 'car_delivery' pool.
     String? category;
-    if (activeTrip.value != null) {
-      final rt = activeTrip.value!.rideType.toLowerCase();
-      if (rt.contains('bike') || rt.contains('courier')) {
-        category = 'bike_courier';
-      } else if (rt.contains('van')) {
-        category = 'Van_delivery';
-      } else {
-        category = 'car_delivery';
-      }
-    } else {
-      // Fallback to driver's default vehicle type
-      final vType =
-          _dashboardController?.currentDriver.value?.driverProfile
-              ?.vehicleDetails.type ??
-          VehicleType.sedan;
-      switch (vType) {
-        case VehicleType.motorcycle:
-          category = 'bike_courier';
-          break;
-        case VehicleType.van:
-        case VehicleType.truck:
-          category = 'Van_delivery';
-          break;
-        default:
-          category = 'car_delivery';
-          break;
-      }
-    }
 
     String? currentTripId;
     if (activeTrip.value != null) {

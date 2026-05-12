@@ -69,10 +69,23 @@ class PhoneVerificationController extends GetxController {
         );
         Get.to(() => const VerifyPhoneNumberScreen());
       } else {
-        THelperFunctions.showErrorSnackBar(
-          'Error',
-          result.error ?? 'Failed to send OTP',
-        );
+        final errorMsg = result.error?.toLowerCase() ?? '';
+        if (errorMsg.contains('verified phone number') ||
+            errorMsg.contains('already has a verified') ||
+            errorMsg.contains('already verified on your account') ||
+            errorMsg.contains('already verified')) {
+          THelperFunctions.showSuccessSnackBar(
+            'Verified',
+            'Phone number already verified. Proceeding...',
+          );
+          await Get.find<MapDrawerController>().refreshUserData();
+          Get.offAll(() => const MapScreenGetX());
+        } else {
+          THelperFunctions.showErrorSnackBar(
+            'Error',
+            result.error ?? 'Failed to send OTP',
+          );
+        }
       }
     } catch (e) {
       THelperFunctions.showErrorSnackBar('Error', e.toString());
@@ -89,6 +102,7 @@ class PhoneVerificationController extends GetxController {
       final result = await AuthService.instance.resendPhoneOtp(
         formattedPhoneNumber,
         _userType,
+        userEmail,
       );
 
       if (result.success) {
