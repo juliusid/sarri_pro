@@ -88,6 +88,10 @@ class RiderSignupController extends GetxController {
 
   void previousStep() {
     if (currentStep.value.index > 0) {
+      // Clear OTP when going back to email step
+      if (currentStep.value == RiderSignupStep.otp) {
+        otpController.clear();
+      }
       currentStep.value = RiderSignupStep.values[currentStep.value.index - 1];
       pageController.previousPage(
         duration: const Duration(milliseconds: 300),
@@ -118,7 +122,7 @@ class RiderSignupController extends GetxController {
           'Success',
           result.message ?? 'OTP sent successfully!',
         );
-
+        otpController.clear();
         startResendTimer();
 
         // Only move to next step if it's the first time
@@ -435,7 +439,9 @@ class RiderSignupController extends GetxController {
         "RIDER_SIGNUP_CONTROLLER: SignInWithAppleAuthorizationException - Code: ${e.code}, Message: ${e.message}",
       );
       if (e.code == AuthorizationErrorCode.canceled) {
-        THelperFunctions.showSnackBar('Apple Sign-In Canceled (or OS aborted).');
+        THelperFunctions.showSnackBar(
+          'Apple Sign-In Canceled (or OS aborted).',
+        );
         debugPrint('Apple Sign-In: User cancelled or OS aborted.');
       } else if (e.code == AuthorizationErrorCode.failed) {
         THelperFunctions.showErrorSnackBar(

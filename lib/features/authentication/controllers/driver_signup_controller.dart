@@ -133,6 +133,10 @@ class DriverSignupController extends GetxController {
 
   void previousStep() {
     if (currentStep.value.index > 0) {
+      // Clear OTP when going back to email step
+      if (currentStep.value == DriverSignupStep.otp) {
+        otpController.clear();
+      }
       currentStep.value = DriverSignupStep.values[currentStep.value.index - 1];
       pageController.previousPage(
         duration: const Duration(milliseconds: 300),
@@ -167,7 +171,7 @@ class DriverSignupController extends GetxController {
           'Success',
           result.message ?? 'OTP sent successfully!',
         );
-
+        otpController.clear();
         startResendTimer();
 
         if (!isResend) {
@@ -175,7 +179,8 @@ class DriverSignupController extends GetxController {
         }
       } else {
         final errorMsg = result.error?.toLowerCase() ?? '';
-        if (errorMsg.contains('already registered') || errorMsg.contains('please login')) {
+        if (errorMsg.contains('already registered') ||
+            errorMsg.contains('please login')) {
           THelperFunctions.showErrorSnackBar(
             'Account Already Exists',
             'This email is already registered. Please login.',
@@ -254,7 +259,9 @@ class DriverSignupController extends GetxController {
       );
 
       if (result.success) {
-        debugPrint('SendPhoneOtp Success: alreadyVerified = ${result.alreadyVerified}');
+        debugPrint(
+          'SendPhoneOtp Success: alreadyVerified = ${result.alreadyVerified}',
+        );
         if (result.alreadyVerified) {
           THelperFunctions.showSuccessSnackBar(
             'Verified',
@@ -262,7 +269,7 @@ class DriverSignupController extends GetxController {
           );
           _verifiedPhoneNumber = formattedPhoneNumber;
           currentStep.value = DriverSignupStep.details;
-          
+
           // Use a small delay to ensure UI is ready
           Future.delayed(const Duration(milliseconds: 100), () {
             pageController.animateToPage(
@@ -276,14 +283,15 @@ class DriverSignupController extends GetxController {
 
         THelperFunctions.showSuccessSnackBar(
           'OTP Sent',
-          result.message ?? 'Please check your phone for the verification code.',
+          result.message ??
+              'Please check your phone for the verification code.',
         );
         startResendTimer();
         nextStep();
       } else {
         final errorMsg = result.error?.toLowerCase() ?? '';
         debugPrint('SendPhoneOtp Error: $errorMsg');
-        
+
         if (errorMsg.contains('verified') ||
             errorMsg.contains('already has a verified') ||
             errorMsg.contains('already verified')) {
@@ -293,7 +301,7 @@ class DriverSignupController extends GetxController {
           );
           _verifiedPhoneNumber = formattedPhoneNumber;
           currentStep.value = DriverSignupStep.details;
-          
+
           Future.delayed(const Duration(milliseconds: 100), () {
             pageController.animateToPage(
               DriverSignupStep.details.index,

@@ -3,18 +3,14 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:sarri_ride/utils/constants/colors.dart'; //
-import 'package:iconsax/iconsax.dart'; // We'll add icons
+import 'package:sarri_ride/utils/constants/colors.dart';
+import 'package:iconsax/iconsax.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 
 class THelperFunctions {
   static Color? getColor(String value) {
-    /// Define your product specific colors here and it will match the attribute colors and show specific 泛泯泙鳩泪洟
-
     if (value == 'Green') {
-      return Colors.green;
-    } else if (value == 'Green') {
       return Colors.green;
     } else if (value == 'Red') {
       return Colors.red;
@@ -45,15 +41,7 @@ class THelperFunctions {
     }
   }
 
-  // --- OLD SNACKBAR (REMOVED) ---
-  // static void showSnackBar(String message) {
-  //   ScaffoldMessenger.of(Get.context!).showSnackBar(
-  //     SnackBar(content: Text(message)),
-  //   );
-  // }
-  // --- END OLD ---
-
-  // --- REBUILT SNACKBARS WITH SCAFFOLDMESSENGER FOR IOS STABILITY ---
+  // --- FIXED: Using Get.rawSnackbar for iOS compatibility ---
   static void _showCustomSnackBar({
     required String title,
     required String message,
@@ -61,17 +49,24 @@ class THelperFunctions {
     required IconData icon,
     Duration duration = const Duration(seconds: 3),
   }) {
-    Get.snackbar(
-      title.isEmpty ? '' : title,
-      message,
-      snackPosition: SnackPosition.TOP,
+    // Close any existing snackbar first to prevent stacking
+    if (Get.isSnackbarOpen) {
+      Get.closeCurrentSnackbar();
+    }
+
+    Get.rawSnackbar(
+      title: title.isEmpty ? null : title,
+      messageText: Text(
+        message,
+        style: const TextStyle(color: Colors.white, fontSize: 14),
+      ),
       backgroundColor: backgroundColor,
-      colorText: Colors.white,
-      icon: Icon(icon, color: Colors.white),
+      icon: Icon(icon, color: Colors.white, size: 28),
       margin: const EdgeInsets.all(15),
       borderRadius: 10,
       duration: duration,
       isDismissible: true,
+      snackPosition: SnackPosition.TOP,
       forwardAnimationCurve: Curves.easeOutBack,
     );
   }
@@ -91,7 +86,7 @@ class THelperFunctions {
       message: message,
       backgroundColor: TColors.error.withOpacity(0.9),
       icon: Iconsax.warning_2,
-      duration: const Duration(seconds: 5), // slightly longer for errors
+      duration: const Duration(seconds: 5),
     );
   }
 
@@ -106,13 +101,13 @@ class THelperFunctions {
 
   static void showSnackBar(String message) {
     _showCustomSnackBar(
-      title: '', // Empty title for simple info
+      title: '',
       message: message,
       backgroundColor: TColors.info.withOpacity(0.9),
       icon: Iconsax.info_circle,
     );
   }
-  // --- END NEW ---
+  // --- END FIXED ---
 
   static void showAlert(String title, String message) {
     showDialog<void>(
