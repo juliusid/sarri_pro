@@ -1619,6 +1619,13 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
         return;
       }
 
+      print("==== DEBUG RIDER RIDE REQUEST ====");
+      print("Pickup: $finalPickupName");
+      print("Destination: ${destinationName.value}");
+      print("Category being sent to backend: ${selectedRideType.value!.name}");
+      print("State: ${pickupState.value}");
+      print("==================================");
+
       final response = await _rideService.bookRide(
         pickupName: finalPickupName,
         destinationName: destinationName.value,
@@ -1627,6 +1634,16 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
         category: selectedRideType.value!.name,
         state: pickupState.value,
       );
+
+      print("==== DEBUG RIDER RIDE RESPONSE ====");
+      print("Status: ${response.status}");
+      print("Message: ${response.message}");
+      print("Data: ${response.data}");
+      if (response.data != null) {
+        print("Ride ID: ${response.data!.rideId}");
+        print("Price: ${response.data!.price}");
+      }
+      print("===================================");
 
       if (response.status == 'success' && response.data != null) {
         rideId.value = response.data!.rideId;

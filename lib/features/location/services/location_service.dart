@@ -43,6 +43,18 @@ class LocationService extends GetxController {
   bool get isLocationLoading => _isLocationLoading.value;
   String get locationStatus => _locationStatus.value;
 
+  // Throttling for location snackbars to avoid spamming the UI
+  DateTime? _lastSnackbarTime;
+
+  void _showThrottledSnackBar(String message) {
+    final now = DateTime.now();
+    if (_lastSnackbarTime == null ||
+        now.difference(_lastSnackbarTime!) > const Duration(seconds: 15)) {
+      THelperFunctions.showSnackBar(message);
+      _lastSnackbarTime = now;
+    }
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -85,7 +97,7 @@ class LocationService extends GetxController {
   Future<void> _offerOpenLocationServicesSettings(String message) async {
     final context = Get.context;
     if (context == null || !context.mounted) {
-      THelperFunctions.showSnackBar(
+      _showThrottledSnackBar(
         'Please enable Location Services (GPS) in Settings when you’re ready.',
       );
       return;
@@ -118,7 +130,7 @@ class LocationService extends GetxController {
       );
     } catch (e) {
       debugPrint('Error showing location services dialog: $e');
-      THelperFunctions.showSnackBar(
+      _showThrottledSnackBar(
         'Please enable Location Services (GPS) in Settings when you\'re ready.',
       );
     }
@@ -130,7 +142,7 @@ class LocationService extends GetxController {
   }) async {
     final context = Get.context;
     if (context == null || !context.mounted) {
-      THelperFunctions.showSnackBar(
+      _showThrottledSnackBar(
         'Location is turned off for this app. You can enable it in Settings when you’re ready.',
       );
       return;
@@ -163,7 +175,7 @@ class LocationService extends GetxController {
       );
     } catch (e) {
       debugPrint('Error showing app settings dialog: $e');
-      THelperFunctions.showSnackBar(
+      _showThrottledSnackBar(
         'Location is turned off for this app. You can enable it in Settings when you\'re ready.',
       );
     }
@@ -244,7 +256,7 @@ class LocationService extends GetxController {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
         _locationStatus.value = 'Permission denied.';
-        THelperFunctions.showSnackBar('Location permissions are denied');
+        _showThrottledSnackBar('Location permissions are denied');
         return false;
       }
     }
@@ -268,7 +280,7 @@ class LocationService extends GetxController {
         );
       } else {
         // Automatic / startup check — only show a non-intrusive snackbar.
-        THelperFunctions.showSnackBar(
+        _showThrottledSnackBar(
           'Location is turned off. Enable it in Settings when you\'re ready.',
         );
       }
@@ -383,7 +395,7 @@ class LocationService extends GetxController {
         }
 
         if (!await Permission.locationAlways.isGranted) {
-          THelperFunctions.showSnackBar(
+          _showThrottledSnackBar(
             'You cannot go online without "Always Allow" location permission.',
           );
           return false;

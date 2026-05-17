@@ -934,6 +934,15 @@ class TripManagementController extends GetxController {
       currentTripId = activeTrip.value!.id;
     }
 
+    print("==== DEBUG DRIVER LOCATION UPDATE ====");
+    print("Latitude: ${position.latitude}");
+    print("Longitude: ${position.longitude}");
+    print("State: $_currentState");
+    print("Availability: $statusToSend");
+    print("Trip ID: $currentTripId");
+    print("Category being sent to backend: $category");
+    print("======================================");
+
     _webSocketService.updateDriverLocation(
       latitude: position.latitude,
       longitude: position.longitude,
@@ -1018,6 +1027,18 @@ class TripManagementController extends GetxController {
             ? 'on_trip'
             : (_dashboardController?.driverTaskStatus.value ?? 'available');
 
+        final String? category =
+            _dashboardController?.currentDriver.value?.driverProfile?.category;
+
+        print("==== DEBUG DRIVER LOOP LOCATION UPDATE ====");
+        print("Latitude: ${position.latitude}");
+        print("Longitude: ${position.longitude}");
+        print("State: $_currentState");
+        print("Availability: $statusToSend");
+        print("Trip ID: ${activeTrip.value?.id}");
+        print("Category being sent in loop: $category");
+        print("===========================================");
+
         _webSocketService.updateDriverLocation(
           latitude: position.latitude,
           longitude: position.longitude,
@@ -1026,6 +1047,7 @@ class TripManagementController extends GetxController {
           tripId: activeTrip.value?.id,
           heading: position.heading,
           speed: position.speed,
+          category: category,
         );
         print("Location Ping Sent: $statusToSend"); // Verification Print
       }

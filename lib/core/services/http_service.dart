@@ -254,6 +254,14 @@ class HttpService extends GetxService {
     Map<String, dynamic>? queryParameters,
   }) async {
     try {
+      print("==== HTTP OUTGOING REQUEST ====");
+      print("Method: $method");
+      print("URL: $endpoint");
+      if (body != null) {
+        print("Body: ${json.encode(body)}");
+      }
+      print("===============================");
+
       // 1. ADD TIMEOUT HERE
       http.Response response = await requestFunction().timeout(
         ApiConfig.receiveTimeout,
