@@ -41,7 +41,7 @@ class THelperFunctions {
     }
   }
 
-  // --- FIXED: Using Get.rawSnackbar for iOS compatibility ---
+  // --- FIXED: Using Native ScaffoldMessenger for iOS Release Compatibility ---
   static void _showCustomSnackBar({
     required String title,
     required String message,
@@ -49,26 +49,53 @@ class THelperFunctions {
     required IconData icon,
     Duration duration = const Duration(seconds: 3),
   }) {
-    // Close any existing snackbar first to prevent stacking
-    if (Get.isSnackbarOpen) {
-      Get.closeCurrentSnackbar();
-    }
+    final context = Get.context;
+    if (context == null) return;
 
-    Get.rawSnackbar(
-      title: title.isEmpty ? null : title,
-      messageText: Text(
-        message,
-        style: const TextStyle(color: Colors.white, fontSize: 14),
+    // Close any existing snackbar first to prevent stacking
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+    final snackBar = SnackBar(
+      content: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Colors.white, size: 28),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (title.isNotEmpty) ...[
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                Text(
+                  message,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
       backgroundColor: backgroundColor,
-      icon: Icon(icon, color: Colors.white, size: 28),
+      behavior: SnackBarBehavior.floating,
       margin: const EdgeInsets.all(15),
-      borderRadius: 10,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
       duration: duration,
-      isDismissible: true,
-      snackPosition: SnackPosition.TOP,
-      forwardAnimationCurve: Curves.easeOutBack,
     );
+
+    ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
 
   static void showSuccessSnackBar(String title, String message) {
