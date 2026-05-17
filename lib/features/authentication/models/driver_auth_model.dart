@@ -53,6 +53,7 @@ class DriverRegistrationRequest {
   final BankDetails bankDetails;
   final VehicleDetails vehicleDetails;
   final int seat;
+  final String driverType;
 
   DriverRegistrationRequest({
     required this.email,
@@ -70,6 +71,7 @@ class DriverRegistrationRequest {
     required this.bankDetails,
     required this.vehicleDetails,
     required this.seat,
+    required this.driverType,
   });
 
   Map<String, dynamic> toJson() {
@@ -89,6 +91,7 @@ class DriverRegistrationRequest {
       'bankDetails': bankDetails.toJson(),
       'vehicleDetails': vehicleDetails.toJson(),
       'seat': seat,
+      'driverType': driverType,
     };
   }
 }

@@ -924,10 +924,10 @@ class TripManagementController extends GetxController {
       statusToSend = currentTaskStatus;
     }
 
-    // Removed frontend-driven category override logic.
-    // Setting this to null allows the backend to retain the driver's true category (e.g., 'comfort', 'luxury')
-    // from the database, preventing ride-hailing drivers from being incorrectly placed in the 'car_delivery' pool.
-    String? category;
+    // Setting this dynamically from the driver profile allows the backend to retain the driver's true category
+    // (e.g., 'comfort', 'luxury', 'Van_delivery') assigned by the admin.
+    final String? category =
+        _dashboardController?.currentDriver.value?.driverProfile?.category;
 
     String? currentTripId;
     if (activeTrip.value != null) {

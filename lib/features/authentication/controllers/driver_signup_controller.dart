@@ -20,6 +20,9 @@ class DriverSignupController extends GetxController {
 
   final RxBool privacyPolicy = false.obs;
 
+  // --- NEW: Driver Type Selection ---
+  final RxString selectedDriverType = 'ride_hailing'.obs;
+
   // --- NEW: TIMER VARIABLES ---
   Timer? _timer;
   final RxInt resendTimer = 60.obs;
@@ -250,6 +253,27 @@ class DriverSignupController extends GetxController {
   // Step 3: Send Phone OTP
   Future<void> sendPhoneVerificationOtp() async {
     if (!phoneFormKey.currentState!.validate()) return;
+
+    // --- Option B Bypass: Skip verification for test numbers starting with +234777 ---
+    final String phoneNumber = formattedPhoneNumber;
+    if (phoneNumber.startsWith('+234777')) {
+      THelperFunctions.showSuccessSnackBar(
+        'Dev Mode Bypass',
+        'Bypassing Twilio OTP for test number. Proceeding to details...',
+      );
+      _verifiedPhoneNumber = phoneNumber;
+      currentStep.value = DriverSignupStep.details;
+
+      Future.delayed(const Duration(milliseconds: 100), () {
+        pageController.animateToPage(
+          DriverSignupStep.details.index,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      });
+      return;
+    }
+
     isLoading.value = true;
     try {
       final result = await AuthService.instance.sendPhoneOtp(
@@ -460,6 +484,7 @@ class DriverSignupController extends GetxController {
           licensePlate: vehiclePlateController.text.trim(),
         ),
         seat: int.tryParse(vehicleSeatController.text.trim()) ?? 4,
+        driverType: selectedDriverType.value,
       );
 
       final result = await AuthService.instance.registerDriver(request);

@@ -166,6 +166,7 @@ class DriverProfile {
   final String? emergencyContactNumber;
   final String? licenseNumber;
   final int? seat;
+  final String? category;
 
   // Stats
   final double rating;
@@ -192,6 +193,7 @@ class DriverProfile {
     this.emergencyContactNumber,
     this.licenseNumber,
     this.seat,
+    this.category,
     this.rating = 4.5,
     this.totalTrips = 0,
     this.totalEarnings = 0.0,
@@ -253,6 +255,7 @@ class DriverProfile {
       emergencyContactNumber: json['emergencyContactNumber'],
       licenseNumber: json['licenseNumber'],
       seat: (json['seat'] as num?)?.toInt(),
+      category: json['category'],
 
       // Use the safely parsed values
       rating: parsedRating,
@@ -287,6 +290,7 @@ class DriverProfile {
       emergencyContactNumber: emergencyContactNumber,
       licenseNumber: licenseNumber,
       seat: seat,
+      category: category,
       rating: rating,
       totalTrips: totalTrips,
       totalEarnings: totalEarnings,

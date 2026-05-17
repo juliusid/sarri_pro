@@ -48,6 +48,114 @@ class DriverDetailsStep extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // --- Driver Service Type ---
+              Text(
+                'Driver Service Type',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: TSizes.spaceBtwItems),
+              Row(
+                children: [
+                  Expanded(
+                    child: Obx(() {
+                      final isSelected = controller.selectedDriverType.value == 'ride_hailing';
+                      final primaryColor = Theme.of(context).primaryColor;
+                      return GestureDetector(
+                        onTap: () => controller.selectedDriverType.value = 'ride_hailing',
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? primaryColor.withOpacity(0.1)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected
+                                  ? primaryColor
+                                  : (isDark ? Colors.grey[800]! : Colors.grey[300]!),
+                              width: isSelected ? 2 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Iconsax.car5,
+                                color: isSelected
+                                    ? primaryColor
+                                    : (isDark ? Colors.grey[400] : Colors.grey[600]),
+                                size: 28,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Ride Hailing',
+                                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                      color: isSelected
+                                          ? primaryColor
+                                          : (isDark ? Colors.grey[300] : Colors.grey[700]),
+                                      fontWeight:
+                                          isSelected ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(width: TSizes.spaceBtwInputFields),
+                  Expanded(
+                    child: Obx(() {
+                      final isSelected =
+                          controller.selectedDriverType.value == 'Package_delivery';
+                      final primaryColor = Theme.of(context).primaryColor;
+                      return GestureDetector(
+                        onTap: () => controller.selectedDriverType.value = 'Package_delivery',
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? primaryColor.withOpacity(0.1)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected
+                                  ? primaryColor
+                                  : (isDark ? Colors.grey[800]! : Colors.grey[300]!),
+                              width: isSelected ? 2 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Iconsax.box5,
+                                color: isSelected
+                                    ? primaryColor
+                                    : (isDark ? Colors.grey[400] : Colors.grey[600]),
+                                size: 28,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Package Delivery',
+                                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                      color: isSelected
+                                          ? primaryColor
+                                          : (isDark ? Colors.grey[300] : Colors.grey[700]),
+                                      fontWeight:
+                                          isSelected ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              ),
+              const SizedBox(height: TSizes.spaceBtwSections),
+
               // --- Personal Information ---
               Text(
                 'Personal Information',

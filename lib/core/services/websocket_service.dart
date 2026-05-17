@@ -327,7 +327,7 @@ class WebSocketService extends GetxService {
       if (tripId != null) 'tripId': tripId,
       if (heading != null) 'heading': heading,
       if (speed != null) 'speed': speed,
-      'category': category ?? 'car',
+      if (category != null && category.isNotEmpty) 'category': category,
     };
 
     // Use emitWithAck to get the server response

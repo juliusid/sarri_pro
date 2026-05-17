@@ -18,6 +18,7 @@ import 'package:sarri_ride/utils/constants/text_strings.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/utils/validators/validation.dart';
 import 'package:sarri_ride/features/authentication/screens/forgot_password/forgot_password_screen.dart';
+import 'package:sarri_ride/features/authentication/screens/debug/debug_snackbar_screen.dart';
 import 'package:sarri_ride/utils/constants/enums.dart'; // Import Enums
 import 'package:sarri_ride/common/widgets/loading_button.dart'; // <-- 1. IMPORT YOUR NEW WIDGET
 
@@ -94,10 +95,13 @@ class _LoginScreenGetXState extends State<LoginScreenGetX> {
                   ),
                 ),
                 const SizedBox(height: TSizes.spaceBtwSections),
-                // Login Title
-                Text(
-                  TTexts.loginTitle,
-                  style: Theme.of(context).textTheme.headlineMedium,
+                // Login Title (Long-press secret debug entry)
+                GestureDetector(
+                  onLongPress: () => Get.to(() => const DebugSnackbarScreen()),
+                  child: Text(
+                    TTexts.loginTitle,
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
                 ),
 
                 const SizedBox(height: TSizes.spaceBtwItems),
