@@ -60,6 +60,37 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
   final PanelController panelController = PanelController();
   late AnimationController driverAnimationController;
   Timer? driverLocationTimer;
+  Timer? _paymentPollingTimer;
+  int _pollingAttempts = 0;
+  static const int _maxPollingAttempts = 36; // 3 min at 5s intervals
+
+  void _startPaymentPolling(String tripId) {
+    _stopPaymentPolling();
+    _pollingAttempts = 0;
+    _paymentPollingTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      if (_pollingAttempts >= _maxPollingAttempts) {
+        _stopPaymentPolling();
+        return;
+      }
+      _pollingAttempts++;
+      try {
+        final response = await _httpService.get(
+          '${ApiConfig.tripPaymentStatusEndpoint}/$tripId',
+        );
+        final data = _httpService.handleResponse(response);
+        if (data['paymentStatus'] == 'paid' || data['paymentStatus'] == 'completed') {
+          _stopPaymentPolling();
+          onPaymentSuccess();
+        }
+      } catch (_) {}
+    });
+  }
+
+  void _stopPaymentPolling() {
+    _paymentPollingTimer?.cancel();
+    _paymentPollingTimer = null;
+    _pollingAttempts = 0;
+  }
 
   // Text Controllers
   final TextEditingController destinationController = TextEditingController();
@@ -384,6 +415,9 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
 
     panelController.open();
     update();
+    
+    // Resume polling in case payment was already made
+    _startPaymentPolling(tripId);
   }
 
   double _calculateBearing(LatLng start, LatLng end) {
@@ -471,6 +505,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
   void _handlePaymentConfirmed(dynamic data) {
     if (data is Map<String, dynamic> && data['tripId'] == rideId.value) {
       print("RIDE CONTROLLER: Received payment:confirmed event.");
+      _stopPaymentPolling();
       onPaymentSuccess();
     }
   }
@@ -1930,6 +1965,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
   }
 
   void _resetUIState() {
+    _stopPaymentPolling();
     currentState.value = BookingState.initial;
     selectedRideType.value = null;
     assignedDriver.value = null;
@@ -1987,6 +2023,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
   }
 
   void onPaymentSuccess() {
+    _stopPaymentPolling();
     isPaymentCompleted.value = true;
 
     // Payment completed; stop forcing the payment-pending UI restoration.
@@ -2220,6 +2257,11 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
         _storage.write('rider_waiting_fare', finalFare.toInt());
         _storage.write('rider_waiting_eta', selectedRideType.value?.eta ?? '...');
         _storage.write('rider_waiting_seats', selectedRideType.value?.seats ?? 4);
+
+        // Start polling fallback in case socket is missed
+        if (paymentStatusRaw == 'pending_confirmation' || data['paymentMethod'] != 'cash') {
+          _startPaymentPolling(rideId.value);
+        }
       }
 
       THelperFunctions.showSuccessSnackBar(

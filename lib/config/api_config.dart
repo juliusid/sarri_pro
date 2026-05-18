@@ -195,6 +195,7 @@ class ApiConfig {
   static String get addPaymentCardEndpoint => '$baseUrl/payment/card/add';
   static String get listPaymentCardsEndpoint => '$baseUrl/payment/cards';
   static String get initiateTripPaymentEndpoint => '$baseUrl/payment/trip/init';
+  static String get tripPaymentStatusEndpoint => '$baseUrl/payment/trip-status';
   static String get switchPaymentMethodEndpoint =>
       '$baseUrl/payment/switch-method';
   // Note: The callback endpoints are for backend/webview use, not direct app calls.
