@@ -135,6 +135,8 @@ class ApiConfig {
       '$baseUrl/driverAuth/driver/updateBankdetails';
   static String get driverBankListEndpoint =>
       '$baseUrl/driverAuth/driver/banklist';
+  static String get driverResolveBankEndpoint =>
+      '$baseUrl/driverAuth/driver/resolve-bank';
   static String get driverTripHistoryEndpoint =>
       '$baseUrl/driverRides/driverTripHistory';
   // Driver Payment & Wallet Endpoints
@@ -252,4 +254,8 @@ class ApiConfig {
       '$baseUrl/package_payment/Package_debt/pay';
   static String get packagePaymentPreviewEndpoint =>
       '$baseUrl/package_payment/Package_payment/preview';
+
+  // Package Delivery Price Check
+  static String get packageDeliveryPriceCheckEndpoint =>
+      '$baseUrl/package_delivery/PackageDelivery-price-check';
 }

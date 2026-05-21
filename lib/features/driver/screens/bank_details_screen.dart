@@ -42,6 +42,8 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
   List<Bank> _bankList = [];
   bool _isLoadingBanks = true;
   bool _isVerifying = false;
+  bool _isResolving = false;
+  String? _resolvedAccountName;
 
   // Controllers to display current details
   final _currentBankNameController = TextEditingController();
@@ -53,6 +55,55 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
     super.initState();
     _fetchBankList();
     _loadCurrentDetails();
+    _accountNumberController.addListener(_onAccountDetailsChanged);
+  }
+
+  void _onAccountDetailsChanged() {
+    final accountText = _accountNumberController.text.trim();
+    if (accountText.length == 10 && _selectedBank != null) {
+      _resolveBankAccount();
+    } else {
+      setState(() {
+        _resolvedAccountName = null;
+      });
+    }
+  }
+
+  Future<void> _resolveBankAccount() async {
+    final accountText = _accountNumberController.text.trim();
+    if (accountText.length != 10 || _selectedBank == null) return;
+
+    setState(() {
+      _isResolving = true;
+      _resolvedAccountName = null;
+    });
+
+    try {
+      final response = await _httpService.get(
+        '${ApiConfig.driverResolveBankEndpoint}?account_number=$accountText&bank_code=${_selectedBank!.code}',
+      );
+      final responseData = _httpService.handleResponse(response);
+
+      if (responseData['success'] == true && responseData['data'] != null) {
+        setState(() {
+          _resolvedAccountName = responseData['data']['account_name'];
+        });
+      } else {
+        setState(() {
+          _resolvedAccountName = 'Account not found';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _resolvedAccountName = 'Verification failed';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isResolving = false;
+        });
+      }
+    }
   }
 
   void _loadCurrentDetails() {
@@ -110,6 +161,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
         body: {
           "bankAccountNumber": _accountNumberController.text.trim(),
           "bankCode": _selectedBank!.code,
+          "bankName": _selectedBank!.name,
         },
       );
       final responseData = _httpService.handleResponse(response);
@@ -175,6 +227,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
 
   @override
   void dispose() {
+    _accountNumberController.removeListener(_onAccountDetailsChanged);
     _accountNumberController.dispose();
     _currentBankNameController.dispose();
     _currentAccountNameController.dispose();
@@ -314,6 +367,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                       setState(() {
                         _selectedBank = newValue;
                       });
+                      _onAccountDetailsChanged();
                     },
                     decoration: const InputDecoration(
                       labelText: 'Bank',
@@ -328,13 +382,82 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
             TextFormField(
               controller: _accountNumberController,
               keyboardType: TextInputType.number,
+              maxLength: 10,
               decoration: const InputDecoration(
                 labelText: 'Account Number',
                 prefixIcon: Icon(Iconsax.hashtag),
               ),
-              validator: (value) =>
-                  TValidator.validateEmptyText('Account Number', value),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Account number is required';
+                }
+                if (value.trim().length != 10) {
+                  return 'Account number must be 10 digits';
+                }
+                return null;
+              },
             ),
+            
+            // Resolved Account Name Display
+            if (_isResolving)
+              const Padding(
+                padding: EdgeInsets.only(top: TSizes.spaceBtwItems),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: TSizes.spaceBtwItems),
+                    Text('Verifying account details...'),
+                  ],
+                ),
+              )
+            else if (_resolvedAccountName != null)
+              Padding(
+                padding: const EdgeInsets.only(top: TSizes.spaceBtwItems),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(TSizes.md),
+                  decoration: BoxDecoration(
+                    color: _resolvedAccountName == 'Account not found' || _resolvedAccountName == 'Verification failed' 
+                        ? TColors.error.withOpacity(0.1) 
+                        : TColors.success.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
+                    border: Border.all(
+                      color: _resolvedAccountName == 'Account not found' || _resolvedAccountName == 'Verification failed' 
+                          ? TColors.error 
+                          : TColors.success,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _resolvedAccountName == 'Account not found' || _resolvedAccountName == 'Verification failed' 
+                            ? Iconsax.warning_2 
+                            : Iconsax.tick_circle,
+                        color: _resolvedAccountName == 'Account not found' || _resolvedAccountName == 'Verification failed' 
+                            ? TColors.error 
+                            : TColors.success,
+                      ),
+                      const SizedBox(width: TSizes.spaceBtwItems),
+                      Expanded(
+                        child: Text(
+                          _resolvedAccountName!,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            color: _resolvedAccountName == 'Account not found' || _resolvedAccountName == 'Verification failed' 
+                                ? TColors.error 
+                                : TColors.success,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
             const SizedBox(height: TSizes.spaceBtwSections),
 
             // Update Button

@@ -341,14 +341,36 @@ class WalletScreen extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        DateFormat('MMM dd, hh:mm a').format(tx.date),
-                        style: TextStyle(
-                          color: dark
-                              ? TColors.lightGrey
-                              : TColors.textSecondary,
-                          fontSize: 12,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            DateFormat('MMM dd, hh:mm a').format(tx.date),
+                            style: TextStyle(
+                              color: dark
+                                  ? TColors.lightGrey
+                                  : TColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                          if (tx.status == 'processing' || tx.status == 'pending')
+                            Container(
+                              margin: const EdgeInsets.only(left: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: TColors.warning.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: TColors.warning.withOpacity(0.5)),
+                              ),
+                              child: Text(
+                                tx.status.capitalizeFirst ?? 'Processing',
+                                style: const TextStyle(
+                                  fontSize: 10, 
+                                  color: TColors.warning, 
+                                  fontWeight: FontWeight.bold
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),

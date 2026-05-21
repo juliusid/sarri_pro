@@ -216,5 +216,32 @@ class PackageDeliveryService extends GetxService {
     );
     return _httpService.handleResponse(response);
   }
-}
 
+  /// Fetches dynamic package delivery prices from the backend.
+  /// Returns a list of options with category, price, and breakdown.
+  /// Throws an exception if the API fails so the caller can prompt retry.
+  Future<List<Map<String, dynamic>>> fetchPackagePrices({
+    required double pickupLat,
+    required double pickupLng,
+    required double destLat,
+    required double destLng,
+  }) async {
+    final response = await _httpService.post(
+      ApiConfig.packageDeliveryPriceCheckEndpoint,
+      body: {
+        'currentLocation': {'latitude': pickupLat, 'longitude': pickupLng},
+        'destination': {'latitude': destLat, 'longitude': destLng},
+      },
+    );
+    final responseData = _httpService.handleResponse(response);
+    if (responseData['status'] == 'success' &&
+        responseData['data']?['options'] != null) {
+      return List<Map<String, dynamic>>.from(
+        responseData['data']['options'] as List,
+      );
+    }
+    throw Exception(
+      responseData['message'] ?? 'Could not fetch package prices. Please try again.',
+    );
+  }
+}

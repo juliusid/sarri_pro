@@ -22,6 +22,7 @@ import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/features/driver/controllers/driver_dashboard_controller.dart';
 import 'package:sarri_ride/features/driver/screens/trip_request_screen.dart';
+import 'package:sarri_ride/config/api_config.dart';
 
 // --- Trip Request Model ---
 class TripRequest {
@@ -212,6 +213,40 @@ class TripManagementController extends GetxController {
 
   // Cached State for location updates
   String _currentState = "";
+  
+  // Payment Polling
+  Timer? _paymentPollingTimer;
+  int _pollingAttempts = 0;
+  static const int _maxPollingAttempts = 36; // 3 min at 5s intervals
+
+  void _startPaymentPolling(String tripId) {
+    _stopPaymentPolling();
+    _pollingAttempts = 0;
+    _paymentPollingTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      if (_pollingAttempts >= _maxPollingAttempts) {
+        _stopPaymentPolling();
+        return;
+      }
+      _pollingAttempts++;
+      try {
+        final HttpService httpService = HttpService.instance;
+        final response = await httpService.get(
+          '${ApiConfig.tripPaymentStatusEndpoint}/$tripId',
+        );
+        final data = httpService.handleResponse(response);
+        if (data['paymentStatus'] == 'paid' || data['paymentStatus'] == 'completed') {
+          _stopPaymentPolling();
+          _handlePaymentConfirmed({'tripId': tripId});
+        }
+      } catch (_) {}
+    });
+  }
+
+  void _stopPaymentPolling() {
+    _paymentPollingTimer?.cancel();
+    _paymentPollingTimer = null;
+    _pollingAttempts = 0;
+  }
 
   // Initial Route Estimates
   double _initialRouteDistanceKm = 0.0;
@@ -293,6 +328,11 @@ class TripManagementController extends GetxController {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _showWaitingForPaymentScreenOnce();
     });
+    
+    // Start polling in case socket was missed
+    if (!isWaitingForCash.value) {
+      _startPaymentPolling(tripId);
+    }
   }
 
   /// User-friendly string representation of current trip status
@@ -725,6 +765,10 @@ class TripManagementController extends GetxController {
         _storage.remove('driver_waiting_cash_amount');
 
         _showWaitingForPaymentScreenOnce();
+        
+        if (!isWaitingForCash.value) {
+          _startPaymentPolling(activeTrip.value!.id);
+        }
       } else {
         throw Exception(responseData['message']);
       }
@@ -1280,6 +1324,7 @@ class TripManagementController extends GetxController {
   void _handlePaymentConfirmed(dynamic data) {
     if (data is Map<String, dynamic> &&
         data['tripId'] == activeTrip.value?.id) {
+      _stopPaymentPolling();
       tripStatus.value = TripStatus.completed;
       activeTrip.value = activeTrip.value?.copyWith(
         status: TripStatus.completed,
@@ -1404,6 +1449,7 @@ class TripManagementController extends GetxController {
     hasNewRequest.value = false;
     isNavigating.value = false;
     _requestTimer?.cancel();
+    _stopPaymentPolling();
     navigationInstruction.value = '';
     currentRoute.clear();
     mapPolylines.clear();

@@ -2056,6 +2056,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
 
   void goToPackageBooking() {
     currentState.value = BookingState.packageBooking;
+    // Show defaults immediately; live prices will replace them after fetch
     rideTypes.assignAll(_packageRideTypes);
     animatePanelTo80Percent();
   }
@@ -2079,12 +2080,72 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
     _ensureMapFitsRoute();
   }
 
-  void continueWithPackageTypes() {
-    rideTypes.assignAll(_packageRideTypes);
-    continueToRideSelection();
+  /// Fetches live package prices from the backend and transitions to ride selection.
+  void continueWithPackageTypes() async {
+    if (pickupLocation.value == null || destinationLocation.value == null) {
+      THelperFunctions.showErrorSnackBar('Error', 'Please set pickup and destination first.');
+      return;
+    }
+
+    THelperFunctions.showSnackBar('Calculating package fares...');
+
+    try {
+      final pkgService = PackageDeliveryService.instance;
+      final options = await pkgService.fetchPackagePrices(
+        pickupLat: pickupLocation.value!.latitude,
+        pickupLng: pickupLocation.value!.longitude,
+        destLat: destinationLocation.value!.latitude,
+        destLng: destinationLocation.value!.longitude,
+      );
+
+      // Map backend categories to RideType objects
+      final Map<String, IconData> categoryIcons = {
+        'bike_courier': Icons.pedal_bike,
+        'car_delivery': Icons.local_shipping,
+        'Van_delivery': Icons.fire_truck,
+      };
+      final Map<String, String> categoryNames = {
+        'bike_courier': 'Bike Courier',
+        'car_delivery': 'Car Delivery',
+        'Van_delivery': 'Van Delivery',
+      };
+      final Map<String, String> categoryEta = {
+        'bike_courier': '10 min',
+        'car_delivery': '15 min',
+        'Van_delivery': '20 min',
+      };
+
+      final liveTypes = options.map((opt) {
+        final cat = opt['category'] as String? ?? '';
+        final rawPrice = opt['price'];
+        final price = rawPrice is num ? rawPrice.toInt() : 0;
+        return RideType(
+          name: categoryNames[cat] ?? cat,
+          price: price,
+          eta: categoryEta[cat] ?? '15 min',
+          icon: categoryIcons[cat] ?? Icons.local_shipping,
+          seats: 1,
+        );
+      }).toList();
+
+      rideTypes.assignAll(liveTypes);
+
+      selectedRideType.value = null;
+      currentState.value = BookingState.selectRide;
+      showDestinationSuggestions.value = false;
+      destinationSuggestions.clear();
+      animatePanelTo80Percent();
+      _ensureMapFitsRoute();
+    } catch (e) {
+      THelperFunctions.showErrorSnackBar(
+        'Pricing Unavailable',
+        'Could not fetch package prices. Please try again.',
+      );
+    }
   }
 
   void continueWithFreightTypes() {
+    // Freight has no dedicated price-check endpoint yet — use hardcoded defaults.
     rideTypes.assignAll(_freightRideTypes);
     continueToRideSelection();
   }

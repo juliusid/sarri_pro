@@ -67,6 +67,20 @@ class WaitingForPaymentScreen extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: TSizes.spaceBtwSections),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Get.until((route) => route.settings.name == '/DriverDashboardScreen' || route.isFirst);
+                },
+                icon: const Icon(Iconsax.home, color: TColors.light),
+                label: const Text(
+                  'Go to Dashboard',
+                  style: TextStyle(color: TColors.light, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
           ],
         ),
       ),
