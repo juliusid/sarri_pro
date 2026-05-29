@@ -258,4 +258,22 @@ class ApiConfig {
   // Package Delivery Price Check
   static String get packageDeliveryPriceCheckEndpoint =>
       '$baseUrl/package_delivery/PackageDelivery-price-check';
+
+  // ── Referral Endpoints ────────────────────────────────────────────────────
+  /// Get or create the logged-in user's referral profile
+  static String get referralProfileEndpoint => '$baseUrl/referral/profile';
+
+  /// Get full referral stats (points, history, tier)
+  static String get referralStatsEndpoint => '$baseUrl/referral/stats';
+
+  /// Apply a referral code after signup
+  static String get referralApplyEndpoint => '$baseUrl/referral/apply';
+
+  /// Validate a referral code (public — no auth needed)
+  static String get referralValidateEndpoint => '$baseUrl/referral/validate';
+
+  /// Calculate how much of a trip price can be covered by points
+  static String get referralCalculateDiscountEndpoint =>
+      '$baseUrl/referral/calculate-discount';
 }
+

@@ -15,6 +15,7 @@ import 'package:sarri_ride/features/authentication/services/auth_service.dart';
 import 'package:sarri_ride/features/authentication/screens/login/login_screen_getx.dart';
 import 'package:sarri_ride/features/ride/controllers/drawer_controller.dart';
 import 'package:sarri_ride/features/ride/widgets/map_screen_getx.dart';
+import 'package:sarri_ride/features/referral/controllers/referral_controller.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
 enum RiderSignupStep { email, otp, details }
@@ -48,6 +49,7 @@ class RiderSignupController extends GetxController {
   final firstNameController = TextEditingController();
   final lastNameController = TextEditingController();
   final passwordController = TextEditingController();
+  final referralCodeController = TextEditingController();
 
   @override
   void onClose() {
@@ -58,6 +60,7 @@ class RiderSignupController extends GetxController {
     firstNameController.dispose();
     lastNameController.dispose();
     passwordController.dispose();
+    referralCodeController.dispose();
     super.onClose();
   }
 
@@ -209,6 +212,18 @@ class RiderSignupController extends GetxController {
       );
 
       if (authResult.success) {
+        // Try to apply referral code if provided
+        final referralCode = referralCodeController.text.trim();
+        if (referralCode.isNotEmpty) {
+          try {
+            final referralController = Get.put(ReferralController());
+            await referralController.applyReferralCode(referralCode);
+          } catch (e) {
+            debugPrint('Failed to apply referral code post-signup: $e');
+            // Don't fail signup because of referral failure
+          }
+        }
+
         Get.offAll(() => const LoginScreenGetX());
         THelperFunctions.showSuccessSnackBar(
           'Success',

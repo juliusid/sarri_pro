@@ -91,14 +91,11 @@ class WebSocketService extends GetxService {
         'forceNew': true,
         'reconnection': false, // Handle manually
         // --- MISTAKE FIX ---
-        // The token must be sent in the 'query' map, not the 'auth' map,
-        // based on the documentation URL: wss://.../?token=...&EIO=4&transport=websocket
+        // based on the documentation URL: wss://.../?token=...
         //
         'auth': null, // Remove auth map
         'query': {
           'token': _cachedToken,
-          'EIO': '4', // Explicitly add EIO=4 as seen in doc
-          'transport': 'websocket', // Explicitly add transport as seen in doc
         },
         // --- END MISTAKE FIX ---
       });
@@ -169,8 +166,6 @@ class WebSocketService extends GetxService {
           // Re-set query params in case they are needed on reconnect
           _socket?.io.options?['query'] = {
             'token': _cachedToken,
-            'EIO': '4',
-            'transport': 'websocket',
           };
           _socket?.connect();
         } else if (_cachedToken == null) {

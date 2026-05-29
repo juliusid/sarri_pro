@@ -85,6 +85,15 @@ class RiderDetailsStep extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(height: TSizes.spaceBtwInputFields),
+                  TextFormField(
+                    controller: controller.referralCodeController,
+                    decoration: const InputDecoration(
+                      labelText: 'Referral Code (Optional)',
+                      prefixIcon: Icon(Iconsax.gift),
+                      hintText: 'Enter code if you have one',
+                    ),
+                  ),
                   // ========================================================
                   // START NEW SECTION: Terms & Conditions Checkbox
                   // ========================================================

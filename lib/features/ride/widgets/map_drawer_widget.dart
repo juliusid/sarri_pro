@@ -10,6 +10,7 @@ import 'package:sarri_ride/features/location/services/location_service.dart';
 import 'package:sarri_ride/features/profile/screens/profile_screen.dart';
 import 'package:sarri_ride/features/ride/screens/history/ride_history_screen.dart';
 import 'package:sarri_ride/features/payment/screens/payment_methods_screen.dart';
+import 'package:sarri_ride/features/referral/screens/referral_screen.dart';
 // PRODUCTION: Sarri Points (payment wallet_screen) has no client API yet — restore import + drawer row when backend exists.
 // import 'package:sarri_ride/features/payment/screens/wallet_screen.dart';
 import 'package:sarri_ride/features/settings/screens/settings_screen.dart';
@@ -176,6 +177,16 @@ class MapDrawerWidget extends StatelessWidget {
                 //   dark: dark,
                 //   textColor: textColor,
                 // ),
+                _buildDrawerItem(
+                  icon: Iconsax.gift,
+                  title: 'Referrals & Points',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Get.to(() => const ReferralScreen());
+                  },
+                  dark: dark,
+                  textColor: textColor,
+                ),
 
                 const SizedBox(height: 8),
                 Divider(
