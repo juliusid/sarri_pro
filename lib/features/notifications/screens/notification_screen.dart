@@ -73,7 +73,19 @@ class _NotificationScreenState extends State<NotificationScreen> {
         ],
       ),
       body: Obx(() {
-        final notifications = notificationController.items;
+        final rawNotifications = notificationController.items.toList();
+        
+        // Sort broadcasts to the top, then by timestamp descending
+        rawNotifications.sort((a, b) {
+          final isABroadcast = a.type.toLowerCase() == 'broadcast';
+          final isBBroadcast = b.type.toLowerCase() == 'broadcast';
+          
+          if (isABroadcast && !isBBroadcast) return -1;
+          if (!isABroadcast && isBBroadcast) return 1;
+          return b.timestamp.compareTo(a.timestamp);
+        });
+
+        final notifications = rawNotifications;
         if (notifications.isEmpty) {
           return Center(
             child: Column(
@@ -109,37 +121,44 @@ class _NotificationScreenState extends State<NotificationScreen> {
           ),
           itemBuilder: (context, index) {
             final notification = notifications[index];
-            return ListTile(
-              leading: _getNotificationIcon(notification.type),
-              title: Text(
-                notification.message,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: notification.isRead
-                      ? FontWeight.normal
-                      : FontWeight.bold,
+            final isBroadcast = notification.type.toLowerCase() == 'broadcast';
+            
+            return Container(
+              color: isBroadcast 
+                  ? (dark ? TColors.primary.withOpacity(0.15) : TColors.primary.withOpacity(0.05)) 
+                  : Colors.transparent,
+              child: ListTile(
+                leading: _getNotificationIcon(notification.type),
+                title: Text(
+                  notification.message,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: notification.isRead
+                        ? FontWeight.normal
+                        : FontWeight.bold,
+                  ),
                 ),
+                subtitle: Text(
+                  _formatTimestamp(notification.timestamp),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: isBroadcast ? TColors.primary : Colors.grey),
+                ),
+                trailing: !notification.isRead
+                    ? Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: TColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      )
+                    : null,
+                onTap: () {
+                  notificationController.markSingleRead(notification.id);
+                },
               ),
-              subtitle: Text(
-                _formatTimestamp(notification.timestamp),
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: Colors.grey),
-              ),
-              trailing: !notification.isRead
-                  ? Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: TColors.primary,
-                        shape: BoxShape.circle,
-                      ),
-                    )
-                  : null,
-              onTap: () {
-                notificationController.markSingleRead(notification.id);
-              },
             );
           },
         );
@@ -151,6 +170,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
     IconData iconData;
     Color color;
     switch (type.toLowerCase()) {
+      case 'broadcast':
+        iconData = Iconsax.mask; // Equivalent to megaphone/announcement in Iconsax
+        color = TColors.primary;
+        break;
       case 'ride_update':
       case 'ride_booking':
       case 'ride_accepted':
