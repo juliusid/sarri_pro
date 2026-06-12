@@ -6,6 +6,7 @@ import 'package:sarri_ride/features/authentication/screens/user_type_selection/u
 import 'package:sarri_ride/features/splash/screen/splash_screen.dart';
 import 'package:sarri_ride/utils/theme/theme.dart';
 import 'package:sarri_ride/utils/theme/theme_controller.dart';
+import 'package:upgrader/upgrader.dart';
 
 class App extends StatefulWidget {
   const App({super.key});
@@ -38,6 +39,17 @@ class _MyAppState extends State<App> {
         theme: TAppTheme.lightTheme,
         darkTheme: TAppTheme.darkTheme,
         home: const SplashScreen(),
+        builder: (context, child) {
+          return UpgradeAlert(
+            upgrader: Upgrader(
+              // This ensures the update prompt isn't forcefully blocking the user
+              showIgnore: true,
+              showLater: true,
+              canDismissDialog: true,
+            ),
+            child: child ?? const SizedBox.shrink(),
+          );
+        },
         getPages: [
           GetPage(name: '/', page: () => const SplashScreen()),
           GetPage(name: '/signup', page: () => const UserTypeSelectionScreen()),
