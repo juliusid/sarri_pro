@@ -41,12 +41,11 @@ class _MyAppState extends State<App> {
         home: const SplashScreen(),
         builder: (context, child) {
           return UpgradeAlert(
-            upgrader: Upgrader(
-              // This ensures the update prompt isn't forcefully blocking the user
-              showIgnore: true,
-              showLater: true,
-              canDismissDialog: true,
-            ),
+            upgrader: Upgrader(),
+            // This ensures the update prompt isn't forcefully blocking the user
+            showIgnore: true,
+            showLater: true,
+            canDismissDialog: true,
             child: child ?? const SizedBox.shrink(),
           );
         },
