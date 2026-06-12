@@ -8,30 +8,25 @@ import 'package:get/get.dart';
 class RideType {
   final String name;
   final int price;
+  final int? originalPrice;
   final String eta;
   final IconData icon;
   final int seats;
+  final bool isActive;
 
   const RideType({
     required this.name,
     required this.price,
+    this.originalPrice,
     required this.eta,
     required this.icon,
     required this.seats,
+    this.isActive = true,
   });
 
   /// Maps backend category names to localized UI names.
   String get displayName {
-    switch (name.toLowerCase()) {
-      case 'comfort':
-        return 'Basic';
-      case 'xl':
-        return 'E-Vehicle';
-      case 'luxury':
-        return 'Luxury';
-      default:
-        return name;
-    }
+    return name;
   }
 
   @override
@@ -134,7 +129,7 @@ class RideSelectionWidget extends StatelessWidget {
                       final isSelected = selectedRideType == rideType;
 
                       return GestureDetector(
-                        onTap: () => onRideTypeSelected(rideType),
+                        onTap: rideType.isActive ? () => onRideTypeSelected(rideType) : null,
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           padding: const EdgeInsets.symmetric(
@@ -183,13 +178,37 @@ class RideSelectionWidget extends StatelessWidget {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      rideType.displayName,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                        color: textColor,
-                                      ),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          rideType.displayName,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                            color: rideType.isActive ? textColor : subtitleColor,
+                                          ),
+                                        ),
+                                        if (!rideType.isActive)
+                                          Padding(
+                                            padding: const EdgeInsets.only(left: 8.0),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.orange.withOpacity(0.1),
+                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                                              ),
+                                              child: const Text(
+                                                'Coming Soon',
+                                                style: TextStyle(
+                                                  color: Colors.orange,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                     const SizedBox(height: 4),
                                     Row(
@@ -224,6 +243,7 @@ class RideSelectionWidget extends StatelessWidget {
                               ),
 
                               // Price
+                              // Price
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
@@ -235,6 +255,16 @@ class RideSelectionWidget extends StatelessWidget {
                                       color: textColor,
                                     ),
                                   ),
+                                  if (rideType.originalPrice != null && rideType.originalPrice! > rideType.price)
+                                    Text(
+                                      '₦${rideType.originalPrice}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 13,
+                                        color: subtitleColor,
+                                        decoration: TextDecoration.lineThrough,
+                                      ),
+                                    ),
                                 ],
                               ),
                             ],

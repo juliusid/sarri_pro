@@ -168,14 +168,14 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
       seats: 4,
     ),
     const RideType(
-      name: 'Comfort',
+      name: 'E-Vehicle',
       price: 3200,
       eta: '5 min',
-      icon: Icons.car_rental,
+      icon: Icons.electric_car,
       seats: 4,
     ),
     const RideType(
-      name: 'XL',
+      name: 'Basic',
       price: 4500,
       eta: '7 min',
       icon: Icons.airport_shuttle,
@@ -811,39 +811,26 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
         final newRideTypes = <RideType>[];
         final estimatedEtaMinutes = (totalDuration.value / 60).round() + 5;
 
-        if (prices.luxury != null) {
+        prices.forEach((key, categoryData) {
+          IconData icon = Icons.car_rental;
+          if (key.toLowerCase().contains('luxury')) icon = Icons.directions_car;
+          if (key.toLowerCase().contains('e-vehicle')) icon = Icons.electric_car;
+          
+          String displayName = key[0].toUpperCase() + key.substring(1);
+          if (key.toLowerCase() == 'e-vehicle') displayName = 'E-Vehicle';
+
           newRideTypes.add(
             RideType(
-              name: 'Luxury',
-              price: prices.luxury!.price,
+              name: displayName,
+              price: categoryData.price,
+              originalPrice: categoryData.originalPrice,
               eta: '${estimatedEtaMinutes + 2} min',
-              icon: Icons.directions_car,
-              seats: prices.luxury!.seats,
+              icon: icon,
+              seats: categoryData.seats,
+              isActive: categoryData.isActive,
             ),
           );
-        }
-        if (prices.comfort != null) {
-          newRideTypes.add(
-            RideType(
-              name: 'Comfort',
-              price: prices.comfort!.price,
-              eta: '$estimatedEtaMinutes min',
-              icon: Icons.car_rental,
-              seats: prices.comfort!.seats,
-            ),
-          );
-        }
-        if (prices.xl != null) {
-          newRideTypes.add(
-            RideType(
-              name: 'XL',
-              price: prices.xl!.price,
-              eta: '${estimatedEtaMinutes + 5} min',
-              icon: Icons.airport_shuttle,
-              seats: prices.xl!.seats,
-            ),
-          );
-        }
+        });
 
         if (newRideTypes.isEmpty) {
           // Handle empty case
@@ -1247,39 +1234,26 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
         final newRideTypes = <RideType>[];
         final estimatedEtaMinutes = (totalDuration.value / 60).round() + 5;
 
-        if (prices.luxury != null) {
+        prices.forEach((key, categoryData) {
+          IconData icon = Icons.car_rental;
+          if (key.toLowerCase().contains('luxury')) icon = Icons.directions_car;
+          if (key.toLowerCase().contains('e-vehicle')) icon = Icons.electric_car;
+          
+          String displayName = key[0].toUpperCase() + key.substring(1);
+          if (key.toLowerCase() == 'e-vehicle') displayName = 'E-Vehicle';
+
           newRideTypes.add(
             RideType(
-              name: 'Luxury',
-              price: prices.luxury!.price,
+              name: displayName,
+              price: categoryData.price,
+              originalPrice: categoryData.originalPrice,
               eta: '${estimatedEtaMinutes + 2} min',
-              icon: Icons.directions_car,
-              seats: prices.luxury!.seats,
+              icon: icon,
+              seats: categoryData.seats,
+              isActive: categoryData.isActive,
             ),
           );
-        }
-        if (prices.comfort != null) {
-          newRideTypes.add(
-            RideType(
-              name: 'Comfort',
-              price: prices.comfort!.price,
-              eta: '$estimatedEtaMinutes min',
-              icon: Icons.car_rental,
-              seats: prices.comfort!.seats,
-            ),
-          );
-        }
-        if (prices.xl != null) {
-          newRideTypes.add(
-            RideType(
-              name: 'XL',
-              price: prices.xl!.price,
-              eta: '${estimatedEtaMinutes + 5} min',
-              icon: Icons.airport_shuttle,
-              seats: prices.xl!.seats,
-            ),
-          );
-        }
+        });
 
         if (newRideTypes.isEmpty) {
           rideTypes.assignAll(_defaultRideTypes);

@@ -48,48 +48,46 @@ class CalculatePriceResponse {
 
 class PriceData {
   final double distanceKm;
-  final RidePrices prices;
+  final Map<String, PriceCategory> prices;
 
   PriceData({required this.distanceKm, required this.prices});
 
   factory PriceData.fromJson(Map<String, dynamic> json) {
+    Map<String, PriceCategory> parsedPrices = {};
+    if (json['prices'] != null) {
+      (json['prices'] as Map<String, dynamic>).forEach((key, value) {
+        if (value != null) {
+          parsedPrices[key] = PriceCategory.fromJson(value);
+        }
+      });
+    }
+
     return PriceData(
       distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0.0,
-      prices: RidePrices.fromJson(json['prices'] ?? {}),
-    );
-  }
-}
-
-class RidePrices {
-  final PriceCategory? luxury;
-  final PriceCategory? xl;
-  final PriceCategory? comfort;
-
-  RidePrices({this.luxury, this.xl, this.comfort});
-
-  factory RidePrices.fromJson(Map<String, dynamic> json) {
-    return RidePrices(
-      luxury: json['luxury'] != null
-          ? PriceCategory.fromJson(json['luxury'])
-          : null,
-      xl: json['xl'] != null ? PriceCategory.fromJson(json['xl']) : null,
-      comfort: json['comfort'] != null
-          ? PriceCategory.fromJson(json['comfort'])
-          : null,
+      prices: parsedPrices,
     );
   }
 }
 
 class PriceCategory {
   final int price;
+  final int? originalPrice;
   final int seats;
+  final bool isActive;
 
-  PriceCategory({required this.price, required this.seats});
+  PriceCategory({
+    required this.price,
+    this.originalPrice,
+    required this.seats,
+    this.isActive = true,
+  });
 
   factory PriceCategory.fromJson(Map<String, dynamic> json) {
     return PriceCategory(
       price: (json['price'] as num?)?.toInt() ?? 0,
+      originalPrice: (json['originalPrice'] as num?)?.toInt(),
       seats: (json['seats'] as num?)?.toInt() ?? 0,
+      isActive: json['isActive'] ?? true,
     );
   }
 }

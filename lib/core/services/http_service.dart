@@ -352,7 +352,12 @@ class HttpService extends GetxService {
       } else if (e is SocketException) {
         message = 'No internet connection.';
       } else {
-        message = 'Network error: ${e.toString()}';
+        String errorString = e.toString();
+        if (errorString.contains('ClientException') || errorString.contains('HandshakeException')) {
+          message = 'Network connection unstable. Please try again.';
+        } else {
+          message = 'Network error: $errorString';
+        }
       }
 
       print("HTTP_SERVICE: $message ($method $endpoint): $e");
