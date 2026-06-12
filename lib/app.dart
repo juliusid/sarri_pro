@@ -45,7 +45,6 @@ class _MyAppState extends State<App> {
             // This ensures the update prompt isn't forcefully blocking the user
             showIgnore: true,
             showLater: true,
-            canDismissDialog: true,
             child: child ?? const SizedBox.shrink(),
           );
         },
