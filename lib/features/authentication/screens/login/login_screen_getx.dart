@@ -248,56 +248,55 @@ class _LoginScreenGetXState extends State<LoginScreenGetX> {
 
                 const SizedBox(height: TSizes.spaceBtwSections),
 
-                // --- NEW: Hide Social Login for Drivers ---
-                Obx(() => controller.selectedRole.value == UserType.rider 
-                  ? Column(
+                // Social Login — available for both riders and drivers
+                Column(
+                  children: [
+                    // Divider
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Divider
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Flexible(
-                              child: Divider(
-                                color: dark ? TColors.darkGrey : TColors.grey,
-                                thickness: .5,
-                                indent: 60,
-                                endIndent: 5,
-                              ),
-                            ),
-                            const Text(TTexts.orSignInWith),
-                            Flexible(
-                              child: Divider(
-                                color: dark ? TColors.darkGrey : TColors.grey,
-                                thickness: .5,
-                                indent: 5,
-                                endIndent: 60,
-                              ),
-                            ),
-                          ],
+                        Flexible(
+                          child: Divider(
+                            color: dark ? TColors.darkGrey : TColors.grey,
+                            thickness: .5,
+                            indent: 60,
+                            endIndent: 5,
+                          ),
                         ),
-
-                        const SizedBox(height: TSizes.spaceBtwSections),
-
-                        // Sign in Options
-                        Column(
-                          children: [
-                            GoogleSignInButton(
-                              isLoading: controller.isGoogleLoading.value,
-                              onPressed: () => controller.handleSocialLogin('google'),
-                            ),
-                            const SizedBox(height: TSizes.spaceBtwItems),
-                            // Show Apple Sign-In only on iOS when available
-                            if (_isAppleSignInAvailable)
-                              AppleSignInButton(
-                                isLoading: controller.isAppleLoading.value,
-                                onPressed: () =>
-                                    controller.handleSocialLogin('apple'),
-                              ),
-                          ],
+                        const Text(TTexts.orSignInWith),
+                        Flexible(
+                          child: Divider(
+                            color: dark ? TColors.darkGrey : TColors.grey,
+                            thickness: .5,
+                            indent: 5,
+                            endIndent: 60,
+                          ),
                         ),
                       ],
-                    )
-                  : const SizedBox.shrink()
+                    ),
+
+                    const SizedBox(height: TSizes.spaceBtwSections),
+
+                    // Sign in Options
+                    Column(
+                      children: [
+                        Obx(() => GoogleSignInButton(
+                              isLoading: controller.isGoogleLoading.value,
+                              onPressed: () =>
+                                  controller.handleSocialLogin('google'),
+                            )),
+                        const SizedBox(height: TSizes.spaceBtwItems),
+                        // Apple Sign-In only on iOS when available
+                        if (_isAppleSignInAvailable &&
+                            controller.selectedRole.value == UserType.rider)
+                          AppleSignInButton(
+                            isLoading: controller.isAppleLoading.value,
+                            onPressed: () =>
+                                controller.handleSocialLogin('apple'),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
 
                 const SizedBox(height: TSizes.spaceBtwSections),

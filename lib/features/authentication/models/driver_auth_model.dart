@@ -41,7 +41,7 @@ class DriverRegistrationRequest {
   final String email;
   final String FirstName;
   final String LastName;
-  final String password;
+  final String? password; // null for Google users
   final String phoneNumber;
   final String DateOfBirth;
   final String Gender;
@@ -54,12 +54,13 @@ class DriverRegistrationRequest {
   final VehicleDetails vehicleDetails;
   final int seat;
   final String driverType;
+  final String? googleId; // Google ID token for Google signup
 
   DriverRegistrationRequest({
     required this.email,
     required this.FirstName,
     required this.LastName,
-    required this.password,
+    this.password,
     required this.phoneNumber,
     required this.DateOfBirth,
     required this.Gender,
@@ -72,14 +73,14 @@ class DriverRegistrationRequest {
     required this.vehicleDetails,
     required this.seat,
     required this.driverType,
+    this.googleId,
   });
 
   Map<String, dynamic> toJson() {
-    return {
+    final map = <String, dynamic>{
       'email': email,
       'FirstName': FirstName,
       'LastName': LastName,
-      'password': password,
       'phoneNumber': phoneNumber,
       'DateOfBirth': DateOfBirth,
       'Gender': Gender,
@@ -93,6 +94,9 @@ class DriverRegistrationRequest {
       'seat': seat,
       'driverType': driverType,
     };
+    if (password != null) map['password'] = password;
+    if (googleId != null) map['googleId'] = googleId;
+    return map;
   }
 }
 

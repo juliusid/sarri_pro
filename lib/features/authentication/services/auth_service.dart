@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:get/get.dart';
 import 'package:sarri_ride/config/api_config.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
@@ -256,6 +258,52 @@ class AuthService extends GetxService {
         return AuthResult.error(e.message);
       }
       return AuthResult.error("An unknown error occurred: ${e.toString()}");
+    }
+  }
+
+  // Google Sign-In for Drivers
+  Future<DriverGoogleAuthResult> loginDriverWithGoogle(
+      String googleToken) async {
+    try {
+      final response = await _httpService.post(
+        ApiConfig.driverGoogleAuthEndpoint,
+        body: {'idToken': googleToken},
+      );
+      final responseData = _httpService.handleResponse(response);
+
+      if (responseData['status'] == 'success') {
+        final data = responseData['data'] as Map<String, dynamic>;
+        final driverData = data['driver'] as Map<String, dynamic>;
+
+        final client = ClientData(
+          id: driverData['driverId']?.toString() ?? '',
+          email: driverData['email'] ?? '',
+          role: driverData['role'] ?? 'driver',
+          isVerified: driverData['isVerified'] ?? false,
+        );
+
+        await _httpService.storeTokens(
+          data['accessToken'],
+          data['refreshToken'],
+        );
+
+        return DriverGoogleAuthResult.success(
+          client: client,
+          isNewDriver: data['isNewDriver'] ?? false,
+          signupStep: data['signupStep'] ?? 'step1',
+          phoneNumber: data['phoneNumber'],
+          message: responseData['message'],
+        );
+      } else {
+        return DriverGoogleAuthResult.error(
+            responseData['message'] ?? 'Google Sign-In failed');
+      }
+    } catch (e) {
+      if (e is ApiException) {
+        return DriverGoogleAuthResult.error(e.message);
+      }
+      return DriverGoogleAuthResult.error(
+          "An unknown error occurred: ${e.toString()}");
     }
   }
 
@@ -568,6 +616,20 @@ class AuthService extends GetxService {
         body: request.toJson(),
       );
       final responseData = _httpService.handleResponse(response);
+
+      // Auto-login: store tokens returned by the backend
+      if (responseData['status'] == 'success') {
+        final data = responseData['data'] as Map<String, dynamic>?;
+        if (data != null &&
+            data['accessToken'] != null &&
+            data['refreshToken'] != null) {
+          await _httpService.storeTokens(
+            data['accessToken'],
+            data['refreshToken'],
+          );
+        }
+      }
+
       return AuthResult.success(
         message: responseData['message'] ?? 'Registration successful',
       );
@@ -584,6 +646,19 @@ class AuthService extends GetxService {
         return AuthResult.error(e.message);
       }
       return AuthResult.error("An unknown error occurred: ${e.toString()}");
+    }
+  }
+
+  // ---------- SAVE DRIVER PHONE (called silently after Step 2 OTP verify) ----------
+  Future<void> saveDriverPhone(String phoneNumber) async {
+    try {
+      await _httpService.put(
+        ApiConfig.driverSavePhoneEndpoint,
+        body: {'phoneNumber': phoneNumber},
+      );
+    } catch (e) {
+      // Non-fatal — log but don't block the user
+      debugPrint('saveDriverPhone error (non-fatal): $e');
     }
   }
 
@@ -677,5 +752,47 @@ class AuthResult {
 
   factory AuthResult.error(String error) {
     return AuthResult._(success: false, error: error);
+  }
+}
+
+// ---------- DRIVER GOOGLE AUTH RESULT ----------
+class DriverGoogleAuthResult {
+  final bool success;
+  final ClientData? client;
+  final String? message;
+  final String? error;
+  final bool isNewDriver;
+  final String signupStep;   // 'step1' | 'step2' | 'step3'
+  final String? phoneNumber; // pre-verified phone if step2 already done
+
+  DriverGoogleAuthResult._({
+    required this.success,
+    this.client,
+    this.message,
+    this.error,
+    this.isNewDriver = false,
+    this.signupStep = 'step1',
+    this.phoneNumber,
+  });
+
+  factory DriverGoogleAuthResult.success({
+    ClientData? client,
+    String? message,
+    bool isNewDriver = false,
+    String signupStep = 'step1',
+    String? phoneNumber,
+  }) {
+    return DriverGoogleAuthResult._(
+      success: true,
+      client: client,
+      message: message,
+      isNewDriver: isNewDriver,
+      signupStep: signupStep,
+      phoneNumber: phoneNumber,
+    );
+  }
+
+  factory DriverGoogleAuthResult.error(String error) {
+    return DriverGoogleAuthResult._(success: false, error: error);
   }
 }

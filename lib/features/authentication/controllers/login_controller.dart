@@ -219,23 +219,11 @@ class LoginController extends GetxController {
     }
   }
 
-  // Handle social login (Google)
+  // Handle social login (Google) — for both riders and drivers
   Future<void> handleGoogleLogin() async {
-    // 1. Check User Role (Google Sign-In is usually for Riders)
-    if (selectedRole.value != UserType.rider) {
-      THelperFunctions.showErrorSnackBar(
-        'Error',
-        "Google Sign-In is currently only available for Riders.",
-      );
-      return;
-    }
-
     isGoogleLoading.value = true;
 
     try {
-      // 2. Configure Google Sign In
-      // I extracted this ID from the google-services.json you sent me.
-      // It is the "Web client (auto created by Google Service)"
       final googleSignIn = GoogleSignIn(
         clientId: Platform.isIOS
             ? '566802818676-af50fhe86j05gsf22vcrpu5o25re8g0h.apps.googleusercontent.com'
@@ -245,94 +233,110 @@ class LoginController extends GetxController {
         scopes: ['email', 'profile'],
       );
 
-      // 3. Start the Sign-In Process
-      await googleSignIn.signOut(); // Ensure we are starting fresh
+      await googleSignIn.signOut();
       final googleUser = await googleSignIn.signIn();
 
-      if (googleUser != null) {
-        // 4. Get the Token
-        final googleAuth = await googleUser.authentication;
-        final googleToken = googleAuth.idToken;
+      if (googleUser == null) {
+        debugPrint('Google Sign-In canceled by user or returned null.');
+        THelperFunctions.showSnackBar('Google Sign-In canceled.');
+        return;
+      }
 
-        if (googleToken != null) {
-          print(
-            "LOGIN_CONTROLLER: Got Token from Google. Sending to Backend...",
-          );
+      final googleAuth = await googleUser.authentication;
+      final googleToken = googleAuth.idToken;
 
-          // 5. Send the Token to YOUR Backend
-          // This calls the 'loginWithGoogle' method in your AuthService
-          final loginResult = await AuthService.instance.loginWithGoogle(
-            googleToken,
-          );
+      if (googleToken == null) {
+        THelperFunctions.showErrorSnackBar(
+            'Error', 'Google did not return a token.');
+        return;
+      }
 
-          if (loginResult.success && loginResult.client != null) {
-            print("LOGIN_CONTROLLER: Backend accepted the login!");
+      final isDriverLogin = selectedRole.value == UserType.driver;
 
-            // --- SAVE DATA & NAVIGATE (Standard Login Flow) ---
+      if (isDriverLogin) {
+        // ── Driver Google Login ──────────────────────────────────────────
+        print('LOGIN_CONTROLLER: Driver Google Sign-In...');
+        final loginResult =
+            await AuthService.instance.loginDriverWithGoogle(googleToken);
 
-            // Clear old data
+        if (loginResult.success && loginResult.client != null) {
+          if (loginResult.isNewDriver) {
+            // New driver — route to complete signup
+            THelperFunctions.showSuccessSnackBar(
+              'Account Created',
+              'Please complete your driver profile.',
+            );
+            Get.offAll(() =>
+                DriverSignupScreen(email: loginResult.client!.email));
+          } else {
+            // Existing driver — go to dashboard
             if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
               Get.delete<ClientData>(tag: 'currentUser', force: true);
             }
+            Get.put<ClientData>(loginResult.client!,
+                tag: 'currentUser', permanent: true);
 
-            // Save new user data
-            Get.put<ClientData>(
-              loginResult.client!,
-              tag: 'currentUser',
-              permanent: true,
-            );
-
-            // Save to local storage
             final storage = GetStorage();
             storage.write('user_role', loginResult.client!.role);
             storage.write('current_user_data', loginResult.client!.toJson());
 
-            // Connect to Realtime features
             WebSocketService.instance.connect();
             await NotificationService.instance.updateTokenOnBackend();
 
-            // Navigate
-            final drawerController = Get.find<MapDrawerController>();
-            await drawerController
-                .refreshUserData(); // Ensure profile is loaded
-
-            // Check if phone number needs verification
-            final profile = drawerController.fullProfile.value;
-            if (profile != null && profile.phoneNumberVerified == false) {
-              Get.offAll(() => const PhoneNumberScreen());
-            } else {
-              Get.offAll(() => const MapScreenGetX());
-              THelperFunctions.showSuccessSnackBar('Success', 'Welcome!');
-            }
-          } else {
-            // Backend rejected the token
-            THelperFunctions.showErrorSnackBar(
-              'Login Failed',
-              loginResult.error ?? 'Server rejected the login.',
-            );
-            try {
-              await googleSignIn.signOut();
-            } catch (e) {
-              print("LOGIN_CONTROLLER: Ignoring signOut error: $e");
-            }
+            Get.offAll(() => const DriverDashboardScreen());
+            THelperFunctions.showSuccessSnackBar(
+                'Welcome back!', 'Signed in as driver.');
           }
         } else {
           THelperFunctions.showErrorSnackBar(
-            'Error',
-            'Google did not return a token.',
-          );
+              'Login Failed', loginResult.error ?? 'Server rejected the login.');
+          try {
+            await googleSignIn.signOut();
+          } catch (_) {}
         }
       } else {
-        // googleUser is null, which typically means the user canceled the sign-in
-        debugPrint('Google Sign-In canceled by user or returned null.');
-        THelperFunctions.showSnackBar('Google Sign-In canceled.');
+        // ── Rider Google Login (unchanged) ───────────────────────────────
+        print('LOGIN_CONTROLLER: Rider Google Sign-In...');
+        final loginResult = await AuthService.instance.loginWithGoogle(googleToken);
+
+        if (loginResult.success && loginResult.client != null) {
+          print('LOGIN_CONTROLLER: Backend accepted the login!');
+
+          if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
+            Get.delete<ClientData>(tag: 'currentUser', force: true);
+          }
+          Get.put<ClientData>(loginResult.client!,
+              tag: 'currentUser', permanent: true);
+
+          final storage = GetStorage();
+          storage.write('user_role', loginResult.client!.role);
+          storage.write('current_user_data', loginResult.client!.toJson());
+
+          WebSocketService.instance.connect();
+          await NotificationService.instance.updateTokenOnBackend();
+
+          final drawerController = Get.find<MapDrawerController>();
+          await drawerController.refreshUserData();
+
+          final profile = drawerController.fullProfile.value;
+          if (profile != null && profile.phoneNumberVerified == false) {
+            Get.offAll(() => const PhoneNumberScreen());
+          } else {
+            Get.offAll(() => const MapScreenGetX());
+            THelperFunctions.showSuccessSnackBar('Success', 'Welcome!');
+          }
+        } else {
+          THelperFunctions.showErrorSnackBar(
+              'Login Failed', loginResult.error ?? 'Server rejected the login.');
+          try {
+            await googleSignIn.signOut();
+          } catch (_) {}
+        }
       }
     } catch (e) {
       THelperFunctions.showErrorSnackBar(
-        'Error',
-        'Google login failed: ${e.toString()}',
-      );
-      print("Google Sign-In Error: $e");
+          'Error', 'Google login failed: ${e.toString()}');
+      print('Google Sign-In Error: $e');
     } finally {
       isGoogleLoading.value = false;
     }

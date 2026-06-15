@@ -1,74 +1,65 @@
 // lib/features/authentication/controllers/driver_signup_controller.dart
 
-import 'dart:async'; // Required for Timer
+import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sarri_ride/features/authentication/models/driver_auth_model.dart';
 import 'package:sarri_ride/features/authentication/screens/login/login_screen_getx.dart';
 import 'package:sarri_ride/features/authentication/services/auth_service.dart';
+import 'package:sarri_ride/features/driver/screens/driver_dashboard_screen.dart';
 import 'package:sarri_ride/utils/formatters/formatter.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
-enum DriverSignupStep { email, otp, phone, phoneOtp, details }
+// 3-step flow: authMethod → phone (enter+OTP combined) → details
+enum DriverSignupStep { authMethod, phone, details }
 
 class DriverSignupController extends GetxController {
   static DriverSignupController get instance => Get.find();
 
   final pageController = PageController();
-  final Rx<DriverSignupStep> currentStep = DriverSignupStep.email.obs;
+  final Rx<DriverSignupStep> currentStep = DriverSignupStep.authMethod.obs;
   final RxBool isLoading = false.obs;
-
   final RxBool privacyPolicy = false.obs;
 
-  // --- NEW: Driver Type Selection ---
+  // ── Google signup state ─────────────────────────────────────────────────
+  final RxBool isGoogleSignup = false.obs;
+  String? _googleIdToken;
+
+  // ── Driver type ─────────────────────────────────────────────────────────
   final RxString selectedDriverType = 'ride_hailing'.obs;
 
-  // --- NEW: TIMER VARIABLES ---
+  // ── OTP timer ───────────────────────────────────────────────────────────
   Timer? _timer;
   final RxInt resendTimer = 60.obs;
   final RxBool isResendEnabled = false.obs;
 
-  // --- Variable to store verified number ---
+  // ── Phone OTP reveal state (combined phone screen) ───────────────────────
+  final RxBool otpFieldVisible = false.obs;
+
+  // ── Verified phone ───────────────────────────────────────────────────────
   String? _verifiedPhoneNumber;
 
-  // Step 1: Email
+  // Step 1 — auth method (email path)
   final emailController = TextEditingController();
   final emailFormKey = GlobalKey<FormState>();
 
-  // Step 2: OTP
+  // OTP (email OTP, for email signup path)
   final otpController = TextEditingController();
   final otpFormKey = GlobalKey<FormState>();
 
-  // Step 3: Phone
+  // Step 2 — phone (combined)
   final phoneNumberController = TextEditingController();
   final phoneFormKey = GlobalKey<FormState>();
-
-  // Step 4: Phone OTP
   final phoneOtpController = TextEditingController();
   final phoneOtpFormKey = GlobalKey<FormState>();
 
-  // Step 5: Details
+  // Step 3 — details
   final detailsFormKey = GlobalKey<FormState>();
-
-  // --- Personal Info Controllers ---
   final firstNameController = TextEditingController();
   final lastNameController = TextEditingController();
   final passwordController = TextEditingController();
-  final dobController = TextEditingController();
-  final genderController = TextEditingController();
-  final licenseNumberController = TextEditingController();
-  final licenseIssueDateController = TextEditingController();
-  final licenseExpiryDateController = TextEditingController();
-  final currentAddressController = TextEditingController();
-  final currentStateController = TextEditingController();
-  final currentCityController = TextEditingController();
-  final permanentAddressController = TextEditingController();
-  final permanentStateController = TextEditingController();
-  final permanentCityController = TextEditingController();
-  final emergencyContactController = TextEditingController();
-  final bankAccountNameController = TextEditingController();
-  final bankAccountNumberController = TextEditingController();
-  final bankNameController = TextEditingController();
   final vehicleMakeController = TextEditingController();
   final vehicleModelController = TextEditingController();
   final vehicleYearController = TextEditingController();
@@ -77,7 +68,7 @@ class DriverSignupController extends GetxController {
 
   @override
   void onClose() {
-    _timer?.cancel(); // Cancel timer
+    _timer?.cancel();
     pageController.dispose();
     emailController.dispose();
     otpController.dispose();
@@ -86,21 +77,6 @@ class DriverSignupController extends GetxController {
     firstNameController.dispose();
     lastNameController.dispose();
     passwordController.dispose();
-    dobController.dispose();
-    genderController.dispose();
-    licenseNumberController.dispose();
-    licenseIssueDateController.dispose();
-    licenseExpiryDateController.dispose();
-    currentAddressController.dispose();
-    currentStateController.dispose();
-    currentCityController.dispose();
-    permanentAddressController.dispose();
-    permanentStateController.dispose();
-    permanentCityController.dispose();
-    emergencyContactController.dispose();
-    bankAccountNameController.dispose();
-    bankAccountNumberController.dispose();
-    bankNameController.dispose();
     vehicleMakeController.dispose();
     vehicleModelController.dispose();
     vehicleYearController.dispose();
@@ -109,7 +85,38 @@ class DriverSignupController extends GetxController {
     super.onClose();
   }
 
-  // --- NEW: TIMER LOGIC ---
+  // ── Navigation ───────────────────────────────────────────────────────────
+
+  void nextStep() {
+    if (currentStep.value.index < DriverSignupStep.values.length - 1) {
+      currentStep.value =
+          DriverSignupStep.values[currentStep.value.index + 1];
+      pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.ease,
+      );
+    }
+  }
+
+  void previousStep() {
+    if (currentStep.value.index > 0) {
+      if (currentStep.value == DriverSignupStep.phone) {
+        otpFieldVisible.value = false;
+        phoneOtpController.clear();
+      }
+      currentStep.value =
+          DriverSignupStep.values[currentStep.value.index - 1];
+      pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.ease,
+      );
+    } else {
+      Get.back();
+    }
+  }
+
+  // ── Timer ────────────────────────────────────────────────────────────────
+
   void startResendTimer() {
     isResendEnabled.value = false;
     resendTimer.value = 60;
@@ -124,33 +131,14 @@ class DriverSignupController extends GetxController {
     });
   }
 
-  void nextStep() {
-    if (currentStep.value.index < DriverSignupStep.values.length - 1) {
-      currentStep.value = DriverSignupStep.values[currentStep.value.index + 1];
-      pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.ease,
-      );
-    }
+  // ── Pre-fill email (when coming from login with incomplete signup) ────────
+
+  void setInitialEmail(String email) {
+    emailController.text = email.trim().toLowerCase();
   }
 
-  void previousStep() {
-    if (currentStep.value.index > 0) {
-      // Clear OTP when going back to email step
-      if (currentStep.value == DriverSignupStep.otp) {
-        otpController.clear();
-      }
-      currentStep.value = DriverSignupStep.values[currentStep.value.index - 1];
-      pageController.previousPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.ease,
-      );
-    } else {
-      Get.back();
-    }
-  }
+  // ── Phone formatter ──────────────────────────────────────────────────────
 
-  // --- HELPER: Get Clean Formatted Number ---
   String get formattedPhoneNumber {
     String formatted = TFormatter.formatNigeriaPhoneNumber(
       phoneNumberController.text.trim(),
@@ -158,9 +146,117 @@ class DriverSignupController extends GetxController {
     return formatted.replaceAll(' ', '');
   }
 
-  // --- API Calls ---
+  // ── Name formatter ───────────────────────────────────────────────────────
 
-  // Updated with isResend
+  String _formatName(String name) {
+    if (name.isEmpty) return name;
+    final trimmed = name.trim();
+    return trimmed[0].toUpperCase() + trimmed.substring(1).toLowerCase();
+  }
+
+  // ────────────────────────────────────────────────────────────────────────
+  // GOOGLE SIGN-IN (primary path)
+  // ────────────────────────────────────────────────────────────────────────
+
+  Future<void> signInWithGoogle() async {
+    isLoading.value = true;
+    try {
+      final googleSignIn = GoogleSignIn(
+        clientId: Platform.isIOS
+            ? '566802818676-af50fhe86j05gsf22vcrpu5o25re8g0h.apps.googleusercontent.com'
+            : null,
+        serverClientId:
+            '566802818676-kuc13au4v6ifp3oe6qimcdp78s84fnnd.apps.googleusercontent.com',
+        scopes: ['email', 'profile'],
+      );
+
+      await googleSignIn.signOut();
+      final googleUser = await googleSignIn.signIn();
+
+      if (googleUser == null) {
+        // User cancelled
+        isLoading.value = false;
+        return;
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+
+      if (idToken == null) {
+        THelperFunctions.showErrorSnackBar(
+            'Error', 'Google did not return a token. Please try again.');
+        return;
+      }
+
+      // Send token to backend — creates/finds driver account
+      final result = await AuthService.instance.loginDriverWithGoogle(idToken);
+
+      if (result.success && result.client != null) {
+        if (result.isNewDriver) {
+          // Incomplete signup — pre-fill from Google
+          isGoogleSignup.value = true;
+          _googleIdToken = idToken;
+
+          // Pre-fill name and email from Google profile
+          final nameParts = googleUser.displayName?.split(' ') ?? [];
+          if (nameParts.isNotEmpty) {
+            firstNameController.text = nameParts.first;
+            if (nameParts.length > 1) {
+              lastNameController.text = nameParts.sublist(1).join(' ');
+            }
+          }
+          emailController.text = result.client!.email;
+
+          if (result.signupStep == 'step2' && result.phoneNumber != null) {
+            // Already verified phone before — skip to Step 3 directly!
+            _verifiedPhoneNumber = result.phoneNumber;
+            phoneNumberController.text = result.phoneNumber!;
+            currentStep.value = DriverSignupStep.details;
+            pageController.animateToPage(
+              DriverSignupStep.details.index,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.ease,
+            );
+            THelperFunctions.showSuccessSnackBar(
+              'Almost there!',
+              'Phone already verified. Complete your vehicle details.',
+            );
+          } else {
+            // Phone not yet verified — go to Step 2
+            currentStep.value = DriverSignupStep.phone;
+            pageController.animateToPage(
+              DriverSignupStep.phone.index,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.ease,
+            );
+            THelperFunctions.showSuccessSnackBar(
+              'Welcome!',
+              'Google account verified. Please verify your phone number.',
+            );
+          }
+        } else {
+          // Fully registered driver — go to dashboard
+          THelperFunctions.showSuccessSnackBar(
+              'Welcome back!', 'Signed in successfully.');
+          Get.offAll(() => const DriverDashboardScreen());
+        }
+      } else {
+        THelperFunctions.showErrorSnackBar(
+            'Sign-In Failed', result.error ?? 'Please try again.');
+        await googleSignIn.signOut();
+      }
+    } catch (e) {
+      THelperFunctions.showErrorSnackBar(
+          'Error', 'Google Sign-In failed: ${e.toString()}');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────────────────
+  // EMAIL PATH — send OTP
+  // ────────────────────────────────────────────────────────────────────────
+
   Future<void> sendVerificationEmail({bool isResend = false}) async {
     if (!emailFormKey.currentState!.validate()) return;
     isLoading.value = true;
@@ -171,29 +267,25 @@ class DriverSignupController extends GetxController {
       );
       if (result.success) {
         THelperFunctions.showSuccessSnackBar(
-          'Success',
-          result.message ?? 'OTP sent successfully!',
-        );
+            'OTP Sent', result.message ?? 'Check your email for the OTP.');
         otpController.clear();
         startResendTimer();
-
-        if (!isResend) {
-          nextStep();
-        }
+        if (!isResend) nextStep();
       } else {
         final errorMsg = result.error?.toLowerCase() ?? '';
         if (errorMsg.contains('already registered') ||
             errorMsg.contains('please login')) {
           THelperFunctions.showErrorSnackBar(
-            'Account Already Exists',
+            'Account Exists',
             'This email is already registered. Please login.',
           );
           Get.offAll(() => const LoginScreenGetX());
         } else if (errorMsg.contains('already verified')) {
           THelperFunctions.showSuccessSnackBar(
             'Welcome Back',
-            'Email verified. Resuming registration...',
+            'Email verified. Continuing registration...',
           );
+          // Skip OTP step, go to phone
           currentStep.value = DriverSignupStep.phone;
           pageController.animateToPage(
             DriverSignupStep.phone.index,
@@ -202,9 +294,7 @@ class DriverSignupController extends GetxController {
           );
         } else {
           THelperFunctions.showErrorSnackBar(
-            'Error',
-            result.error ?? 'Failed to send OTP.',
-          );
+              'Error', result.error ?? 'Failed to send OTP.');
         }
       }
     } finally {
@@ -212,19 +302,7 @@ class DriverSignupController extends GetxController {
     }
   }
 
-  // --- NEW: Email Initialization ---
-  void setInitialEmail(String email) {
-    emailController.text = email.trim().toLowerCase();
-  }
-
-  // --- HELPER: Format Name ---
-  String _formatName(String name) {
-    if (name.isEmpty) return name;
-    final trimmed = name.trim();
-    return trimmed[0].toUpperCase() + trimmed.substring(1).toLowerCase();
-  }
-
-  Future<void> verifyOtp() async {
+  Future<void> verifyEmailOtp() async {
     if (!otpFormKey.currentState!.validate()) return;
     isLoading.value = true;
     try {
@@ -235,109 +313,69 @@ class DriverSignupController extends GetxController {
       );
       if (result.success) {
         THelperFunctions.showSuccessSnackBar(
-          'Success',
-          result.message ?? 'Email verified!',
+            'Email Verified!', result.message ?? '');
+        // Go to phone step (index 1 in the new 3-step flow)
+        currentStep.value = DriverSignupStep.phone;
+        pageController.animateToPage(
+          DriverSignupStep.phone.index,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.ease,
         );
-        nextStep();
       } else {
         THelperFunctions.showErrorSnackBar(
-          'Error',
-          result.error ?? 'Invalid OTP.',
-        );
+            'Error', result.error ?? 'Invalid OTP.');
       }
     } finally {
       isLoading.value = false;
     }
   }
 
-  // Step 3: Send Phone OTP
+  // ────────────────────────────────────────────────────────────────────────
+  // PHONE — send OTP (combined screen: reveal OTP field inline)
+  // ────────────────────────────────────────────────────────────────────────
+
   Future<void> sendPhoneVerificationOtp() async {
     if (!phoneFormKey.currentState!.validate()) return;
 
-    // --- Option B Bypass: Skip verification for test numbers starting with +234777 ---
+    // Dev bypass
     final String phoneNumber = formattedPhoneNumber;
     if (phoneNumber.startsWith('+234777')) {
       THelperFunctions.showSuccessSnackBar(
-        'Dev Mode Bypass',
-        'Bypassing Twilio OTP for test number. Proceeding to details...',
-      );
+          'Dev Bypass', 'Test number — skipping OTP.');
       _verifiedPhoneNumber = phoneNumber;
-      currentStep.value = DriverSignupStep.details;
-
-      Future.delayed(const Duration(milliseconds: 100), () {
-        pageController.animateToPage(
-          DriverSignupStep.details.index,
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeInOut,
-        );
-      });
+      _goToDetails();
       return;
     }
 
     isLoading.value = true;
     try {
+      final email = isGoogleSignup.value ? '' : emailController.text.trim();
       final result = await AuthService.instance.sendPhoneOtp(
-        formattedPhoneNumber,
+        phoneNumber,
         'driver',
-        emailController.text.trim(),
+        email,
       );
 
       if (result.success) {
-        debugPrint(
-          'SendPhoneOtp Success: alreadyVerified = ${result.alreadyVerified}',
-        );
         if (result.alreadyVerified) {
-          THelperFunctions.showSuccessSnackBar(
-            'Verified',
-            'Phone number already verified. Proceeding to details...',
-          );
-          _verifiedPhoneNumber = formattedPhoneNumber;
-          currentStep.value = DriverSignupStep.details;
-
-          // Use a small delay to ensure UI is ready
-          Future.delayed(const Duration(milliseconds: 100), () {
-            pageController.animateToPage(
-              DriverSignupStep.details.index,
-              duration: const Duration(milliseconds: 500),
-              curve: Curves.easeInOut,
-            );
-          });
+          _verifiedPhoneNumber = phoneNumber;
+          _goToDetails();
           return;
         }
-
         THelperFunctions.showSuccessSnackBar(
-          'OTP Sent',
-          result.message ??
-              'Please check your phone for the verification code.',
-        );
+            'OTP Sent', 'Check your phone for the verification code.');
         startResendTimer();
-        nextStep();
+        // Reveal the OTP input field inline (no page navigation)
+        otpFieldVisible.value = true;
       } else {
         final errorMsg = result.error?.toLowerCase() ?? '';
-        debugPrint('SendPhoneOtp Error: $errorMsg');
-
         if (errorMsg.contains('verified') ||
-            errorMsg.contains('already has a verified') ||
             errorMsg.contains('already verified')) {
-          THelperFunctions.showSuccessSnackBar(
-            'Verified',
-            'Phone number already verified. Proceeding to details...',
-          );
-          _verifiedPhoneNumber = formattedPhoneNumber;
-          currentStep.value = DriverSignupStep.details;
-
-          Future.delayed(const Duration(milliseconds: 100), () {
-            pageController.animateToPage(
-              DriverSignupStep.details.index,
-              duration: const Duration(milliseconds: 500),
-              curve: Curves.easeInOut,
-            );
-          });
+          _verifiedPhoneNumber = phoneNumber;
+          _goToDetails();
         } else {
           THelperFunctions.showErrorSnackBar(
-            'Error',
-            result.error ?? 'Failed to send Phone OTP.',
-          );
+              'Error', result.error ?? 'Failed to send OTP.');
         }
       }
     } finally {
@@ -345,164 +383,157 @@ class DriverSignupController extends GetxController {
     }
   }
 
-  // --- NEW: Resend Phone OTP ---
   Future<void> resendPhoneOtp() async {
     isLoading.value = true;
     try {
+      final email = isGoogleSignup.value ? '' : emailController.text.trim();
       final result = await AuthService.instance.resendPhoneOtp(
         formattedPhoneNumber,
         'driver',
-        emailController.text.trim(),
+        email,
       );
-
       if (result.success) {
-        THelperFunctions.showSuccessSnackBar(
-          'Success',
-          'Phone OTP resent successfully',
-        );
-        startResendTimer(); // Restart timer
+        THelperFunctions.showSuccessSnackBar('Resent', 'OTP sent again.');
+        startResendTimer();
       } else {
         THelperFunctions.showErrorSnackBar(
-          'Error',
-          result.error ?? 'Failed to resend OTP',
-        );
+            'Error', result.error ?? 'Failed to resend OTP.');
       }
     } finally {
       isLoading.value = false;
     }
   }
 
-  // Step 4: Verify Phone OTP
   Future<void> verifyPhoneOtp() async {
-    String otpCode = phoneOtpController.text.trim();
+    final otpCode = phoneOtpController.text.trim();
     if (otpCode.length != 6) {
       THelperFunctions.showErrorSnackBar(
-        'Invalid OTP',
-        'Please enter a valid 6-digit OTP.',
-      );
+          'Invalid OTP', 'Please enter the 6-digit code.');
       return;
     }
-
-    String email = emailController.text.trim();
-    if (email.isEmpty) {
-      THelperFunctions.showErrorSnackBar(
-        'Error',
-        'Email is missing. Please restart registration.',
-      );
-      return;
-    }
-
     if (!phoneOtpFormKey.currentState!.validate()) return;
     isLoading.value = true;
 
     try {
+      final email = isGoogleSignup.value ? '' : emailController.text.trim();
       final result = await AuthService.instance.verifyPhoneOtp(
         formattedPhoneNumber,
         otpCode,
         'driver',
         email,
       );
-
       if (result.success) {
         THelperFunctions.showSuccessSnackBar(
-          'Success',
-          result.message ?? 'Phone verified!',
-        );
+            'Phone Verified!', result.message ?? '');
         _verifiedPhoneNumber = formattedPhoneNumber;
-        nextStep();
+        // Silently save phone to backend so resume works if they drop off
+        AuthService.instance.saveDriverPhone(formattedPhoneNumber);
+        _goToDetails();
       } else {
         THelperFunctions.showErrorSnackBar(
-          'Error',
-          result.error ?? 'Invalid Phone OTP.',
-        );
+            'Error', result.error ?? 'Invalid OTP.');
       }
     } finally {
       isLoading.value = false;
     }
   }
 
-  // Step 5: Final Registration
+  void _goToDetails() {
+    otpFieldVisible.value = false;
+    currentStep.value = DriverSignupStep.details;
+    pageController.animateToPage(
+      DriverSignupStep.details.index,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  // ────────────────────────────────────────────────────────────────────────
+  // FINAL REGISTRATION — Step 3
+  // ────────────────────────────────────────────────────────────────────────
+
   Future<void> registerDriverDetails() async {
     if (!detailsFormKey.currentState!.validate()) return;
+
+    // Password required only for email signup
+    if (!isGoogleSignup.value && passwordController.text.trim().isEmpty) {
+      THelperFunctions.showErrorSnackBar('Error', 'Password is required.');
+      return;
+    }
+
+    if (!privacyPolicy.value) {
+      THelperFunctions.showSnackBar(
+          'Please accept the Terms & Conditions to continue.');
+      return;
+    }
+
     isLoading.value = true;
     try {
       final firstName = _formatName(firstNameController.text);
       final lastName = _formatName(lastNameController.text);
       final email = emailController.text.trim().toLowerCase();
-
-      String finalPhoneNumber = _verifiedPhoneNumber ?? formattedPhoneNumber;
-
-      String finalPermanentState = permanentStateController.text.trim().isEmpty
-          ? currentStateController.text.trim()
-          : permanentStateController.text.trim();
-
-      String finalPermanentCity = permanentCityController.text.trim().isEmpty
-          ? currentCityController.text.trim()
-          : permanentCityController.text.trim();
-
-      final formattedEmergencyContact = TFormatter.formatNigeriaPhoneNumber(
-        emergencyContactController.text.trim(),
-      );
+      final finalPhone = _verifiedPhoneNumber ?? formattedPhoneNumber;
+      final int vehicleYear =
+          int.tryParse(vehicleYearController.text.trim()) ?? 2020;
 
       final request = DriverRegistrationRequest(
         email: email,
         FirstName: firstName,
         LastName: lastName,
-        password: passwordController.text.trim(),
-        phoneNumber: finalPhoneNumber,
-        DateOfBirth: dobController.text.trim(),
-        Gender: genderController.text.trim().toLowerCase(),
-        licenseNumber: licenseNumberController.text.trim(),
-        drivingLicense: DrivingLicense(
-          issueDate: licenseIssueDateController.text.trim(),
-          expiryDate: licenseExpiryDateController.text.trim(),
-        ),
+        password: isGoogleSignup.value ? null : passwordController.text.trim(),
+        phoneNumber: finalPhone,
+        // KYC-deferred fields — sent as empty/null
+        DateOfBirth: '',
+        Gender: '',
+        licenseNumber: '',
+        drivingLicense: DrivingLicense(issueDate: '', expiryDate: ''),
         currentAddress: Address(
-          address: currentAddressController.text.trim(),
-          state: currentStateController.text.trim(),
-          city: currentCityController.text.trim(),
+          address: '',
+          state: '',
+          city: '',
           country: 'Nigeria',
           postalCode: '100001',
         ),
         permanentAddress: Address(
-          address: permanentAddressController.text.trim(),
-          state: finalPermanentState,
-          city: finalPermanentCity,
+          address: '',
+          state: '',
+          city: '',
           country: 'Nigeria',
           postalCode: '100001',
         ),
-        emergencyContactNumber: formattedEmergencyContact,
+        emergencyContactNumber: '',
         bankDetails: BankDetails(
-          bankAccountNumber: bankAccountNumberController.text.trim(),
-          bankName: bankNameController.text.trim(),
-          bankAccountName: bankAccountNameController.text.trim(),
+          bankAccountNumber: '',
+          bankName: '',
+          bankAccountName: '',
         ),
         vehicleDetails: VehicleDetails(
           make: vehicleMakeController.text.trim(),
           model: vehicleModelController.text.trim(),
-          year: int.tryParse(vehicleYearController.text.trim()) ?? 2020,
+          year: vehicleYear,
           licensePlate: vehiclePlateController.text.trim(),
         ),
         seat: int.tryParse(vehicleSeatController.text.trim()) ?? 4,
         driverType: selectedDriverType.value,
+        googleId: isGoogleSignup.value ? _googleIdToken : null,
       );
 
       final result = await AuthService.instance.registerDriver(request);
 
       if (result.success) {
+        // Tokens already stored by AuthService.registerDriver — driver is logged in!
         THelperFunctions.showSuccessSnackBar(
-          'Success',
-          result.message ?? 'Registration successful! Please login.',
+          'Welcome to SarriRide! 🎉',
+          result.message ?? 'Your account is pending admin verification.',
         );
-        Get.offAll(() => const LoginScreenGetX());
+        Get.offAll(() => const DriverDashboardScreen());
       } else {
         THelperFunctions.showErrorSnackBar(
-          'Registration Failed',
-          result.error ?? 'Registration failed.',
-        );
+            'Registration Failed', result.error ?? 'Please try again.');
       }
     } catch (e) {
-      THelperFunctions.showErrorSnackBar("An error occurred", e.toString());
+      THelperFunctions.showErrorSnackBar(
+          'Error', 'An unexpected error occurred: ${e.toString()}');
     } finally {
       isLoading.value = false;
     }

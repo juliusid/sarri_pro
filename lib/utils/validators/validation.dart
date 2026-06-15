@@ -27,24 +27,24 @@ class TValidator {
       return 'Password is required.';
     }
 
-    // Check for minimum password length
-    if (value.length < 6) {
-      return 'Password must be at least 6 characters long.';
+    // Minimum 8 characters
+    if (value.length < 8) {
+      return 'Password must be at least 8 characters long.';
     }
 
-    // Check for uppercase letters
+    // Must contain an uppercase letter
     if (!value.contains(RegExp(r'[A-Z]'))) {
       return 'Password must contain at least one uppercase letter.';
     }
 
-    // Check for numbers
-    if (!value.contains(RegExp(r'[0-9]'))) {
-      return 'Password must contain at least one number.';
+    // Must contain a lowercase letter
+    if (!value.contains(RegExp(r'[a-z]'))) {
+      return 'Password must contain at least one lowercase letter.';
     }
 
-    // Check for special characters
-    if (!value.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) {
-      return 'Password must contain at least one special character.';
+    // Must contain a number
+    if (!value.contains(RegExp(r'[0-9]'))) {
+      return 'Password must contain at least one number.';
     }
 
     return null;

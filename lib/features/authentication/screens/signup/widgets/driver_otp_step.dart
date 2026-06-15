@@ -78,7 +78,7 @@ class DriverOtpStep extends StatelessWidget {
             () => ElevatedButton(
               onPressed: controller.isLoading.value
                   ? null
-                  : () => controller.verifyOtp(),
+                  : () => controller.verifyEmailOtp(),
               child: controller.isLoading.value
                   ? const CircularProgressIndicator(color: Colors.white)
                   : const Text('Verify & Proceed'),

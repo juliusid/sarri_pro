@@ -18,8 +18,24 @@ class NotificationService extends GetxService {
 
   // --- 1. INITIAL SETUP ---
   Future<void> init() async {
-    // Request Permissions
-    await _fcm.requestPermission(alert: true, badge: true, sound: true);
+    // Request Permissions — guarded against "already running" race condition
+    // that happens on first-install when Android's OS dialog fires at the same
+    // time as our programmatic request (which causes a fatal unhandled exception
+    // that freezes the splash screen).
+    try {
+      await _fcm.requestPermission(alert: true, badge: true, sound: true);
+    } catch (e) {
+      // If a permission dialog is already showing (race on first launch),
+      // wait briefly and try once more. If it still fails, we continue — the
+      // user can still accept/deny the system dialog without us blocking.
+      print('⚠️ NotificationService: requestPermission error ($e). Retrying once...');
+      try {
+        await Future.delayed(const Duration(milliseconds: 800));
+        await _fcm.requestPermission(alert: true, badge: true, sound: true);
+      } catch (retryError) {
+        print('⚠️ NotificationService: requestPermission retry also failed ($retryError). Continuing without blocking.');
+      }
+    }
 
     // Create the Android Channel (Crucial for Sounds)
     const AndroidNotificationChannel channel = AndroidNotificationChannel(

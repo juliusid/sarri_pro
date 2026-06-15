@@ -123,6 +123,10 @@ class ApiConfig {
   static String get driverRegisterEndpoint =>
       '$baseUrl/driverAuth/driver/register';
   static String get driverLoginEndpoint => '$baseUrl/driverAuth/driver/login';
+  static String get driverGoogleAuthEndpoint =>
+      '$baseUrl/driverAuth/driver/google';
+  static String get driverSavePhoneEndpoint =>
+      '$baseUrl/driverAuth/driver/save-phone';
   static String get driverProfileEndpoint =>
       '$baseUrl/driverRides/driver/profile'; // Added profile endpoint
   static String get driverStatusEndpoint => '$baseUrl/driverRides/getStatus';
