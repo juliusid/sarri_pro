@@ -6,13 +6,16 @@ import 'package:sarri_ride/common/widgets/loading_button.dart';
 import 'package:sarri_ride/features/driver/controllers/driver_dashboard_controller.dart'; //
 import 'package:sarri_ride/features/driver/controllers/trip_management_controller.dart'; //
 import 'package:sarri_ride/features/driver/screens/trip_navigation_screen.dart'; //
-import 'package:sarri_ride/features/driver/screens/document_upload/document_upload_screen.dart'; //
 import 'package:sarri_ride/features/driver/widgets/verification_banner.dart'; //
 import 'package:sarri_ride/common/widgets/notifications/notification_icon.dart'; //
 import 'package:sarri_ride/utils/constants/colors.dart'; //
 import 'package:sarri_ride/utils/constants/sizes.dart'; //
 import 'package:sarri_ride/utils/constants/enums.dart'; //
 import 'package:sarri_ride/utils/helpers/helper_functions.dart'; //
+import 'package:sarri_ride/features/verification/screens/driver_verification_wizard_screen.dart'; //
+import 'package:sarri_ride/features/verification/controllers/driver_verification_controller.dart';
+import 'package:sarri_ride/features/driver/screens/driver_manifest_screen.dart';
+import 'package:sarri_ride/common/widgets/double_back_to_close.dart';
 
 class DriverDashboardScreen extends StatelessWidget {
   //
@@ -25,9 +28,10 @@ class DriverDashboardScreen extends StatelessWidget {
     final tripController = Get.put(TripManagementController()); //
     final dark = THelperFunctions.isDarkMode(context); //
 
-    return Scaffold(
-      //
-      appBar: AppBar(
+    return DoubleBackToCloseWidget(
+      child: Scaffold(
+        //
+        appBar: AppBar(
         //
         backgroundColor: Colors.transparent, //
         elevation: 0, //
@@ -47,7 +51,12 @@ class DriverDashboardScreen extends StatelessWidget {
       body: SafeArea(
         //
         top: false, //
-        child: SingleChildScrollView(
+        child: RefreshIndicator(
+          onRefresh: () async {
+            await controller.checkDriverStatus();
+            await controller.fetchTodayStats();
+          },
+          child: SingleChildScrollView(
           //
           child: Column(
             //
@@ -60,17 +69,32 @@ class DriverDashboardScreen extends StatelessWidget {
                 print("Dashboard UI: Driver operational status = $status"); //
 
                 if (status == 'unverified') {
-                  //
+                  final driver = controller.currentDriver.value;
+                  final hasPhone = driver?.phoneNumber?.isNotEmpty ?? false;
+                  final hasVehicle = driver?.driverProfile?.vehicleDetails.make?.isNotEmpty ?? false;
+
+                  DriverVerificationStep startStep;
+                  if (!hasPhone) {
+                    startStep = DriverVerificationStep.phone;
+                  } else if (!hasVehicle) {
+                    startStep = DriverVerificationStep.details;
+                  } else {
+                    startStep = DriverVerificationStep.documents;
+                  }
+
                   return VerificationBanner(
-                    //
-                    title: 'Verification Required', //
-                    message:
-                        'Please upload your documents to get full access.', //
-                    buttonText: 'Start Verification', //
-                    bannerColor: TColors.warning, //
-                    iconData: Iconsax.warning_2, //
-                    onButtonPressed: () =>
-                        Get.to(() => const DocumentUploadScreen()), //
+                    title: hasPhone && hasVehicle ? 'Verification Required' : 'Action Required',
+                    message: hasPhone && hasVehicle
+                        ? 'Please upload your verification documents to start accepting trips.'
+                        : 'Please verify your phone number and add your vehicle details.',
+                    buttonText: hasPhone && hasVehicle ? 'Start Verification' : 'Complete Setup',
+                    bannerColor: TColors.warning,
+                    iconData: Iconsax.warning_2,
+                    onButtonPressed: () {
+                      Get.to(() => DriverVerificationWizardScreen(
+                        initialStep: startStep,
+                      ));
+                    },
                   );
                 } else if (status == 'pending') {
                   return VerificationBanner(
@@ -93,7 +117,9 @@ class DriverDashboardScreen extends StatelessWidget {
                     bannerColor: TColors.error, //
                     iconData: Iconsax.close_circle, //
                     onButtonPressed: () =>
-                        Get.to(() => const DocumentUploadScreen()), //
+                        Get.to(() => const DriverVerificationWizardScreen(
+                          initialStep: DriverVerificationStep.documents,
+                        )), //
                   );
                 } else if (status == 'in_progress') {
                   //
@@ -151,7 +177,8 @@ class DriverDashboardScreen extends StatelessWidget {
           ),
         ),
       ),
-    );
+      ),
+    ));
   }
 
   Widget _buildHeader(
@@ -196,17 +223,23 @@ class DriverDashboardScreen extends StatelessWidget {
           GestureDetector(
             //
             onTap: () => controller.navigateToProfile(), //
-            child: CircleAvatar(
-              //
-              radius: TSizes.lg + 4.0, //
-              backgroundColor: TColors.primary.withOpacity(0.1), //
-              child: Icon(
-                //
-                Iconsax.user, //
-                color: TColors.primary, //
-                size: TSizes.iconLg, //
-              ),
-            ),
+            child: Obx(() {
+              final pictureUrl = controller.currentDriver.value?.picture;
+              return CircleAvatar(
+                radius: TSizes.lg + 4.0,
+                backgroundColor: TColors.primary.withOpacity(0.1),
+                backgroundImage: pictureUrl != null && pictureUrl.isNotEmpty
+                    ? NetworkImage(pictureUrl)
+                    : null,
+                child: pictureUrl == null || pictureUrl.isEmpty
+                    ? Icon(
+                        Iconsax.user,
+                        color: TColors.primary,
+                        size: TSizes.iconLg,
+                      )
+                    : null,
+              );
+            }),
           ),
         ],
       ),
@@ -741,50 +774,53 @@ class DriverDashboardScreen extends StatelessWidget {
         ),
         const SizedBox(height: TSizes.spaceBtwItems), //
         GridView.count(
-          //
-          shrinkWrap: true, //
-          physics: const NeverScrollableScrollPhysics(), //
-          crossAxisCount: 2, //
-          crossAxisSpacing: TSizes.spaceBtwItems, //
-          mainAxisSpacing: TSizes.spaceBtwItems, //
-          childAspectRatio: 1.8, //
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          crossAxisSpacing: TSizes.spaceBtwItems,
+          mainAxisSpacing: TSizes.spaceBtwItems,
+          childAspectRatio: 1.8,
           children: [
             _buildActionCard(
-              //
               context,
               'Wallet', // Updated Label
               Iconsax.wallet_money, // Updated Icon
               TColors.success,
               () => controller.navigateToEarnings(),
               dark,
-            ), //
+            ),
             _buildActionCard(
-              //
               context,
               'Trips',
               Iconsax.route_square,
               TColors.info,
               () => controller.navigateToTrips(),
               dark,
-            ), //
+            ),
             _buildActionCard(
-              //
+              context,
+              'Manifest',
+              Iconsax.box,
+              TColors.primary,
+              () => Get.to(() => const DriverManifestScreen()),
+              dark,
+            ),
+            _buildActionCard(
               context,
               'Vehicle',
               Iconsax.car,
               TColors.warning,
               () => controller.navigateToVehicle(),
               dark,
-            ), //
+            ),
             _buildActionCard(
-              //
               context,
               'Profile',
               Iconsax.user,
               TColors.secondary,
               () => controller.navigateToProfile(),
               dark,
-            ), //
+            ),
           ],
         ),
       ],

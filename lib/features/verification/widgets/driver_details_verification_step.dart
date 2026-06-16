@@ -1,33 +1,27 @@
-// lib/features/authentication/screens/signup/widgets/driver_details_step.dart
-//
-// Step 3 — Vehicle & Personal Basics
-// Collects: First name, Last name, Password (email users only), Service type,
-//           Vehicle make, model, plate, year, seats.
-// Everything else (DOB, gender, license, address, bank) → deferred to KYC.
+// lib/features/verification/widgets/driver_details_verification_step.dart
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/common/widgets/loading_button.dart';
-import 'package:sarri_ride/features/authentication/controllers/driver_signup_controller.dart';
+import 'package:sarri_ride/features/verification/controllers/driver_verification_controller.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/utils/validators/validation.dart';
 
-class DriverDetailsStep extends StatefulWidget {
-  final DriverSignupController controller;
+class DriverDetailsVerificationStep extends StatefulWidget {
+  final DriverVerificationController controller;
 
-  const DriverDetailsStep({super.key, required this.controller});
+  const DriverDetailsVerificationStep({super.key, required this.controller});
 
   @override
-  State<DriverDetailsStep> createState() => _DriverDetailsStepState();
+  State<DriverDetailsVerificationStep> createState() => _DriverDetailsVerificationStepState();
 }
 
-class _DriverDetailsStepState extends State<DriverDetailsStep> {
-  final _obscurePassword = true.obs;
+class _DriverDetailsVerificationStepState extends State<DriverDetailsVerificationStep> {
 
-  DriverSignupController get c => widget.controller;
+  DriverVerificationController get c => widget.controller;
 
   @override
   Widget build(BuildContext context) {
@@ -51,86 +45,13 @@ class _DriverDetailsStepState extends State<DriverDetailsStep> {
             ),
             const SizedBox(height: TSizes.xs),
             Text(
-              'Tell us about yourself and your vehicle.',
+              'Tell us about your vehicle.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: dark ? TColors.lightGrey : TColors.darkGrey,
                   ),
             ),
 
             const SizedBox(height: TSizes.spaceBtwSections),
-
-            // ── Section: Personal Info ──────────────────────────────────
-            _SectionLabel(label: 'Personal Information', dark: dark),
-            const SizedBox(height: TSizes.spaceBtwItems),
-
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: c.firstNameController,
-                    validator: (v) =>
-                        TValidator.validateEmptyText('First name', v),
-                    textCapitalization: TextCapitalization.words,
-                    decoration: InputDecoration(
-                      labelText: 'First name',
-                      prefixIcon: Icon(Iconsax.user,
-                          color: dark ? TColors.light : TColors.dark,
-                          size: TSizes.iconMd),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: TSizes.spaceBtwItems),
-                Expanded(
-                  child: TextFormField(
-                    controller: c.lastNameController,
-                    validator: (v) =>
-                        TValidator.validateEmptyText('Last name', v),
-                    textCapitalization: TextCapitalization.words,
-                    decoration: InputDecoration(
-                      labelText: 'Last name',
-                      prefixIcon: Icon(Iconsax.user,
-                          color: dark ? TColors.light : TColors.dark,
-                          size: TSizes.iconMd),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: TSizes.spaceBtwInputFields),
-
-            // ── Password (email users only) ────────────────────────────
-            Obx(() => !c.isGoogleSignup.value
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Obx(() => TextFormField(
-                            controller: c.passwordController,
-                            obscureText: _obscurePassword.value,
-                            validator: TValidator.validatePassword,
-                            decoration: InputDecoration(
-                              labelText: 'Password',
-                              hintText:
-                                  'Min 8 chars, uppercase, lowercase, number',
-                              prefixIcon: Icon(Iconsax.password_check,
-                                  color: dark ? TColors.light : TColors.dark,
-                                  size: TSizes.iconMd),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePassword.value
-                                      ? Iconsax.eye_slash
-                                      : Iconsax.eye,
-                                  color: dark ? TColors.light : TColors.dark,
-                                  size: TSizes.iconMd,
-                                ),
-                                onPressed: () => _obscurePassword.toggle(),
-                              ),
-                            ),
-                          )),
-                      const SizedBox(height: TSizes.spaceBtwInputFields),
-                    ],
-                  )
-                : const SizedBox.shrink()),
 
             // ── Section: Service Type ──────────────────────────────────
             _SectionLabel(label: 'Service Type', dark: dark),
@@ -363,8 +284,8 @@ class _DriverDetailsStepState extends State<DriverDetailsStep> {
               width: double.infinity,
               child: Obx(() => LoadingElevatedButton(
                     isLoading: c.isLoading.value,
-                    text: 'Complete Registration',
-                    loadingText: 'Registering...',
+                    text: 'Complete Setup',
+                    loadingText: 'Setting up...',
                     onPressed: c.registerDriverDetails,
                     backgroundColor: TColors.primary,
                     foregroundColor: TColors.white,

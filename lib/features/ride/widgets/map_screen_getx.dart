@@ -5,11 +5,13 @@ import 'package:sarri_ride/features/notifications/controllers/notification_contr
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 
 import 'package:sarri_ride/features/ride/controllers/ride_controller.dart';
+import 'package:sarri_ride/features/warehouse/controllers/warehouse_booking_controller.dart';
 import 'package:sarri_ride/features/location/services/location_service.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
 import 'package:sarri_ride/features/ride/widgets/map_screen_widgets_index.dart';
+import 'package:sarri_ride/common/widgets/double_back_to_close.dart';
 
 class MapScreenGetX extends StatelessWidget {
   const MapScreenGetX({super.key});
@@ -134,15 +136,16 @@ class MapScreenGetX extends StatelessWidget {
       }
     });
 
-    return Scaffold(
-      drawer: MapDrawerWidget(
-        onRefreshLocation: rideController.refreshCurrentLocation,
-        onLogout: () {
-          Get.back(); /* Logout handled by SettingsController */
-        },
-      ),
-      // Everything is now contained within the SlidingUpPanel's body
-      body: SlidingUpPanel(
+    return DoubleBackToCloseWidget(
+      child: Scaffold(
+        drawer: MapDrawerWidget(
+          onRefreshLocation: rideController.refreshCurrentLocation,
+          onLogout: () {
+            Get.back(); /* Logout handled by SettingsController */
+          },
+        ),
+        // Everything is now contained within the SlidingUpPanel's body
+        body: SlidingUpPanel(
         controller: rideController.panelController,
         minHeight: panelMinHeight,
         maxHeight: MediaQuery.of(context).size.height * 0.9,
@@ -279,7 +282,7 @@ class MapScreenGetX extends StatelessWidget {
           // Optional: Add paralax or fade effects here if needed
         },
       ),
-    );
+    ));
   }
 
   Widget _buildBottomSheet(RideController controller) {
@@ -291,6 +294,7 @@ class MapScreenGetX extends StatelessWidget {
             onCarTap: controller.goToDestinationSearch,
             onPackageTap: controller.goToPackageBooking,
             onFreightTap: controller.goToFreightBooking,
+            onWarehouseTap: controller.goToWarehouseBooking,
             recentDestinations: controller.recentDestinations,
             onRecentDestinationTap: controller.selectDestinationFromRecent,
           );
@@ -384,6 +388,15 @@ class MapScreenGetX extends StatelessWidget {
                   controller.freightDeliveryController,
                 ),
             onGetQuote: controller.continueWithFreightTypes,
+          );
+
+        case BookingState.warehouseBooking:
+          return WarehouseBookingWidget(
+            onBackPressed: controller.onBackPressed,
+            onContinue: () {
+              final warehouseController = Get.find<WarehouseBookingController>();
+              warehouseController.createOrder();
+            }
           );
       }
     });

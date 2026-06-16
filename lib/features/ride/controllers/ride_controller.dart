@@ -42,6 +42,7 @@ enum BookingState {
   tripCompleted,
   packageBooking,
   freightBooking,
+  warehouseBooking,
 }
 
 class RideController extends GetxController with GetTickerProviderStateMixin, WidgetsBindingObserver {
@@ -2038,6 +2039,11 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
   void goToFreightBooking() {
     currentState.value = BookingState.freightBooking;
     rideTypes.assignAll(_freightRideTypes);
+    animatePanelTo80Percent();
+  }
+
+  void goToWarehouseBooking() {
+    currentState.value = BookingState.warehouseBooking;
     animatePanelTo80Percent();
   }
 

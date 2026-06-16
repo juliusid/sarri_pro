@@ -479,6 +479,21 @@ class DriverDashboardController extends GetxController with WidgetsBindingObserv
         if (apiIsOnBreak != null) {
           isOnBreak.value = apiIsOnBreak;
         }
+
+        // 3. Operational Status (Account Status)
+        final String? apiStatus = data['status'] as String?;
+        if (apiStatus != null && driverOperationalStatus.value != apiStatus.toLowerCase()) {
+          driverOperationalStatus.value = apiStatus.toLowerCase();
+          // Update the current driver object as well if we have it
+          if (currentDriver.value != null && currentDriver.value!.driverProfile != null) {
+            currentDriver.value = currentDriver.value!.copyWith(
+              driverProfile: currentDriver.value!.driverProfile!.copyWith(
+                status: apiStatus.toLowerCase(),
+                adminVerified: data['adminVerified'] ?? currentDriver.value!.driverProfile!.adminVerified,
+              )
+            );
+          }
+        }
       }
     } catch (e) {
       print("Error checking driver status: $e");

@@ -325,6 +325,13 @@ class HttpService extends GetxService {
                 body: body != null ? json.encode(body) : null,
               );
               break;
+            case 'PATCH':
+              retryFunction = () => _client.patch(
+                uri,
+                headers: retryHeaders,
+                body: body != null ? json.encode(body) : null,
+              );
+              break;
             case 'DELETE':
               retryFunction = () => _client.delete(uri, headers: retryHeaders);
               break;
@@ -412,6 +419,31 @@ class HttpService extends GetxService {
         body: body != null ? json.encode(body) : null,
       ),
       method: 'POST',
+      endpoint: endpoint,
+      headers: headers,
+      body: body,
+      queryParameters: queryParameters,
+      requiresAuth: requiresAuth,
+    );
+  }
+
+  Future<http.Response> patch(
+    String endpoint, {
+    Map<String, String>? headers,
+    Map<String, dynamic>? body,
+    Map<String, dynamic>? queryParameters,
+    bool requiresAuth = true,
+  }) async {
+    return await _makeRequest(
+      () => _client.patch(
+        Uri.parse(endpoint).replace(queryParameters: queryParameters),
+        headers: _getHeaders(
+          additionalHeaders: headers,
+          requiresAuth: requiresAuth,
+        ),
+        body: body != null ? json.encode(body) : null,
+      ),
+      method: 'PATCH',
       endpoint: endpoint,
       headers: headers,
       body: body,

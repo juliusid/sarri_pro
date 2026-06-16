@@ -122,6 +122,8 @@ class ApiConfig {
   // Driver Endpoints
   static String get driverRegisterEndpoint =>
       '$baseUrl/driverAuth/driver/register';
+  static String get driverEmailSignupEndpoint =>
+      '$baseUrl/driverAuth/driver/signup-email';
   static String get driverLoginEndpoint => '$baseUrl/driverAuth/driver/login';
   static String get driverGoogleAuthEndpoint =>
       '$baseUrl/driverAuth/driver/google';

@@ -8,16 +8,16 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/common/widgets/loading_button.dart';
-import 'package:sarri_ride/features/authentication/controllers/driver_signup_controller.dart';
+import 'package:sarri_ride/features/verification/controllers/driver_verification_controller.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/utils/validators/validation.dart';
 
-class DriverPhoneCombinedStep extends StatelessWidget {
-  final DriverSignupController controller;
+class DriverPhoneVerificationStep extends StatelessWidget {
+  final DriverVerificationController controller;
 
-  const DriverPhoneCombinedStep({super.key, required this.controller});
+  const DriverPhoneVerificationStep({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +112,7 @@ class DriverPhoneCombinedStep extends StatelessWidget {
 // OTP section — slides in below phone number after OTP is sent
 // ─────────────────────────────────────────────────────────────────────────────
 class _OtpRevealSection extends StatelessWidget {
-  final DriverSignupController controller;
+  final DriverVerificationController controller;
   final bool dark;
 
   const _OtpRevealSection({required this.controller, required this.dark});

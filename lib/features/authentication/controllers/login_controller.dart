@@ -38,12 +38,12 @@ class LoginController extends GetxController {
   final RxBool isAppleLoading = false.obs;
   final selectedRole = UserType.rider.obs;
 
-  @override
-  void onClose() {
-    emailController.dispose();
-    passwordController.dispose();
-    super.onClose();
-  }
+  // @override
+  // void onClose() {
+  //   emailController.dispose();
+  //   passwordController.dispose();
+  //   super.onClose();
+  // }
 
   // Toggle password visibility
   void togglePasswordVisibility() {
@@ -261,32 +261,29 @@ class LoginController extends GetxController {
 
         if (loginResult.success && loginResult.client != null) {
           if (loginResult.isNewDriver) {
-            // New driver — route to complete signup
             THelperFunctions.showSuccessSnackBar(
               'Account Created',
-              'Please complete your driver profile.',
+              'Welcome! Please complete your driver profile setup.',
             );
-            Get.offAll(() =>
-                DriverSignupScreen(email: loginResult.client!.email));
           } else {
-            // Existing driver — go to dashboard
-            if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
-              Get.delete<ClientData>(tag: 'currentUser', force: true);
-            }
-            Get.put<ClientData>(loginResult.client!,
-                tag: 'currentUser', permanent: true);
-
-            final storage = GetStorage();
-            storage.write('user_role', loginResult.client!.role);
-            storage.write('current_user_data', loginResult.client!.toJson());
-
-            WebSocketService.instance.connect();
-            await NotificationService.instance.updateTokenOnBackend();
-
-            Get.offAll(() => const DriverDashboardScreen());
             THelperFunctions.showSuccessSnackBar(
                 'Welcome back!', 'Signed in as driver.');
           }
+
+          if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
+            Get.delete<ClientData>(tag: 'currentUser', force: true);
+          }
+          Get.put<ClientData>(loginResult.client!,
+              tag: 'currentUser', permanent: true);
+
+          final storage = GetStorage();
+          storage.write('user_role', loginResult.client!.role);
+          storage.write('current_user_data', loginResult.client!.toJson());
+
+          WebSocketService.instance.connect();
+          await NotificationService.instance.updateTokenOnBackend();
+
+          Get.offAll(() => const DriverDashboardScreen());
         } else {
           THelperFunctions.showErrorSnackBar(
               'Login Failed', loginResult.error ?? 'Server rejected the login.');

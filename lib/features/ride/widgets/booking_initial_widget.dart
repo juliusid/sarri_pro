@@ -10,6 +10,7 @@ class BookingInitialWidget extends StatelessWidget {
   final VoidCallback onCarTap;
   final VoidCallback onPackageTap;
   final VoidCallback onFreightTap;
+  final VoidCallback onWarehouseTap;
   final List<Map<String, dynamic>> recentDestinations;
   final Function(Map<String, dynamic>) onRecentDestinationTap;
 
@@ -19,6 +20,7 @@ class BookingInitialWidget extends StatelessWidget {
     required this.onCarTap,
     required this.onPackageTap,
     required this.onFreightTap,
+    required this.onWarehouseTap,
     required this.recentDestinations,
     required this.onRecentDestinationTap,
   });
@@ -99,6 +101,23 @@ class BookingInitialWidget extends StatelessWidget {
 
                   fallbackIcon: Icons.local_shipping_rounded,
                   onTap: onPackageTap,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Send to Warehouse
+          Row(
+            children: [
+              Expanded(
+                child: RideTypeCard(
+                  title: 'Send to Warehouse',
+                  subtitle: 'Drop off at our hub for inter-state delivery',
+                  imagePath: 'assets/images/content/warehouse.png',
+                  fallbackIcon: Icons.warehouse_rounded,
+                  onTap: onWarehouseTap,
                 ),
               ),
             ],

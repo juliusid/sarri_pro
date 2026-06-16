@@ -608,44 +608,76 @@ class AuthService extends GetxService {
     }
   }
 
-  // ---------- DRIVER: REGISTER ----------
-  Future<AuthResult> registerDriver(DriverRegistrationRequest request) async {
+  // ---------- NEW: DRIVER EMAIL SIGNUP ----------
+  Future<AuthResult> driverEmailSignup(
+    String email,
+    String password,
+    String firstName,
+    String lastName,
+  ) async {
     try {
       final response = await _httpService.post(
+        ApiConfig.driverEmailSignupEndpoint,
+        body: {
+          'email': email,
+          'password': password,
+          'FirstName': firstName,
+          'LastName': lastName,
+        },
+      );
+      final responseData = _httpService.handleResponse(response);
+      if (responseData['status'] == 'success') {
+        final data = responseData['data'];
+        if (data != null && data['accessToken'] != null) {
+          await _httpService.storeTokens(data['accessToken'], data['refreshToken']);
+        }
+        return AuthResult.success(
+          message: responseData['message'],
+          client: data != null && data['driver'] != null 
+              ? ClientData(
+                  id: data['driver']['driverId']?.toString() ?? '',
+                  email: data['driver']['email'] ?? '',
+                  role: data['driver']['role'] ?? 'driver',
+                  isVerified: data['driver']['isVerified'] ?? false,
+                )
+              : null,
+        );
+      }
+      return AuthResult.error(responseData['message']);
+    } catch (e) {
+      if (e is ApiException) {
+        return AuthResult.error(e.message);
+      }
+      return AuthResult.error("Registration failed: ${e.toString()}");
+    }
+  }
+
+  // ---------- COMPLETE DRIVER VERIFICATION ----------
+  Future<AuthResult> completeDriverVerification(Map<String, dynamic> request) async {
+    try {
+      // This is an authenticated POST because they are now logged in
+      final response = await _httpService.post(
         ApiConfig.driverRegisterEndpoint,
-        body: request.toJson(),
+        body: request,
       );
       final responseData = _httpService.handleResponse(response);
 
-      // Auto-login: store tokens returned by the backend
       if (responseData['status'] == 'success') {
-        final data = responseData['data'] as Map<String, dynamic>?;
-        if (data != null &&
-            data['accessToken'] != null &&
-            data['refreshToken'] != null) {
-          await _httpService.storeTokens(
-            data['accessToken'],
-            data['refreshToken'],
-          );
-        }
+        return AuthResult.success(
+          message: responseData['message'] ?? 'Verification successful',
+        );
       }
-
-      return AuthResult.success(
-        message: responseData['message'] ?? 'Registration successful',
-      );
+      return AuthResult.error(responseData['message']);
     } catch (e) {
       if (e is ApiException) {
         final errors = (e.data['data'] as Map?)?['errors'];
         if (errors is List && errors.isNotEmpty) {
           final first = errors.first as Map?;
-          final fieldMsg = first?['msg'] ?? first?['message'];
-          if (fieldMsg is String && fieldMsg.isNotEmpty) {
-            return AuthResult.error(fieldMsg);
-          }
+          return AuthResult.error(first?['msg'] ?? e.message);
         }
         return AuthResult.error(e.message);
       }
-      return AuthResult.error("An unknown error occurred: ${e.toString()}");
+      return AuthResult.error("Verification failed: ${e.toString()}");
     }
   }
 

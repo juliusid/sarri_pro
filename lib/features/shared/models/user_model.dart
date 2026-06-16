@@ -271,6 +271,8 @@ class DriverProfile {
     String? availabilityStatus,
     bool? isOnBreak,
     BankDetailsModel? bankDetails,
+    String? status,
+    bool? adminVerified,
   }) {
     return DriverProfile(
       userId: userId,
@@ -281,9 +283,9 @@ class DriverProfile {
       vehicleDetails: vehicleDetails,
       location: location.copyWith(coordinates: currentLocation),
       isVerified: isVerified,
-      adminVerified: adminVerified,
+      adminVerified: adminVerified ?? this.adminVerified,
       availabilityStatus: availabilityStatus ?? this.availabilityStatus,
-      status: status,
+      status: status ?? this.status,
       lastLocationUpdate: DateTime.now(),
       dateOfBirth: dateOfBirth,
       gender: gender,
