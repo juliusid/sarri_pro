@@ -17,29 +17,43 @@ class WarehouseOrderHistoryController extends GetxController {
   Future<void> fetchOrders() async {
     isLoading.value = true;
     try {
-      final response = await _httpService.get('/api/warehouse/orders/history');
+      final response = await _httpService.get(
+        '/api/warehouse/orders',
+        queryParameters: {'page': '1', 'limit': '50'},
+      );
       final data = _httpService.handleResponse(response);
       if (data['status'] == 'success') {
         orders.value = List<Map<String, dynamic>>.from(data['data']);
       }
     } catch (e) {
       print('Error fetching warehouse orders: $e');
-      THelperFunctions.showErrorSnackBar('Error', 'Failed to load order history.');
+      String errMsg = 'Failed to load order history.';
+      if (e is ApiException) {
+        errMsg = e.message;
+      }
+      THelperFunctions.showErrorSnackBar('Error', errMsg);
     } finally {
       isLoading.value = false;
     }
   }
 
-  Future<void> cancelOrder(String shipmentId) async {
+  Future<bool> cancelOrder(String shipmentId) async {
     try {
-      final response = await _httpService.patch('/api/warehouse/orders/$shipmentId/cancel');
+      final response = await _httpService.delete('/api/warehouse/orders/$shipmentId');
       final data = _httpService.handleResponse(response);
       if (data['status'] == 'success') {
         THelperFunctions.showSuccessSnackBar('Success', 'Order cancelled successfully.');
         fetchOrders();
+        return true;
       }
+      return false;
     } catch (e) {
-      THelperFunctions.showErrorSnackBar('Error', 'Failed to cancel order.');
+      String errMsg = 'Failed to cancel order.';
+      if (e is ApiException) {
+        errMsg = e.message;
+      }
+      THelperFunctions.showErrorSnackBar('Error', errMsg);
+      return false;
     }
   }
 }

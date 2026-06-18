@@ -5,9 +5,16 @@ import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
 class ClientClaimScreen extends StatefulWidget {
-  final Map<String, dynamic> order;
+  final String shipmentId;
+  final int itemIndex;
+  final Map<String, dynamic> item;
 
-  const ClientClaimScreen({super.key, required this.order});
+  const ClientClaimScreen({
+    super.key,
+    required this.shipmentId,
+    required this.itemIndex,
+    required this.item,
+  });
 
   @override
   State<ClientClaimScreen> createState() => _ClientClaimScreenState();
@@ -16,93 +23,95 @@ class ClientClaimScreen extends StatefulWidget {
 class _ClientClaimScreenState extends State<ClientClaimScreen> {
   final HttpService _httpService = HttpService.instance;
   final TextEditingController _reasonController = TextEditingController();
-  final TextEditingController _amountController = TextEditingController();
-  
-  String _selectedReason = 'Damaged Item';
   bool _isLoading = false;
-  
-  final List<String> _claimReasons = [
-    'Damaged Item',
-    'Missing Item',
-    'Wrong Item Delivered',
-    'Delayed Delivery',
-    'Other'
-  ];
 
   Future<void> _submitClaim() async {
-    if (_reasonController.text.isEmpty) {
-      THelperFunctions.showErrorSnackBar('Error', 'Please provide details for your claim.');
+    final reasonText = _reasonController.text.trim();
+    if (reasonText.isEmpty) {
+      THelperFunctions.showErrorSnackBar('Error', 'Please provide a detailed reason for your claim.');
+      return;
+    }
+    if (reasonText.length > 500) {
+      THelperFunctions.showErrorSnackBar('Error', 'Reason details cannot exceed 500 characters.');
       return;
     }
 
     setState(() => _isLoading = true);
     try {
-      final shipmentId = widget.order['shipmentId'] ?? widget.order['_id'];
       final response = await _httpService.post(
-        '/api/warehouse/claims',
+        '/api/warehouse/orders/${widget.shipmentId}/items/${widget.itemIndex}/refund',
         body: {
-          'shipmentId': shipmentId,
-          'reason': _selectedReason,
-          'details': _reasonController.text,
-          'requestedAmount': double.tryParse(_amountController.text) ?? 0.0,
+          'reason': reasonText,
         },
       );
       final data = _httpService.handleResponse(response);
       
       if (data['status'] == 'success') {
-        THelperFunctions.showSuccessSnackBar('Claim Submitted', 'Your claim has been filed successfully.');
-        Get.back();
+        THelperFunctions.showSuccessSnackBar(
+          'Claim Submitted',
+          'Your claim has been submitted successfully and is under review.',
+        );
+        Get.back(result: true); // Return true to refresh details
       }
     } catch (e) {
-      THelperFunctions.showErrorSnackBar('Error', 'Failed to submit claim.');
+      String errMsg = 'Failed to submit claim request.';
+      if (e is ApiException) {
+        errMsg = e.message;
+      }
+      THelperFunctions.showErrorSnackBar('Error', errMsg);
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
   @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final dark = THelperFunctions.isDarkMode(context);
+    final itemDesc = widget.item['description'] ?? 'Item';
+    
     return Scaffold(
-      appBar: AppBar(title: const Text('File a Claim')),
+      appBar: AppBar(
+        title: const Text('File a Claim'),
+        backgroundColor: dark ? TColors.dark : TColors.white,
+        foregroundColor: dark ? TColors.white : TColors.black,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Reason for Claim', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(12)),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _selectedReason,
-                  isExpanded: true,
-                  items: _claimReasons.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
-                  onChanged: (val) => setState(() => _selectedReason = val!),
-                ),
-              ),
+            Text(
+              'Item: $itemDesc',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: TColors.primary),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Declared Value: ₦${widget.item['declaredValue'] ?? 0}',
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
             ),
             const SizedBox(height: 24),
-            const Text('Requested Compensation (₦)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                hintText: 'e.g. 5000',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
+            const Text(
+              'Details & Evidence Description',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            const SizedBox(height: 24),
-            const Text('Details & Evidence Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 12),
             TextField(
               controller: _reasonController,
-              maxLines: 5,
+              maxLines: 6,
+              maxLength: 500, // Enforce 500 characters limit
               decoration: InputDecoration(
-                hintText: 'Please describe the issue in detail...',
+                hintText: 'Please describe the damage or loss in detail (max 500 characters)...',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: TColors.primary),
+                ),
               ),
             ),
             const SizedBox(height: 32),
@@ -114,8 +123,11 @@ class _ClientClaimScreenState extends State<ClientClaimScreen> {
                   backgroundColor: TColors.primary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('Submit Claim'),
+                child: _isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text('Submit Claim'),
               ),
             ),
           ],

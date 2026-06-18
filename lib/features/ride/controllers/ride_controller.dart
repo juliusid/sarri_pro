@@ -976,43 +976,49 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
     final position = _locationService.getLocationForMap();
     final newLatLng = LatLng(position.latitude, position.longitude);
 
-    pickupLocation.value = newLatLng;
-    pickupName.value = 'Current Location';
+    if (currentState.value == BookingState.initial ||
+        currentState.value == BookingState.destinationSearch) {
+      pickupLocation.value = newLatLng;
+      pickupName.value = 'Current Location';
 
-    try {
-      final address = await PlacesService.getAddressFromCoordinates(
-        newLatLng.latitude,
-        newLatLng.longitude,
-      );
-      if (address != null) pickupAddress.value = address;
-    } catch (e, stack) {
-      AppLogger.error(
-        'Failed to get address from coordinates',
-        error: e,
-        stackTrace: stack,
-      );
-    }
+      try {
+        final address = await PlacesService.getAddressFromCoordinates(
+          newLatLng.latitude,
+          newLatLng.longitude,
+        );
+        if (address != null) pickupAddress.value = address;
+      } catch (e, stack) {
+        AppLogger.error(
+          'Failed to get address from coordinates',
+          error: e,
+          stackTrace: stack,
+        );
+      }
 
-    pickupController.text = pickupName.value;
-    await _getAndSetStateFromLatLng(newLatLng, defaultState: "Lagos");
+      pickupController.text = pickupName.value;
+      await _getAndSetStateFromLatLng(newLatLng, defaultState: "Lagos");
 
-    if (stops.isNotEmpty && stops.first.type == StopType.pickup) {
-      stops[0] = StopPoint(
-        id: stops.first.id,
-        type: StopType.pickup,
-        location: newLatLng,
-        name: pickupName.value,
-        address: pickupAddress.value,
-        isEditable: false,
-      );
+      if (stops.isNotEmpty && stops.first.type == StopType.pickup) {
+        stops[0] = StopPoint(
+          id: stops.first.id,
+          type: StopType.pickup,
+          location: newLatLng,
+          name: pickupName.value,
+          address: pickupAddress.value,
+          isEditable: false,
+        );
+      } else {
+        initializeStops();
+      }
+      addPickupMarker();
+      mapController?.animateCamera(CameraUpdate.newLatLngZoom(newLatLng, 16.0));
+      if (destinationLocation.value != null) {
+        await recalculateRoute();
+        updatePricing();
+      }
     } else {
-      initializeStops();
-    }
-    addPickupMarker();
-    mapController?.animateCamera(CameraUpdate.newLatLngZoom(newLatLng, 16.0));
-    if (destinationLocation.value != null) {
-      await recalculateRoute();
-      updatePricing();
+      // Just animate map to show the user's location, without resetting booking parameters
+      mapController?.animateCamera(CameraUpdate.newLatLngZoom(newLatLng, 16.0));
     }
     update();
   }
@@ -1306,6 +1312,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
       case BookingState.destinationSearch:
       case BookingState.packageBooking:
       case BookingState.freightBooking:
+      case BookingState.warehouseBooking:
         currentState.value = BookingState.initial;
         showDestinationSuggestions.value = false;
         destinationSuggestions.clear();

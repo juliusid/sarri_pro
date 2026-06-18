@@ -379,6 +379,13 @@ class HttpService extends GetxService {
     }
   }
 
+  String _normalizeEndpoint(String endpoint) {
+    if (endpoint.startsWith('/')) {
+      return '${ApiConfig.baseUrl}$endpoint';
+    }
+    return endpoint;
+  }
+
   // --- Standard HTTP Methods (unchanged, they use the wrapper) ---
   Future<http.Response> get(
     String endpoint, {
@@ -386,6 +393,7 @@ class HttpService extends GetxService {
     Map<String, dynamic>? queryParameters,
     bool requiresAuth = true,
   }) async {
+    endpoint = _normalizeEndpoint(endpoint);
     return await _makeRequest(
       () => _client.get(
         Uri.parse(endpoint).replace(queryParameters: queryParameters),
@@ -409,6 +417,7 @@ class HttpService extends GetxService {
     Map<String, dynamic>? queryParameters,
     bool requiresAuth = true,
   }) async {
+    endpoint = _normalizeEndpoint(endpoint);
     return await _makeRequest(
       () => _client.post(
         Uri.parse(endpoint).replace(queryParameters: queryParameters),
@@ -434,6 +443,7 @@ class HttpService extends GetxService {
     Map<String, dynamic>? queryParameters,
     bool requiresAuth = true,
   }) async {
+    endpoint = _normalizeEndpoint(endpoint);
     return await _makeRequest(
       () => _client.patch(
         Uri.parse(endpoint).replace(queryParameters: queryParameters),
@@ -459,6 +469,7 @@ class HttpService extends GetxService {
     Map<String, dynamic>? queryParameters,
     bool requiresAuth = true,
   }) async {
+    endpoint = _normalizeEndpoint(endpoint);
     return await _makeRequest(
       () => _client.put(
         Uri.parse(endpoint).replace(queryParameters: queryParameters),
@@ -484,6 +495,7 @@ class HttpService extends GetxService {
     Map<String, String>? fields,
     bool requiresAuth = true,
   }) async {
+    endpoint = _normalizeEndpoint(endpoint);
     // This method does not use the `_makeRequest` wrapper because
     // multipart request logic is different.
     // It will, however, handle a 401 and attempt a refresh manually.
@@ -599,6 +611,7 @@ class HttpService extends GetxService {
     Map<String, dynamic>? queryParameters,
     bool requiresAuth = true,
   }) async {
+    endpoint = _normalizeEndpoint(endpoint);
     return await _makeRequest(
       () => _client.delete(
         Uri.parse(endpoint).replace(queryParameters: queryParameters),

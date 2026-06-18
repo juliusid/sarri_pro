@@ -17,38 +17,114 @@ class DriverManifestController extends GetxController {
   Future<void> fetchManifest() async {
     isLoading.value = true;
     try {
-      final response = await _httpService.get('/api/warehouse/batches/driver');
+      final response = await _httpService.get('/api/warehouse/delivery/manifest');
       final data = _httpService.handleResponse(response);
-      if (data['status'] == 'success') {
-        batches.value = List<Map<String, dynamic>>.from(data['data']);
+      if (data['status'] == 'success' && data['data'] != null && data['data']['batches'] != null) {
+        batches.value = List<Map<String, dynamic>>.from(data['data']['batches']);
+      } else {
+        batches.clear();
       }
     } catch (e) {
       print('Error fetching manifest: $e');
-      THelperFunctions.showErrorSnackBar('Error', 'Failed to load manifest.');
+      String errMsg = 'Failed to load manifest.';
+      if (e is ApiException) {
+        errMsg = e.message;
+      }
+      THelperFunctions.showErrorSnackBar('Error', errMsg);
+      batches.clear();
     } finally {
       isLoading.value = false;
     }
   }
 
-  Future<bool> updateBatchStatus(String batchId, String newStatus, {String? qrData}) async {
+  // Scan QR at delivery point
+  Future<Map<String, dynamic>?> scanDelivery(String qrPayload, double? lat, double? lng) async {
     try {
-      final response = await _httpService.patch(
-        '/api/warehouse/batches/$batchId/status',
+      final response = await _httpService.post(
+        '/api/warehouse/delivery/scan',
         body: {
-          'status': newStatus,
-          if (qrData != null) 'scannedQrData': qrData,
+          'payload': qrPayload,
+          'latitude': lat,
+          'longitude': lng,
         },
       );
       final data = _httpService.handleResponse(response);
       if (data['status'] == 'success') {
-        THelperFunctions.showSuccessSnackBar('Success', 'Batch updated to $newStatus');
-        fetchManifest(); // Refresh
+        return data['data'];
+      }
+      return null;
+    } catch (e) {
+      String errMsg = 'Delivery scan failed.';
+      if (e is ApiException) {
+        errMsg = e.message;
+      }
+      THelperFunctions.showErrorSnackBar('Scan Error', errMsg);
+      return null;
+    }
+  }
+
+  // Confirm delivery with PIN
+  Future<bool> confirmDeliveryPIN({
+    required String shipmentId,
+    required int itemIndex,
+    required String pin,
+    required String receivedByName,
+    required String receivedByIdType,
+  }) async {
+    try {
+      final response = await _httpService.post(
+        '/api/warehouse/delivery/$shipmentId/items/$itemIndex/confirm',
+        body: {
+          'pin': pin,
+          'receivedByName': receivedByName,
+          'receivedByIdType': receivedByIdType,
+        },
+      );
+      final data = _httpService.handleResponse(response);
+      if (data['status'] == 'success') {
+        THelperFunctions.showSuccessSnackBar('Delivered', 'Delivery confirmed successfully.');
+        fetchManifest(); // Refresh manifest list
         return true;
       }
       return false;
     } catch (e) {
-      THelperFunctions.showErrorSnackBar('Error', 'Failed to update batch status.');
+      String errMsg = 'Failed to confirm delivery.';
+      if (e is ApiException) {
+        errMsg = e.message;
+      }
+      THelperFunctions.showErrorSnackBar('Delivery Confirmation Error', errMsg);
+      return false;
+    }
+  }
+
+  // Report failed delivery
+  Future<bool> reportFailure({
+    required String shipmentId,
+    required int itemIndex,
+    String? reason,
+  }) async {
+    try {
+      final response = await _httpService.post(
+        '/api/warehouse/delivery/$shipmentId/items/$itemIndex/failed',
+        body: {
+          if (reason != null && reason.trim().isNotEmpty) 'reason': reason,
+        },
+      );
+      final data = _httpService.handleResponse(response);
+      if (data['status'] == 'success') {
+        THelperFunctions.showSuccessSnackBar('Logged', 'Delivery issue logged successfully.');
+        fetchManifest(); // Refresh manifest list
+        return true;
+      }
+      return false;
+    } catch (e) {
+      String errMsg = 'Failed to log delivery failure.';
+      if (e is ApiException) {
+        errMsg = e.message;
+      }
+      THelperFunctions.showErrorSnackBar('Failure Report Error', errMsg);
       return false;
     }
   }
 }
+

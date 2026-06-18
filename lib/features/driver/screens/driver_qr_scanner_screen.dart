@@ -1,13 +1,23 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/driver/controllers/driver_manifest_controller.dart';
+import 'package:sarri_ride/features/driver/screens/pin_confirmation_screen.dart';
+import 'package:sarri_ride/features/location/services/location_service.dart';
 
 class DriverQrScannerScreen extends StatefulWidget {
-  final String? batchId;
-  const DriverQrScannerScreen({super.key, this.batchId});
+  final String? expectedShipmentId;
+  final int? expectedItemIndex;
+
+  const DriverQrScannerScreen({
+    super.key,
+    this.expectedShipmentId,
+    this.expectedItemIndex,
+  });
 
   @override
   State<DriverQrScannerScreen> createState() => _DriverQrScannerScreenState();
@@ -33,83 +43,131 @@ class _DriverQrScannerScreenState extends State<DriverQrScannerScreen> {
       final String? code = barcodes.first.rawValue;
       if (code != null) {
         setState(() => _isProcessing = true);
-        
-        if (widget.batchId != null) {
-          // Update specific batch (e.g. mark as picked up or arrived)
-          _showStatusUpdateDialog(code);
-        } else {
-          // General scan (e.g. check-in an item)
-          _handleGeneralScan(code);
-        }
+        await _processScannedCode(code);
       }
     }
   }
 
-  void _showStatusUpdateDialog(String qrData) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Update Batch Status'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('What is the new status of this batch?'),
-              const SizedBox(height: 16),
-              _buildStatusOption('In Transit', 'in_transit', qrData),
-              _buildStatusOption('Arrived Destination', 'arrived_destination', qrData),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                setState(() => _isProcessing = false);
-                Get.back();
-              },
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
-  }
+  Future<void> _processScannedCode(String qrData) async {
+    try {
+      // 1. Parse JSON
+      Map<String, dynamic> parsed;
+      try {
+        parsed = jsonDecode(qrData);
+      } catch (e) {
+        THelperFunctions.showErrorSnackBar('Invalid QR', 'The QR code does not contain a valid delivery payload.');
+        setState(() => _isProcessing = false);
+        return;
+      }
 
-  Widget _buildStatusOption(String label, String value, String qrData) {
-    return ListTile(
-      title: Text(label),
-      leading: const Icon(Icons.local_shipping),
-      onTap: () async {
-        Get.back(); // close dialog
-        final controller = Get.find<DriverManifestController>();
-        final success = await controller.updateBatchStatus(widget.batchId!, value, qrData: qrData);
-        if (success) {
-          Get.back(); // close scanner
-        } else {
-          setState(() => _isProcessing = false);
+      final String? shipmentId = parsed['shipmentId'];
+      final int? itemIndex = parsed['itemIndex'];
+      final String? hmacSignature = parsed['hmacSignature'];
+
+      if (shipmentId == null || itemIndex == null || hmacSignature == null) {
+        THelperFunctions.showErrorSnackBar('Invalid QR', 'QR payload is missing required delivery details.');
+        setState(() => _isProcessing = false);
+        return;
+      }
+
+      // 2. Validate expected package if specified
+      if (widget.expectedShipmentId != null && widget.expectedItemIndex != null) {
+        if (widget.expectedShipmentId != shipmentId || widget.expectedItemIndex != itemIndex) {
+          bool proceed = await _showMismatchWarningDialog();
+          if (!proceed) {
+            setState(() => _isProcessing = false);
+            return;
+          }
         }
-      },
-    );
+      }
+
+      // 3. Fetch GPS Coordinates using LocationService
+      double? lat;
+      double? lng;
+      try {
+        final pos = await LocationService.instance.getCurrentLocation();
+        if (pos != null) {
+          lat = pos.latitude;
+          lng = pos.longitude;
+        }
+      } catch (e) {
+        print('Could not fetch GPS location: $e');
+        // Do not block scanning completely, backend allows nullable coordinates
+      }
+
+      // 4. Submit to delivery scan endpoint
+      final controller = Get.find<DriverManifestController>();
+      final resData = await controller.scanDelivery(qrData, lat, lng);
+
+      if (resData != null) {
+        // Success!
+        final bool geofenceViolation = resData['geofenceViolation'] ?? false;
+        final num? distance = resData['distanceFromRecipient'];
+
+        if (geofenceViolation && distance != null) {
+          THelperFunctions.showSnackBar('Geofence Warning: Recipient is ${distance.round()}m away.');
+        }
+
+        // Navigate to PIN Confirm
+        Get.off(() => PinConfirmationScreen(
+              shipmentId: resData['shipmentId'] ?? shipmentId,
+              itemIndex: resData['itemIndex'] ?? itemIndex,
+              description: resData['description'] ?? 'Package',
+              recipientName: resData['recipientName'] ?? 'Recipient',
+              recipientPhone: resData['recipientPhone'] ?? '',
+            ));
+      } else {
+        // Scan failed
+        setState(() => _isProcessing = false);
+      }
+    } catch (e) {
+      print('Error processing scanned QR code: $e');
+      THelperFunctions.showErrorSnackBar('Scan Error', 'An unexpected error occurred during processing.');
+      setState(() => _isProcessing = false);
+    }
   }
 
-  void _handleGeneralScan(String qrData) {
-    // Process single item delivery scan (e.g., driver delivering item to the warehouse)
-    // Could navigate to a PIN confirmation screen or directly call API
-    THelperFunctions.showSuccessSnackBar('Scanned', 'Scanned QR: $qrData');
-    
-    // Simulating going to PIN screen
-    Future.delayed(const Duration(seconds: 1), () {
-      setState(() => _isProcessing = false);
-      Get.back();
-    });
+  Future<bool> _showMismatchWarningDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) {
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.orange),
+                  SizedBox(width: 8),
+                  Text('Item Mismatch'),
+                ],
+              ),
+              content: const Text(
+                'The package you scanned does not match the one you selected in your manifest.\n\n'
+                'Do you want to deliver this scanned package instead?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel & Scan Correct'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Yes, Deliver Scanned'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scan QR Code'),
+        title: const Text('Scan Delivery QR'),
         backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        elevation: 0,
       ),
       extendBodyBehindAppBar: true,
       body: Stack(
@@ -138,8 +196,8 @@ class _DriverQrScannerScreenState extends State<DriverQrScannerScreen> {
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: const Text(
-                  'Align QR code within frame',
-                  style: TextStyle(color: Colors.white, fontSize: 16),
+                  'Align recipient\'s QR code within the frame',
+                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
                 ),
               ),
             ),
@@ -158,7 +216,7 @@ class ScannerOverlayPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     final path = Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
-    
+
     final scanAreaSize = size.width * 0.7;
     final scanAreaRect = Rect.fromCenter(
       center: Offset(size.width / 2, size.height / 2),
@@ -176,10 +234,11 @@ class ScannerOverlayPainter extends CustomPainter {
       ..color = TColors.primary
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.0;
-      
+
     canvas.drawRRect(RRect.fromRectAndRadius(scanAreaRect, const Radius.circular(16)), borderPaint);
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+

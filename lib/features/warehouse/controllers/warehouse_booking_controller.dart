@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'dart:async';
-import 'package:sarri_ride/config/api_config.dart';
 import 'package:sarri_ride/features/payment/screens/paystack_webview_screen.dart';
 import 'package:sarri_ride/features/warehouse/screens/warehouse_qr_code_screen.dart';
+import 'package:sarri_ride/utils/constants/colors.dart';
 
 class WarehouseBookingController extends GetxController {
   final HttpService _httpService = HttpService.instance;
@@ -15,11 +15,16 @@ class WarehouseBookingController extends GetxController {
   final RxList<Map<String, dynamic>> pricingRoutes = <Map<String, dynamic>>[].obs;
   final RxList<String> prohibitedItems = <String>[].obs;
 
+  // Maintenance Mode
+  final RxBool isMaintenanceMode = false.obs;
+
   // Form selections
   final RxString selectedWarehouseId = ''.obs;
   final RxString selectedDestinationState = ''.obs;
   final RxBool prohibitedItemsAcknowledged = false.obs;
+  final RxSet<String> checkedProhibitedItems = <String>{}.obs;
   DateTime? prohibitedItemsAcknowledgedAt;
+  bool _isCheckingPayment = false;
 
   // Sender Details
   final senderName = TextEditingController();
@@ -51,14 +56,38 @@ class WarehouseBookingController extends GetxController {
   }
 
   Future<void> _fetchWarehouses() async {
+    isMaintenanceMode.value = false;
     try {
       final response = await _httpService.get('/api/warehouse/warehouses');
       final data = _httpService.handleResponse(response);
       if (data['status'] == 'success') {
-        warehouses.value = List<Map<String, dynamic>>.from(data['data']);
+        final list = List<Map<String, dynamic>>.from(data['data']);
+        if (list.isEmpty) {
+          isMaintenanceMode.value = true;
+        } else {
+          warehouses.value = list;
+        }
+      } else {
+        isMaintenanceMode.value = true;
       }
     } catch (e) {
       print('Error fetching warehouses: $e');
+      isMaintenanceMode.value = true;
+    }
+  }
+
+  void retryFetchWarehouses() {
+    _fetchWarehouses();
+    _fetchProhibitedItems();
+  }
+
+  void toggleProhibitedItemChecked(String item, bool? checked) {
+    if (checked == true) {
+      checkedProhibitedItems.add(item);
+    } else {
+      checkedProhibitedItems.remove(item);
+      prohibitedItemsAcknowledged.value = false;
+      prohibitedItemsAcknowledgedAt = null;
     }
   }
 
@@ -112,6 +141,13 @@ class WarehouseBookingController extends GetxController {
   }
 
   void acknowledgeProhibitedItems(bool? value) {
+    if (checkedProhibitedItems.length < prohibitedItems.length) {
+      THelperFunctions.showWarningSnackBar(
+        'Checklist Required',
+        'Please read and check all prohibited items individually first.',
+      );
+      return;
+    }
     prohibitedItemsAcknowledged.value = value ?? false;
     if (prohibitedItemsAcknowledged.value) {
       prohibitedItemsAcknowledgedAt = DateTime.now();
@@ -127,6 +163,10 @@ class WarehouseBookingController extends GetxController {
     }
     if (selectedDestinationState.isEmpty) {
       THelperFunctions.showErrorSnackBar('Error', 'Please select a destination state.');
+      return false;
+    }
+    if (checkedProhibitedItems.length < prohibitedItems.length) {
+      THelperFunctions.showErrorSnackBar('Error', 'You must read and check all prohibited items.');
       return false;
     }
     if (!prohibitedItemsAcknowledged.value) {
@@ -191,6 +231,37 @@ class WarehouseBookingController extends GetxController {
     };
   }
 
+  void _showCheckingPaymentDialog() {
+    _isCheckingPayment = true;
+    Get.dialog(
+      PopScope(
+        canPop: false,
+        child: Center(
+          child: Card(
+            color: Get.isDarkMode ? TColors.dark : Colors.white,
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(color: TColors.primary),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Checking payment...',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      barrierDismissible: false,
+    ).then((_) {
+      _isCheckingPayment = false;
+    });
+  }
+
   Future<void> createOrder() async {
     if (!validateForm()) return;
     
@@ -208,7 +279,7 @@ class WarehouseBookingController extends GetxController {
         final result = await Get.to(() => PaystackWebViewScreen(authorizationUrl: paymentUrl));
         
         if (result == 'success' || result == null) {
-          THelperFunctions.showSnackBar('Confirming payment...');
+          _showCheckingPaymentDialog();
           _pollPaymentStatus(shipmentId);
         } else {
           THelperFunctions.showSnackBar('Payment cancelled.');
@@ -216,7 +287,17 @@ class WarehouseBookingController extends GetxController {
       }
     } catch (e) {
       print('Error creating order: $e');
-      THelperFunctions.showErrorSnackBar('Error', 'Failed to create order: $e');
+      if (e is ApiException) {
+        if (e.statusCode == 400 && e.data.containsKey('errors')) {
+          final errorsList = e.data['errors'] as List;
+          final errorMessages = errorsList.map((err) => "${err['message']}").join('\n');
+          THelperFunctions.showErrorSnackBar('Validation Error', errorMessages);
+        } else {
+          THelperFunctions.showErrorSnackBar('Error', e.message);
+        }
+      } else {
+        THelperFunctions.showErrorSnackBar('Error', 'Failed to create order: $e');
+      }
     }
   }
 
@@ -226,6 +307,9 @@ class WarehouseBookingController extends GetxController {
       attempts++;
       if (attempts > 10) {
         timer.cancel();
+        if (_isCheckingPayment) {
+          Get.back();
+        }
         THelperFunctions.showErrorSnackBar('Timeout', 'Could not confirm payment. Check history.');
         return;
       }
@@ -234,6 +318,9 @@ class WarehouseBookingController extends GetxController {
         final data = _httpService.handleResponse(response);
         if (data['data']['paymentStatus'] == 'paid') {
           timer.cancel();
+          if (_isCheckingPayment) {
+            Get.back();
+          }
           THelperFunctions.showSuccessSnackBar('Success', 'Order confirmed!');
           Get.off(() => WarehouseQRCodeScreen(shipmentId: shipmentId));
         }

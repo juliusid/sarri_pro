@@ -481,7 +481,7 @@ class DriverDashboardController extends GetxController with WidgetsBindingObserv
         }
 
         // 3. Operational Status (Account Status)
-        final String? apiStatus = data['status'] as String?;
+        final String? apiStatus = (data['accountStatus'] ?? data['status']) as String?;
         if (apiStatus != null && driverOperationalStatus.value != apiStatus.toLowerCase()) {
           driverOperationalStatus.value = apiStatus.toLowerCase();
           // Update the current driver object as well if we have it

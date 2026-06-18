@@ -515,8 +515,7 @@ class WebSocketService extends GetxService {
       if (errorString.contains('authentication') ||
           errorString.contains('unauthorized') ||
           errorString.contains('token') ||
-          errorString.contains('bad request') || // Often used for bad queries
-          errorString.contains('xhr poll error')) {
+          errorString.contains('bad request')) { // Removed 'xhr poll error'
         _handleAuthError();
       } else {
         _attemptReconnect();

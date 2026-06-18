@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
@@ -38,7 +37,11 @@ class _WarehouseQRCodeScreenState extends State<WarehouseQRCodeScreen> {
       }
     } catch (e) {
       setState(() => _isLoading = false);
-      THelperFunctions.showErrorSnackBar('Error', 'Failed to fetch QR codes. Try again later.');
+      String errMsg = 'Failed to fetch QR codes. Try again later.';
+      if (e is ApiException) {
+        errMsg = e.message;
+      }
+      THelperFunctions.showErrorSnackBar('Error', errMsg);
     }
   }
 

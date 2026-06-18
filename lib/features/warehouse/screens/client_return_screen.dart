@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
+import 'package:sarri_ride/features/payment/screens/paystack_webview_screen.dart';
 
 class ClientReturnScreen extends StatefulWidget {
-  final Map<String, dynamic> order;
+  final String shipmentId;
+  final int itemIndex;
+  final Map<String, dynamic> item;
 
-  const ClientReturnScreen({super.key, required this.order});
+  const ClientReturnScreen({
+    super.key,
+    required this.shipmentId,
+    required this.itemIndex,
+    required this.item,
+  });
 
   @override
   State<ClientReturnScreen> createState() => _ClientReturnScreenState();
@@ -15,119 +24,162 @@ class ClientReturnScreen extends StatefulWidget {
 
 class _ClientReturnScreenState extends State<ClientReturnScreen> {
   final HttpService _httpService = HttpService.instance;
-  final TextEditingController _reasonController = TextEditingController();
-  
-  String _selectedReason = 'Defective Item';
   bool _isLoading = false;
-  
-  final List<String> _returnReasons = [
-    'Defective Item',
-    'Wrong Item Received',
-    'Changed Mind',
-    'Arrived Too Late',
-    'Other'
-  ];
 
-  Future<void> _submitReturn() async {
-    if (_reasonController.text.isEmpty) {
-      THelperFunctions.showErrorSnackBar('Error', 'Please provide details for your return request.');
-      return;
-    }
-
+  Future<void> _initiateReturnPayment() async {
     setState(() => _isLoading = true);
     try {
-      final shipmentId = widget.order['shipmentId'] ?? widget.order['_id'];
       final response = await _httpService.post(
-        '/api/warehouse/returns',
-        body: {
-          'shipmentId': shipmentId,
-          'reason': _selectedReason,
-          'details': _reasonController.text,
-        },
+        '/api/warehouse/orders/${widget.shipmentId}/items/${widget.itemIndex}/return-payment',
+        body: {}, // Empty body required
       );
       final data = _httpService.handleResponse(response);
       
       if (data['status'] == 'success') {
-        THelperFunctions.showSuccessSnackBar('Return Requested', 'Your return request has been submitted.');
-        Get.back();
+        final paymentUrl = data['data']['authorizationUrl'];
+        final returnFee = data['data']['returnFee'];
+        
+        setState(() => _isLoading = false);
+        
+        // Open Paystack web view
+        final result = await Get.to(() => PaystackWebViewScreen(authorizationUrl: paymentUrl));
+        
+        if (result == 'success') {
+          THelperFunctions.showSuccessSnackBar(
+            'Payment Confirmed',
+            'Return fee of ₦${returnFee.toString()} processed successfully.',
+          );
+          Get.back(result: true); // Return true to trigger detail page refresh
+        } else {
+          THelperFunctions.showWarningSnackBar('Payment Incomplete', 'Return payment was not completed.');
+        }
       }
     } catch (e) {
-      THelperFunctions.showErrorSnackBar('Error', 'Failed to submit return request.');
-    } finally {
       setState(() => _isLoading = false);
+      String errMsg = 'Failed to initiate return payment.';
+      if (e is ApiException) {
+        errMsg = e.message;
+      }
+      THelperFunctions.showErrorSnackBar('Error', errMsg);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final dark = THelperFunctions.isDarkMode(context);
+    final itemDesc = widget.item['description'] ?? 'Item';
+    
+    final returnDeadlineStr = widget.item['returnDeadline'];
+    final returnDeadline = returnDeadlineStr != null ? DateTime.tryParse(returnDeadlineStr) : null;
+    final isDeadlineExpired = returnDeadline != null && DateTime.now().isAfter(returnDeadline);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Request Return')),
+      appBar: AppBar(
+        title: const Text('Arrange Item Return'),
+        backgroundColor: dark ? TColors.dark : TColors.white,
+        foregroundColor: dark ? TColors.white : TColors.black,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Return instructions info box
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: TColors.warning.withOpacity(0.1),
+                color: isDeadlineExpired ? Colors.red.withOpacity(0.1) : TColors.warning.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: TColors.warning),
+                border: Border.all(color: isDeadlineExpired ? Colors.red : TColors.warning),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: TColors.warning),
-                  SizedBox(width: 12),
+                  Icon(
+                    isDeadlineExpired ? Icons.warning_amber_rounded : Icons.info_outline,
+                    color: isDeadlineExpired ? Colors.red : TColors.warning,
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Returns must be requested within 3 days of delivery. Additional shipping fees may apply.',
-                      style: TextStyle(color: TColors.warning),
+                      isDeadlineExpired
+                          ? 'The return deadline has passed. This item can no longer be returned and is scheduled for disposal.'
+                          : 'To return this item, you must pay a return fee representing 50% of the item\'s shipping cost (minimum ₦100).',
+                      style: TextStyle(
+                        color: isDeadlineExpired ? Colors.red : (dark ? TColors.white : TColors.black),
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
-            const Text('Reason for Return', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(12)),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _selectedReason,
-                  isExpanded: true,
-                  items: _returnReasons.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
-                  onChanged: (val) => setState(() => _selectedReason = val!),
+            
+            // Item details card
+            Card(
+              color: dark ? TColors.darkerGrey : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Item Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Divider(height: 24),
+                    _buildInfoRow('Description', itemDesc),
+                    _buildInfoRow('Weight', '${widget.item['declaredWeight'] ?? 0} kg'),
+                    _buildInfoRow('Declared Value', '₦${widget.item['declaredValue'] ?? 0}'),
+                    _buildInfoRow('Destination State', widget.item['destinationState'] ?? 'N/A'),
+                    if (returnDeadline != null)
+                      _buildInfoRow(
+                        'Return Deadline',
+                        DateFormat.yMMMd().format(returnDeadline),
+                        textColor: isDeadlineExpired ? Colors.red : Colors.orange.shade800,
+                      ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-            const Text('Additional Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _reasonController,
-              maxLines: 5,
-              decoration: InputDecoration(
-                hintText: 'Please describe why you are returning this item...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
             const SizedBox(height: 32),
+            
+            // Payment Button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _isLoading ? null : _submitReturn,
+                onPressed: _isLoading || isDeadlineExpired ? null : _initiateReturnPayment,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: TColors.primary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('Submit Return Request'),
+                child: _isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text('Initiate Return Payment'),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, {Color? textColor}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: textColor,
+            ),
+          ),
+        ],
       ),
     );
   }

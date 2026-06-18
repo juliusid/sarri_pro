@@ -51,7 +51,12 @@ class WarehouseOrderHistoryScreen extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 16),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: InkWell(
-                onTap: () => Get.to(() => WarehouseOrderDetailScreen(order: order)),
+                onTap: () async {
+                  final result = await Get.to(() => WarehouseOrderDetailScreen(order: order));
+                  if (result == true) {
+                    controller.fetchOrders();
+                  }
+                },
                 borderRadius: BorderRadius.circular(16),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -98,7 +103,7 @@ class WarehouseOrderHistoryScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            '₦${(order['totalCost'] ?? 0).toString()}',
+                            '₦${(order['totalPrice'] ?? 0).toString()}',
                             style: TextStyle(color: TColors.primary, fontWeight: FontWeight.bold, fontSize: 16),
                           ),
                           const Text('View Details', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.w600)),

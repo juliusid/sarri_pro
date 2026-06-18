@@ -44,222 +44,315 @@ class WarehouseBookingWidget extends StatelessWidget {
           Expanded(
             child: SingleChildScrollView(
               child: Obx(
-                () => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Step 1: Drop-off Warehouse
-                    _buildSectionTitle('1. Select Drop-off Hub', dark),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      decoration: _inputDecoration(dark, 'Drop-off Warehouse'),
-                      value: controller.selectedWarehouseId.value.isEmpty ? null : controller.selectedWarehouseId.value,
-                      hint: const Text('Select a hub near you'),
-                      items: controller.warehouses.map((w) {
-                        return DropdownMenuItem<String>(
-                          value: w['_id'] as String,
-                          child: Text('${w['name']} (${w['city']})'),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          controller.fetchPricingRoutes(val);
-                        }
-                      },
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Step 2: Destination State
-                    _buildSectionTitle('2. Destination State', dark),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      decoration: _inputDecoration(dark, 'Destination State'),
-                      value: controller.selectedDestinationState.value.isEmpty ? null : controller.selectedDestinationState.value,
-                      hint: const Text('Where is the package going?'),
-                      items: controller.pricingRoutes.map((r) {
-                        return DropdownMenuItem<String>(
-                          value: r['destinationState'] as String,
-                          child: Text(r['destinationState']),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          controller.selectedDestinationState.value = val;
-                          controller.calculatePrice();
-                        }
-                      },
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Step 3: Sender Details
-                    _buildSectionTitle('3. Sender Details', dark),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: controller.senderName,
-                      decoration: _inputDecoration(dark, 'Sender Name'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: controller.senderPhone,
-                      decoration: _inputDecoration(dark, 'Sender Phone'),
-                      keyboardType: TextInputType.phone,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: controller.senderAddress,
-                      decoration: _inputDecoration(dark, 'Sender Address'),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Step 4: Recipient Details
-                    _buildSectionTitle('4. Recipient Details', dark),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: controller.recipientName,
-                      decoration: _inputDecoration(dark, 'Recipient Name'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: controller.recipientPhone,
-                      decoration: _inputDecoration(dark, 'Recipient Phone'),
-                      keyboardType: TextInputType.phone,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: controller.recipientAddress,
-                      decoration: _inputDecoration(dark, 'Recipient Address'),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Step 5: Package Details
-                    _buildSectionTitle('5. Package Details', dark),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: controller.itemDescription,
-                      decoration: _inputDecoration(dark, 'Description (e.g., Box of clothes)'),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: controller.itemDeclaredWeight,
-                            decoration: _inputDecoration(dark, 'Weight (kg)'),
-                            keyboardType: TextInputType.number,
-                            onChanged: (_) => controller.calculatePrice(),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: controller.itemDeclaredValue,
-                            decoration: _inputDecoration(dark, 'Declared Value (₦)'),
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(child: TextFormField(controller: controller.itemLength, decoration: _inputDecoration(dark, 'Length (cm)'), keyboardType: TextInputType.number)),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextFormField(controller: controller.itemWidth, decoration: _inputDecoration(dark, 'Width (cm)'), keyboardType: TextInputType.number)),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextFormField(controller: controller.itemHeight, decoration: _inputDecoration(dark, 'Height (cm)'), keyboardType: TextInputType.number)),
-                      ],
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Step 6: Prohibited Items
-                    Container(
-                      padding: const EdgeInsets.all(12),
+                () {
+                  if (controller.isMaintenanceMode.value) {
+                    return Container(
+                      padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: dark ? TColors.darkerGrey : Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.red.shade200),
+                        color: dark ? TColors.darkerGrey : Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.orange.shade300),
                       ),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('Prohibited Items:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-                          const SizedBox(height: 8),
-                          if (controller.prohibitedItems.isEmpty)
-                            const Text('Loading list...')
-                          else
-                            ...controller.prohibitedItems.map((item) => Text('• $item', style: const TextStyle(fontSize: 12))),
-                          
-                          Row(
-                            children: [
-                              Checkbox(
-                                value: controller.prohibitedItemsAcknowledged.value,
-                                onChanged: controller.acknowledgeProhibitedItems,
-                                activeColor: TColors.primary,
-                              ),
-                              const Expanded(
-                                child: Text('I confirm my package does not contain any of these prohibited items.', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Price Estimate
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: TColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Estimated Price', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          const Icon(Icons.build_rounded, size: 64, color: Colors.orange),
+                          const SizedBox(height: 16),
                           Text(
-                            '₦${controller.estimatedPrice.value.toStringAsFixed(2)}',
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: TColors.primary),
+                            'Hub Services Undergoing Maintenance',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: dark ? TColors.white : TColors.black,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Our cargo drop-off hubs are temporarily undergoing system maintenance. We expect to be back online shortly.',
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () => controller.retryFetchWarehouses(),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: TColors.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              child: const Text('Retry Connection'),
+                            ),
                           ),
                         ],
                       ),
-                    ),
+                    );
+                  }
 
-                    const SizedBox(height: 24),
-
-                    // Continue button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (controller.validateForm()) {
-                            onContinue();
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Step 1: Drop-off Warehouse
+                      _buildSectionTitle('1. Select Drop-off Hub', dark),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        decoration: _inputDecoration(dark, 'Drop-off Warehouse'),
+                        value: controller.selectedWarehouseId.value.isEmpty ? null : controller.selectedWarehouseId.value,
+                        hint: const Text('Select a hub near you'),
+                        items: controller.warehouses.map((w) {
+                          return DropdownMenuItem<String>(
+                            value: w['_id'] as String,
+                            child: Text('${w['name']} (${w['city']})'),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            controller.fetchPricingRoutes(val);
                           }
                         },
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Step 2: Destination State
+                      _buildSectionTitle('2. Destination State', dark),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        decoration: _inputDecoration(dark, 'Destination State'),
+                        value: controller.selectedDestinationState.value.isEmpty ? null : controller.selectedDestinationState.value,
+                        hint: const Text('Where is the package going?'),
+                        items: controller.pricingRoutes.map((r) {
+                          return DropdownMenuItem<String>(
+                            value: r['destinationState'] as String,
+                            child: Text(r['destinationState']),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            controller.selectedDestinationState.value = val;
+                            controller.calculatePrice();
+                          }
+                        },
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Step 3: Sender Details
+                      _buildSectionTitle('3. Sender Details', dark),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: controller.senderName,
+                        decoration: _inputDecoration(dark, 'Sender Name'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: controller.senderPhone,
+                        decoration: _inputDecoration(dark, 'Sender Phone'),
+                        keyboardType: TextInputType.phone,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: controller.senderAddress,
+                        decoration: _inputDecoration(dark, 'Sender Address'),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Step 4: Recipient Details
+                      _buildSectionTitle('4. Recipient Details', dark),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: controller.recipientName,
+                        decoration: _inputDecoration(dark, 'Recipient Name'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: controller.recipientPhone,
+                        decoration: _inputDecoration(dark, 'Recipient Phone'),
+                        keyboardType: TextInputType.phone,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: controller.recipientAddress,
+                        decoration: _inputDecoration(dark, 'Recipient Address'),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Step 5: Package Details
+                      _buildSectionTitle('5. Package Details', dark),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: controller.itemDescription,
+                        decoration: _inputDecoration(dark, 'Description (e.g., Box of clothes)'),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: controller.itemDeclaredWeight,
+                              decoration: _inputDecoration(dark, 'Weight (kg)'),
+                              keyboardType: TextInputType.number,
+                              onChanged: (_) => controller.calculatePrice(),
+                            ),
                           ),
-                          backgroundColor: TColors.primary,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextFormField(
+                              controller: controller.itemDeclaredValue,
+                              decoration: _inputDecoration(dark, 'Declared Value (₦)'),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: TextFormField(controller: controller.itemLength, decoration: _inputDecoration(dark, 'Length (cm)'), keyboardType: TextInputType.number)),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextFormField(controller: controller.itemWidth, decoration: _inputDecoration(dark, 'Width (cm)'), keyboardType: TextInputType.number)),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextFormField(controller: controller.itemHeight, decoration: _inputDecoration(dark, 'Height (cm)'), keyboardType: TextInputType.number)),
+                        ],
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Step 6: Prohibited Items
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: dark ? TColors.darkerGrey : Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.shade200),
                         ),
-                        child: const Text(
-                          'Continue to Payment',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.warning_amber_rounded, color: Colors.red),
+                                SizedBox(width: 8),
+                                Text('Prohibited Items Checklist:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 14)),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Please check each item below to confirm your package does not contain them:',
+                              style: TextStyle(fontSize: 11, color: Colors.grey),
+                            ),
+                            const SizedBox(height: 8),
+                            if (controller.prohibitedItems.isEmpty)
+                              const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(8.0),
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: TColors.primary),
+                                  ),
+                                ),
+                              )
+                            else
+                              ...controller.prohibitedItems.map((item) {
+                                final isChecked = controller.checkedProhibitedItems.contains(item);
+                                return CheckboxListTile(
+                                  value: isChecked,
+                                  title: Text(item, style: const TextStyle(fontSize: 12)),
+                                  dense: true,
+                                  controlAffinity: ListTileControlAffinity.leading,
+                                  contentPadding: EdgeInsets.zero,
+                                  onChanged: (val) {
+                                    controller.toggleProhibitedItemChecked(item, val);
+                                  },
+                                  activeColor: TColors.primary,
+                                );
+                              }),
+                            const Divider(height: 24),
+                            Row(
+                              children: [
+                                Checkbox(
+                                  value: controller.prohibitedItemsAcknowledged.value,
+                                  onChanged: controller.checkedProhibitedItems.length < controller.prohibitedItems.length
+                                      ? null
+                                      : controller.acknowledgeProhibitedItems,
+                                  activeColor: TColors.primary,
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    'I confirm my package does not contain any of these prohibited items.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: controller.checkedProhibitedItems.length < controller.prohibitedItems.length
+                                          ? Colors.grey
+                                          : (dark ? TColors.white : TColors.black),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Price Estimate
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: TColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Estimated Price', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            Text(
+                              '₦${controller.estimatedPrice.value.toStringAsFixed(2)}',
+                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: TColors.primary),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Continue button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            if (controller.validateForm()) {
+                              onContinue();
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            backgroundColor: TColors.primary,
+                          ),
+                          child: const Text(
+                            'Continue to Payment',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  );
+                }
               ),
             ),
           ),
