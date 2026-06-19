@@ -91,18 +91,24 @@ class _DriverAuthMethodStepState extends State<DriverAuthMethodStep> {
 
           const SizedBox(height: TSizes.spaceBtwItems),
 
-          // ── Email Form ────────────────────────────────────────────────
-          Obx(() => _showOtpField.value
-              ? _OtpSection(
-                  controller: c,
-                  showOtpField: _showOtpField,
-                  dark: dark,
-                )
-              : _EmailSection(
-                  controller: c,
-                  showOtpField: _showOtpField,
-                  dark: dark,
-                )),
+          // ── Form Area ────────────────────────────────────────────────
+          Obx(() {
+            if (c.isOtpVerified.value) {
+              return _ProfileSection(controller: c, dark: dark);
+            } else if (_showOtpField.value) {
+              return _OtpSection(
+                controller: c,
+                showOtpField: _showOtpField,
+                dark: dark,
+              );
+            } else {
+              return _EmailSection(
+                controller: c,
+                showOtpField: _showOtpField,
+                dark: dark,
+              );
+            }
+          }),
         ],
       ),
     );
@@ -152,10 +158,8 @@ class _EmailSection extends StatelessWidget {
                   text: 'Send OTP',
                   loadingText: 'Sending...',
                   onPressed: () async {
-                    await controller.sendVerificationEmail();
-                    if (controller.currentStep.value ==
-                        DriverSignupStep.authMethod) {
-                      // Still on authMethod step means OTP was sent, reveal OTP field
+                    final bool otpSent = await controller.sendVerificationEmail();
+                    if (otpSent && controller.currentStep.value == DriverSignupStep.authMethod) {
                       showOtpField.value = true;
                     }
                   },
@@ -258,6 +262,109 @@ class _OtpSection extends StatelessWidget {
                     ),
                   )),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Profile section (inline, after OTP verified)
+// ─────────────────────────────────────────────────────────────────────────────
+class _ProfileSection extends StatefulWidget {
+  final DriverSignupController controller;
+  final bool dark;
+
+  const _ProfileSection({
+    required this.controller,
+    required this.dark,
+  });
+
+  @override
+  State<_ProfileSection> createState() => _ProfileSectionState();
+}
+
+class _ProfileSectionState extends State<_ProfileSection> {
+  bool _obscurePassword = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Form(
+      key: widget.controller.profileFormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Complete your profile',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: TSizes.spaceBtwItems),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: widget.controller.firstNameController,
+                  validator: (v) => TValidator.validateEmptyText('First name', v),
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(
+                    labelText: 'First name',
+                    prefixIcon: Icon(Iconsax.user,
+                        color: widget.dark ? TColors.light : TColors.dark,
+                        size: TSizes.iconMd),
+                  ),
+                ),
+              ),
+              const SizedBox(width: TSizes.spaceBtwItems),
+              Expanded(
+                child: TextFormField(
+                  controller: widget.controller.lastNameController,
+                  validator: (v) => TValidator.validateEmptyText('Last name', v),
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(
+                    labelText: 'Last name',
+                    prefixIcon: Icon(Iconsax.user,
+                        color: widget.dark ? TColors.light : TColors.dark,
+                        size: TSizes.iconMd),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: TSizes.spaceBtwInputFields),
+          TextFormField(
+            controller: widget.controller.passwordController,
+            obscureText: _obscurePassword,
+            validator: TValidator.validatePassword,
+            decoration: InputDecoration(
+              labelText: 'Password',
+              hintText: 'Min 8 chars, uppercase, lowercase, number',
+              prefixIcon: Icon(Iconsax.password_check,
+                  color: widget.dark ? TColors.light : TColors.dark,
+                  size: TSizes.iconMd),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Iconsax.eye_slash : Iconsax.eye,
+                  color: widget.dark ? TColors.light : TColors.dark,
+                  size: TSizes.iconMd,
+                ),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              ),
+            ),
+          ),
+          const SizedBox(height: TSizes.spaceBtwSections),
+          SizedBox(
+            width: double.infinity,
+            child: Obx(() => LoadingElevatedButton(
+                  isLoading: widget.controller.isLoading.value,
+                  text: 'Complete Registration',
+                  loadingText: 'Registering...',
+                  onPressed: widget.controller.completeEmailSignup,
+                  backgroundColor: TColors.primary,
+                  foregroundColor: TColors.white,
+                )),
           ),
         ],
       ),

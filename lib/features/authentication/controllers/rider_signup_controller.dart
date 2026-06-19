@@ -196,6 +196,48 @@ class RiderSignupController extends GetxController {
     }
   }
 
+  Future<void> _handleSuccessfulLogin(AuthResult loginResult) async {
+    // 1. Store Data
+    if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
+      Get.delete<ClientData>(tag: 'currentUser', force: true);
+    }
+    Get.put<ClientData>(
+      loginResult.client!,
+      tag: 'currentUser',
+      permanent: true,
+    );
+
+    final drawerController = Get.find<MapDrawerController>();
+    await drawerController.refreshUserData();
+
+    final storage = GetStorage();
+    storage.write('user_role', loginResult.client!.role);
+
+    // 2. Refresh Token
+    final String userId = loginResult.client!.id;
+    bool refreshSuccess = await HttpService.instance
+        .refreshTokenImmediately(isDriver: false, userId: userId);
+
+    if (!refreshSuccess) {
+      THelperFunctions.showErrorSnackBar('Login Failed', 'Session initialization failed.');
+      Get.offAll(() => const LoginScreenGetX());
+      return;
+    }
+
+    // 3. Connect Socket
+    WebSocketService.instance.connect();
+
+    // 4. Check Phone Number
+    final profile = drawerController.fullProfile.value;
+    if (profile != null && profile.phoneNumberVerified == false) {
+      Get.offAll(() => const PhoneNumberScreen());
+      THelperFunctions.showSnackBar('Please verify your phone number.');
+    } else {
+      Get.offAll(() => const MapScreenGetX());
+      THelperFunctions.showSuccessSnackBar('Success', 'Welcome!');
+    }
+  }
+
   Future<void> registerRider() async {
     if (!detailsFormKey.currentState!.validate()) return;
     isLoading.value = true;
@@ -203,10 +245,11 @@ class RiderSignupController extends GetxController {
       final firstName = _formatName(firstNameController.text);
       final lastName = _formatName(lastNameController.text);
       final email = emailController.text.trim().toLowerCase();
+      final password = passwordController.text.trim();
 
       final authResult = await AuthService.instance.signup(
         email,
-        passwordController.text.trim(),
+        password,
         firstName,
         lastName,
       );
@@ -224,11 +267,18 @@ class RiderSignupController extends GetxController {
           }
         }
 
-        Get.offAll(() => const LoginScreenGetX());
-        THelperFunctions.showSuccessSnackBar(
-          'Success',
-          'Registration successful! Please log in to your new account.',
-        );
+        // --- NEW: Automatically login the user instead of sending to Login screen ---
+        final loginResult = await AuthService.instance.login(email, password);
+        if (loginResult.success && loginResult.client != null) {
+          await _handleSuccessfulLogin(loginResult);
+        } else {
+          // Fallback if login fails for some reason
+          Get.offAll(() => const LoginScreenGetX());
+          THelperFunctions.showSuccessSnackBar(
+            'Success',
+            'Registration successful! Please log in to your new account.',
+          );
+        }
       } else {
         THelperFunctions.showErrorSnackBar(
           'Signup Failed',
@@ -267,45 +317,7 @@ class RiderSignupController extends GetxController {
           );
 
           if (loginResult.success && loginResult.client != null) {
-            // 1. Store Data
-            if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
-              Get.delete<ClientData>(tag: 'currentUser', force: true);
-            }
-            Get.put<ClientData>(
-              loginResult.client!,
-              tag: 'currentUser',
-              permanent: true,
-            );
-
-            final drawerController = Get.find<MapDrawerController>();
-            await drawerController.refreshUserData();
-
-            final storage = GetStorage();
-            storage.write('user_role', loginResult.client!.role);
-
-            // 2. Refresh Token
-            final String userId = loginResult.client!.id;
-            bool refreshSuccess = await HttpService.instance
-                .refreshTokenImmediately(isDriver: false, userId: userId);
-
-            if (!refreshSuccess) {
-              await googleSignIn.signOut();
-              isGoogleLoading.value = false;
-              return;
-            }
-
-            // 3. Connect Socket
-            WebSocketService.instance.connect();
-
-            // 4. Check Phone Number
-            final profile = drawerController.fullProfile.value;
-            if (profile != null && profile.phoneNumberVerified == false) {
-              Get.offAll(() => const PhoneNumberScreen());
-              THelperFunctions.showSnackBar('Please verify your phone number.');
-            } else {
-              Get.offAll(() => const MapScreenGetX());
-              THelperFunctions.showSuccessSnackBar('Success', 'Welcome!');
-            }
+            await _handleSuccessfulLogin(loginResult);
           } else {
             await googleSignIn.signOut();
             THelperFunctions.showErrorSnackBar(
@@ -395,43 +407,7 @@ class RiderSignupController extends GetxController {
           print(
             "RIDER_SIGNUP_CONTROLLER: Apple signup successful - User email: ${loginResult.client!.email}",
           );
-
-          if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
-            Get.delete<ClientData>(tag: 'currentUser', force: true);
-          }
-
-          Get.put<ClientData>(
-            loginResult.client!,
-            tag: 'currentUser',
-            permanent: true,
-          );
-
-          final drawerController = Get.find<MapDrawerController>();
-          await drawerController.refreshUserData();
-
-          final storage = GetStorage();
-          storage.write('user_role', loginResult.client!.role);
-
-          final String userId = loginResult.client!.id;
-          bool refreshSuccess = await HttpService.instance
-              .refreshTokenImmediately(isDriver: false, userId: userId);
-
-          if (!refreshSuccess) {
-            print("RIDER_SIGNUP_CONTROLLER: Token refresh failed");
-            isAppleLoading.value = false;
-            return;
-          }
-
-          WebSocketService.instance.connect();
-
-          final profile = drawerController.fullProfile.value;
-          if (profile != null && profile.phoneNumberVerified == false) {
-            Get.offAll(() => const PhoneNumberScreen());
-            THelperFunctions.showSnackBar('Please verify your phone number.');
-          } else {
-            Get.offAll(() => const MapScreenGetX());
-            THelperFunctions.showSuccessSnackBar('Success', 'Welcome!');
-          }
+          await _handleSuccessfulLogin(loginResult);
         } else {
           print(
             "RIDER_SIGNUP_CONTROLLER: Apple signup failed - Error: ${loginResult.error}",

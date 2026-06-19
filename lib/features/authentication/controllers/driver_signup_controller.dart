@@ -57,10 +57,12 @@ class DriverSignupController extends GetxController {
     if (currentStep.value.index < DriverSignupStep.values.length - 1) {
       currentStep.value =
           DriverSignupStep.values[currentStep.value.index + 1];
-      pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.ease,
-      );
+      if (pageController.hasClients) {
+        pageController.nextPage(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.ease,
+        );
+      }
     }
   }
 
@@ -68,10 +70,12 @@ class DriverSignupController extends GetxController {
     if (currentStep.value.index > 0) {
       currentStep.value =
           DriverSignupStep.values[currentStep.value.index - 1];
-      pageController.previousPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.ease,
-      );
+      if (pageController.hasClients) {
+        pageController.previousPage(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.ease,
+        );
+      }
     } else {
       Get.back();
     }
@@ -163,8 +167,8 @@ class DriverSignupController extends GetxController {
   // EMAIL PATH
   // ────────────────────────────────────────────────────────────────────────
 
-  Future<void> sendVerificationEmail({bool isResend = false}) async {
-    if (!emailFormKey.currentState!.validate()) return;
+  Future<bool> sendVerificationEmail({bool isResend = false}) async {
+    if (!emailFormKey.currentState!.validate()) return false;
     isLoading.value = true;
     try {
       final result = await AuthService.instance.sendRegistrationOtp(
@@ -172,13 +176,29 @@ class DriverSignupController extends GetxController {
         'driver',
       );
       if (result.success) {
-        THelperFunctions.showSuccessSnackBar(
-            'OTP Sent', result.message ?? 'Check your email for the OTP.');
-        otpController.clear();
-        startResendTimer();
-        if (!isResend) nextStep();
+        if (result.message != null && result.message!.toLowerCase().contains('already verified')) {
+          THelperFunctions.showSuccessSnackBar(
+              'Email Verified!', 'Your email is already verified. Please complete your profile.');
+          isOtpVerified.value = true;
+          return false; // OTP not sent, went straight to profile
+        } else {
+          THelperFunctions.showSuccessSnackBar(
+              'OTP Sent', result.message ?? 'Check your email for the OTP.');
+          otpController.clear();
+          startResendTimer();
+          return true; // OTP was sent
+        }
       } else {
         final errorMsg = result.error?.toLowerCase() ?? '';
+        
+        // Let's also check if the backend returned "already verified" as an error message!
+        if (errorMsg.contains('already verified')) {
+          THelperFunctions.showSuccessSnackBar(
+              'Email Verified!', 'Your email is already verified. Please complete your profile.');
+          isOtpVerified.value = true;
+          return false; // OTP not sent, went straight to profile
+        }
+
         if (errorMsg.contains('already registered') ||
             errorMsg.contains('please login')) {
           THelperFunctions.showErrorSnackBar(
@@ -190,11 +210,14 @@ class DriverSignupController extends GetxController {
           THelperFunctions.showErrorSnackBar(
               'Error', result.error ?? 'Failed to send OTP.');
         }
+        return false;
       }
     } finally {
       isLoading.value = false;
     }
   }
+
+  final RxBool isOtpVerified = false.obs;
 
   Future<void> verifyEmailOtp() async {
     if (!otpFormKey.currentState!.validate()) return;
@@ -207,19 +230,25 @@ class DriverSignupController extends GetxController {
       );
       if (result.success) {
         THelperFunctions.showSuccessSnackBar(
-            'Email Verified!', 'Setting up your account...');
-        await _completeEmailSignup();
+            'Email Verified!', 'Please complete your profile.');
+        isOtpVerified.value = true;
       } else {
         THelperFunctions.showErrorSnackBar(
             'Error', result.error ?? 'Invalid OTP.');
-        isLoading.value = false;
       }
     } catch (e) {
+      THelperFunctions.showErrorSnackBar(
+            'Error', 'An unexpected error occurred.');
+    } finally {
       isLoading.value = false;
     }
   }
 
-  Future<void> _completeEmailSignup() async {
+  final profileFormKey = GlobalKey<FormState>();
+
+  Future<void> completeEmailSignup() async {
+    if (!profileFormKey.currentState!.validate()) return;
+    isLoading.value = true;
     try {
       final result = await AuthService.instance.driverEmailSignup(
         emailController.text.trim(),
