@@ -466,19 +466,13 @@ class TripManagementController extends GetxController {
 
   Future<void> acceptTripRequest() async {
     if (currentTripRequest.value == null || isAccepting.value) return;
-    
+
     isAccepting.value = true;
     _requestTimer?.cancel();
     final request = currentTripRequest.value!;
 
-    Get.dialog(
-      const Center(child: CircularProgressIndicator()),
-      barrierDismissible: false,
-    );
-
     try {
       final responseData = await _driverTripService.acceptRide(request.id);
-      if (Get.isDialogOpen!) Get.back();
 
       if (responseData['status'] == 'success') {
         final String chatId = responseData['data'] != null
@@ -505,34 +499,29 @@ class TripManagementController extends GetxController {
         );
 
         hasNewRequest.value = false;
-        currentTripRequest.value = null;
+        currentTripRequest.value = null; // triggers auto-dismiss on screen
         tripStatus.value = TripStatus.accepted;
 
         _storage.write('active_ride_id', request.id);
-        // PERSIST coordinates locally so they survive app restarts
         _storage.write('trip_pickup_lat', request.pickupLocation.latitude);
         _storage.write('trip_pickup_lng', request.pickupLocation.longitude);
         _storage.write('trip_dest_lat', request.destinationLocation.latitude);
         _storage.write('trip_dest_lng', request.destinationLocation.longitude);
         await _startNavigationToPickup();
         THelperFunctions.showSnackBar('Trip accepted! Navigate to pickup.');
-
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (Get.currentRoute == '/TripRequestScreen') Get.back();
-        });
       } else {
         THelperFunctions.showErrorSnackBar(
-          "Error",
+          'Error',
           responseData['message'] ?? 'Failed to accept.',
         );
       }
     } catch (e) {
-      if (Get.isDialogOpen!) Get.back();
-      THelperFunctions.showErrorSnackBar("Error", "Accept failed: $e");
+      THelperFunctions.showErrorSnackBar('Error', 'Accept failed: $e');
     } finally {
       isAccepting.value = false;
     }
   }
+
 
   void declineTripRequest() {
     if (currentTripRequest.value == null) return;
@@ -886,6 +875,57 @@ class TripManagementController extends GetxController {
     _storage.remove('active_ride_id');
     THelperFunctions.showSnackBar('Trip cancelled: $reason');
     Future.delayed(const Duration(seconds: 3), _resetTripState);
+    update();
+  }
+
+  /// Called when the SERVER sends a `ride:cancelled` event (e.g. client cancelled).
+  /// Resets driver state exactly like [cancelTrip] but does NOT emit
+  /// `ride:driverCancel` back to the server — preventing the feedback loop.
+  void handleServerCancellation(String rideId, String reason) {
+    // Only act if this event is relevant to our current request or active trip
+    final bool matchesRequest = currentTripRequest.value?.id == rideId;
+    final bool matchesActiveTrip = activeTrip.value?.id == rideId &&
+        tripStatus.value != TripStatus.none &&
+        tripStatus.value != TripStatus.completed &&
+        tripStatus.value != TripStatus.cancelled;
+
+    if (!matchesRequest && !matchesActiveTrip) {
+      print('WS: handleServerCancellation — rideId $rideId does not match current state. Ignored.');
+      return;
+    }
+
+    print('WS: Server cancelled ride $rideId. Reason: $reason');
+
+    _requestTimer?.cancel();
+    isNavigating.value = false;
+    tripStatus.value = TripStatus.cancelled;
+    hasNewRequest.value = false;
+
+    if (matchesActiveTrip) {
+      activeTrip.value = activeTrip.value!.copyWith(
+        status: TripStatus.cancelled,
+        endTime: DateTime.now(),
+        cancellationReason: reason,
+      );
+    }
+    if (matchesRequest) {
+      currentTripRequest.value = null;
+    }
+
+    mapPolylines.clear();
+    mapMarkers.removeWhere(
+      (m) => m.markerId.value == 'pickup' || m.markerId.value == 'destination',
+    );
+
+    _storage.remove('active_ride_id');
+    THelperFunctions.showSnackBar('Ride cancelled: $reason');
+    Future.delayed(const Duration(seconds: 3), _resetTripState);
+
+    // Dismiss TripRequestScreen if it's currently showing
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (Get.currentRoute == '/TripRequestScreen') Get.back();
+    });
+
     update();
   }
 

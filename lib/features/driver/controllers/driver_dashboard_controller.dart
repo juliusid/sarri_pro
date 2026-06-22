@@ -89,6 +89,7 @@ class DriverDashboardController extends GetxController with WidgetsBindingObserv
     );
     _webSocketService.registerWalletUpdateListener(_handleWalletUpdate);
     _webSocketService.registerPaymentProcessedListener(_handlePaymentProcessed);
+    _webSocketService.registerRatingUpdateListener(_handleRatingUpdate);
   }
 
   @override
@@ -100,6 +101,7 @@ class DriverDashboardController extends GetxController with WidgetsBindingObserv
     _webSocketService.unregisterPaymentProcessedListener(
       _handlePaymentProcessed,
     );
+    _webSocketService.unregisterRatingUpdateListener(_handleRatingUpdate);
     super.onClose();
   }
 
@@ -266,6 +268,22 @@ class DriverDashboardController extends GetxController with WidgetsBindingObserv
     }
   }
 
+  /// Handles 'driver:rating:updated'
+  void _handleRatingUpdate(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      if (data['averageRating'] != null) {
+        averageRating.value = (data['averageRating'] as num).toDouble();
+      }
+      final double newRating = (data['newRating'] as num?)?.toDouble() ?? 5.0;
+      THelperFunctions.showSuccessSnackBar(
+        'New Rating Received',
+        'A rider rated you ${newRating.toStringAsFixed(1)} stars!',
+      );
+      print("Dashboard: Updated rating immediately to: ${averageRating.value}");
+      update();
+    }
+  }
+
   Future<bool> _fetchDriverProfile() async {
     print("Fetching driver profile...");
     try {
@@ -368,7 +386,6 @@ class DriverDashboardController extends GetxController with WidgetsBindingObserv
       ever(_tripController!.hasNewRequest, (bool hasRequest) {
         if (hasRequest &&
             isOnline.value &&
-            driverTaskStatus.value == 'available' &&
             !isOnBreak.value) {
           _showTripRequestNotification();
         }

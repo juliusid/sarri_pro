@@ -45,6 +45,7 @@ class WebSocketService extends GetxService {
   final List<Function(dynamic)> _paymentConfirmedListeners = [];
   final List<Function(dynamic)> _walletUpdateListeners = [];
   final List<Function(dynamic)> _paymentProcessedListeners = [];
+  final List<Function(dynamic)> _ratingUpdateListeners = [];
   // --- Listener Lists for Emergency ---
   final List<Function(dynamic)> _emergencyMessageListeners = [];
   final List<Function(dynamic)> _emergencyTypingListeners = [];
@@ -255,6 +256,17 @@ class WebSocketService extends GetxService {
     }
   }
 
+  Map<String, dynamic>? _getMapData(dynamic data) {
+    if (data is Map) {
+      try {
+        return Map<String, dynamic>.from(data);
+      } catch (e) {
+        print("Error casting map data: $e");
+      }
+    }
+    return null;
+  }
+
   // --- Specific Event Emitters ---
   void joinChatRoom(String chatId) {
     if (chatId.isEmpty) {
@@ -423,6 +435,14 @@ class WebSocketService extends GetxService {
 
   void unregisterPaymentProcessedListener(Function(dynamic) listener) {
     _paymentProcessedListeners.remove(listener);
+  }
+
+  void registerRatingUpdateListener(Function(dynamic) listener) {
+    _ratingUpdateListeners.add(listener);
+  }
+
+  void unregisterRatingUpdateListener(Function(dynamic) listener) {
+    _ratingUpdateListeners.remove(listener);
   }
 
   // --- Listener Registration Methods ---
@@ -686,9 +706,10 @@ class WebSocketService extends GetxService {
       }
     });
 
-    _listen('ride:searching', (data) {
-      print('[WS Rcvd] ride:searching -> $data');
-      if (data is Map<String, dynamic> && data['tripId'] != null) {
+    _listen('ride:searching', (incomingData) {
+      print('[WS Rcvd] ride:searching -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null && data['tripId'] != null) {
         try {
           if (Get.isRegistered<RideController>()) {
             final rideController = Get.find<RideController>();
@@ -701,10 +722,17 @@ class WebSocketService extends GetxService {
     });
 
     // Driver Ride Events
-    _listen('ride:request', (data) {
-      print('[WebSocket Received] ride:request -> $data');
-      if (data is Map<String, dynamic> && data['rideId'] != null) {
+    _listen('ride:request', (incomingData) {
+      print('[WebSocket Received] ride:request -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null && data['rideId'] != null) {
         try {
+          // Guard: controller may not be registered yet if the event arrives
+          // before DriverDashboardController finishes its 100ms delayed init.
+          if (!Get.isRegistered<TripManagementController>()) {
+            print('WS: ride:request received but TripManagementController not yet registered. Ignoring.');
+            return;
+          }
           final tripController = Get.find<TripManagementController>();
           
           // --- Fix Logic Loophole ---
@@ -732,38 +760,51 @@ class WebSocketService extends GetxService {
             return;
           }
 
+          // Helper: parse LatLng from either {latitude, longitude} map
+          // OR a [lng, lat] coordinate array sent by the server.
           LatLng parseLatLng(dynamic locationData, LatLng fallback) {
             if (locationData is Map) {
-              // Try parsing as double, then as int, then as String
               final lat =
                   (locationData['latitude'] as num?)?.toDouble() ??
                   double.tryParse(locationData['latitude'].toString());
               final lon =
                   (locationData['longitude'] as num?)?.toDouble() ??
                   double.tryParse(locationData['longitude'].toString());
-
-              if (lat != null && lon != null) {
-                return LatLng(lat, lon);
-              }
+              if (lat != null && lon != null) return LatLng(lat, lon);
             }
-            print(
-              "Warning: Could not parse LatLng from ride:request payload. Using fallback.",
-            );
+            // Server sometimes sends coordinates as [lng, lat] array
+            if (locationData is List && locationData.length >= 2) {
+              final lon = (locationData[0] as num?)?.toDouble();
+              final lat = (locationData[1] as num?)?.toDouble();
+              if (lat != null && lon != null) return LatLng(lat, lon);
+            }
+            print('Warning: Could not parse LatLng from ride:request payload. Using fallback.');
             return fallback;
           }
 
-          //  Look for 'dropoffLocation' first ---
-          final dynamic dropoffData =
-              data['dropoffLocation'] ?? data['destinationLocation'];
-          LatLng destLoc = parseLatLng(
-            dropoffData, // Use the new variable
-            const LatLng(6.42, 3.42),
-          );
+          // Helper: safely extract price from either a plain num
+          // or a MongoDB Decimal128 object {\$numberDecimal: '17076.66'}.
+          double parsePrice(dynamic raw) {
+            if (raw is num) return raw.toDouble();
+            if (raw is Map) {
+              final dec = raw[r'$numberDecimal'] ?? raw['numberDecimal'];
+              if (dec != null) return double.tryParse(dec.toString()) ?? 0.0;
+            }
+            return 0.0;
+          }
 
+          // Pickup: try pickupLocation map first, then pickupCoordinates array
           LatLng pickupLoc = parseLatLng(
-            data['pickupLocation'],
+            data['pickupLocation'] ?? data['pickupCoordinates'],
             const LatLng(6.52, 3.37),
           );
+
+          // Destination: try dropoffLocation / destinationLocation map, then array
+          final dynamic dropoffData =
+              data['dropoffLocation'] ??
+              data['destinationLocation'] ??
+              data['destinationCoordinates'];
+          LatLng destLoc = parseLatLng(dropoffData, const LatLng(6.42, 3.42));
 
           final expiresAtTimestamp =
               (data['expiresAt'] as num?)?.toInt() ??
@@ -774,29 +815,37 @@ class WebSocketService extends GetxService {
             expiresAtTimestamp,
           );
 
+          // pickup/destination address: server uses pickupLocationName / destinationName
+          final pickupAddress =
+              data['pickupLocationName'] ??
+              data['currentLocationName'] ??
+              'Unknown Pickup';
+          final destinationAddress =
+              data['destinationName'] ?? 'Unknown Destination';
+
+          // riderName: server uses clientName field
+          final riderName = data['clientName'] ?? data['riderName'] ?? 'Rider';
+          final riderId = data['clientId'] ?? data['riderId'] ?? '?';
+          final riderRating = (data['clientRating'] ?? data['riderRating'] as num?)?.toDouble() ?? 4.0;
+
           final request = TripRequest(
             id: data['rideId'],
-            riderId: data['riderId'] ?? '?',
-            riderName: data['riderName'] ?? 'Rider',
+            riderId: riderId,
+            riderName: riderName,
             riderPhone: data['riderPhone'] ?? '',
-            riderRating: (data['riderRating'] as num?)?.toDouble() ?? 4.0,
+            riderRating: riderRating,
             pickupLocation: pickupLoc,
             destinationLocation: destLoc,
-            pickupAddress:
-                data['currentLocationName'] ??
-                'Unknown Pickup', // Mapped from currentLocationName
-            destinationAddress:
-                data['destinationName'] ?? 'Unknown Destination',
+            pickupAddress: pickupAddress,
+            destinationAddress: destinationAddress,
             requestTime:
-                DateTime.tryParse(data['requestTime'] ?? '') ?? DateTime.now(),
-            estimatedFare: (data['price'] as num?)?.toDouble() ?? 0.0,
+                DateTime.tryParse(data['timestamp'] ?? data['requestTime'] ?? '') ?? DateTime.now(),
+            estimatedFare: parsePrice(data['price']),
             estimatedDistance: (data['distanceKm'] as num?)?.toDouble() ?? 0.0,
-            estimatedDuration:
-                (data['estimatedDuration'] as num?)?.toInt() ?? 0,
-            rideType:
-                data['category'] ?? 'Standard', // <-- MODIFIED: Use 'category'
-            seats: (data['seats'] as num?)?.toInt() ?? 4, // <-- ADDED
-            expiresAt: expiresAt, // <-- ADDED
+            estimatedDuration: (data['estimatedDuration'] as num?)?.toInt() ?? 0,
+            rideType: data['category'] ?? 'Standard',
+            seats: (data['seats'] as num?)?.toInt() ?? 4,
+            expiresAt: expiresAt,
           );
           tripController.showTripRequest(request);
         } catch (e) {
@@ -819,51 +868,54 @@ class WebSocketService extends GetxService {
         THelperFunctions.showSuccessSnackBar("Success", data['message']);
       }
     });
-    _listen('ride:cancelled', (data) {
-      print('[WebSocket Received] ride:cancelled -> $data');
-      if (data is Map<String, dynamic> && data['rideId'] != null) {
+    _listen('ride:cancelled', (incomingData) {
+      print('[WebSocket Received] ride:cancelled -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null && data['rideId'] != null) {
         try {
-          // This event could be for either rider or driver, check both controllers
+          final String cancelledRideId = data['rideId'];
+          final String reason = data['message'] ?? 'Client cancelled the ride';
+
+          // Driver side: use handleServerCancellation (NOT cancelTrip) to avoid
+          // re-emitting ride:driverCancel back to the server (feedback loop).
           if (Get.isRegistered<TripManagementController>()) {
             final tripController = Get.find<TripManagementController>();
-            String reason = data['message'] ?? 'Client cancelled the ride';
-            String cancelledRideId = data['rideId'];
-            if (tripController.currentTripRequest.value?.id ==
-                    cancelledRideId ||
+            if (tripController.currentTripRequest.value?.id == cancelledRideId ||
                 tripController.activeTrip.value?.id == cancelledRideId) {
               print(
-                "Notifying TripManagementController of cancellation for ride ID: $cancelledRideId",
+                'WS: Notifying TripManagementController of SERVER cancellation for ride: $cancelledRideId',
               );
-              tripController.cancelTrip(reason);
+              tripController.handleServerCancellation(cancelledRideId, reason);
             }
           }
+
+          // Rider side: notify RideController
           if (Get.isRegistered<RideController>()) {
             final rideController = Get.find<RideController>();
-            String message = data['message'] ?? 'Your ride was cancelled.';
-            String cancelledRideId = data['rideId'];
             if (rideController.rideId.value == cancelledRideId) {
-              print("Notifying RideController of cancellation confirmation.");
-              rideController.handleCancellationConfirmed(message);
+              print('WS: Notifying RideController of cancellation.');
+              rideController.handleCancellationConfirmed(reason);
             }
           }
         } catch (e) {
-          print("Error handling ride:cancelled : $e");
+          print('Error handling ride:cancelled : $e');
         }
       } else {
-        print("Invalid data format for ride:cancelled");
+        print('Invalid data format for ride:cancelled');
       }
     });
 
     // Client Ride Events
-    _listen('ride:accepted', (data) {
-      print('[WS Rcvd] ride:accepted -> $data');
-      if (data is Map<String, dynamic>) {
+    _listen('ride:accepted', (incomingData) {
+      print('[WS Rcvd] ride:accepted -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null) {
         try {
           final rideController = Get.find<RideController>();
 
-          final driverData = data['driver'] as Map<String, dynamic>? ?? {};
+          final driverData = data['driver'] as Map<dynamic, dynamic>? ?? {};
           final vehicleData =
-              driverData['vehicleDetails'] as Map<String, dynamic>? ?? {};
+              driverData['vehicleDetails'] as Map<dynamic, dynamic>? ?? {};
 
           final String driverName =
               driverData['name'] ?? data['driverName'] ?? 'Driver';
@@ -923,9 +975,10 @@ class WebSocketService extends GetxService {
       }
     });
 
-    _listen('ride:rejected', (data) {
-      print('[WS Rcvd] ride:rejected -> $data');
-      if (data is Map<String, dynamic>) {
+    _listen('ride:rejected', (incomingData) {
+      print('[WS Rcvd] ride:rejected -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null) {
         try {
           final rideController = Get.find<RideController>();
           String message =
@@ -939,9 +992,10 @@ class WebSocketService extends GetxService {
       }
     });
 
-    _listen('ride:failed', (data) {
-      print('[WS Rcvd] ride:failed -> $data');
-      if (data is Map<String, dynamic>) {
+    _listen('ride:failed', (incomingData) {
+      print('[WS Rcvd] ride:failed -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null) {
         try {
           final rideController = Get.find<RideController>();
           String message =
@@ -955,9 +1009,10 @@ class WebSocketService extends GetxService {
       }
     });
 
-    _listen('ride:cancellationConfirmed', (data) {
-      print('[WS Rcvd] ride:cancellationConfirmed -> $data');
-      if (data is Map<String, dynamic>) {
+    _listen('ride:cancellationConfirmed', (incomingData) {
+      print('[WS Rcvd] ride:cancellationConfirmed -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null) {
         try {
           final rideController = Get.find<RideController>();
           String message = data['message'] ?? 'Ride cancelled successfully.';
@@ -970,9 +1025,10 @@ class WebSocketService extends GetxService {
       }
     });
 
-    _listen('ride:started', (data) {
-      print('[WS Rcvd] ride:started -> $data');
-      if (data is Map<String, dynamic>) {
+    _listen('ride:started', (incomingData) {
+      print('[WS Rcvd] ride:started -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null) {
         try {
           final rideController = Get.find<RideController>();
           rideController.handleRideStarted(data); // <-- PASS THE DATA
@@ -983,11 +1039,11 @@ class WebSocketService extends GetxService {
         print("WS: Invalid data format for ride:started");
       }
     });
-    _listen('driver:location:live', (data) {
+    _listen('driver:location:live', (incomingData) {
       // --- DEBUG LOGGING ---
-      print('[WS Rcvd] driver:location:live -> $data');
-
-      if (data is Map<String, dynamic> &&
+      print('[WS Rcvd] driver:location:live -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null &&
           data['latitude'] != null &&
           data['longitude'] != null) {
         try {
@@ -1015,9 +1071,10 @@ class WebSocketService extends GetxService {
       }
     });
 
-    _listen('ride:completed', (data) {
-      print('[WS Rcvd] ride:completed -> $data');
-      if (data is Map<String, dynamic>) {
+    _listen('ride:completed', (incomingData) {
+      print('[WS Rcvd] ride:completed -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null) {
         try {
           final rideController = Get.find<RideController>();
           // Pass the entire data map to the controller
@@ -1031,9 +1088,10 @@ class WebSocketService extends GetxService {
     });
 
     // Package delivery arrived at dropoff
-    _listen('package:arrived', (data) {
-      print('[WS Rcvd] package:arrived -> $data');
-      if (data is Map<String, dynamic>) {
+    _listen('package:arrived', (incomingData) {
+      print('[WS Rcvd] package:arrived -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null) {
         try {
           if (Get.isRegistered<RideController>()) {
             Get.find<RideController>().handlePackageArrived(data);
@@ -1045,9 +1103,10 @@ class WebSocketService extends GetxService {
     });
 
     // Package picked up by driver
-    _listen('package:picked_up', (data) {
-      print('[WS Rcvd] package:picked_up -> $data');
-      if (data is Map<String, dynamic>) {
+    _listen('package:picked_up', (incomingData) {
+      print('[WS Rcvd] package:picked_up -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null) {
         try {
           if (Get.isRegistered<RideController>()) {
             Get.find<RideController>().handlePackagePickedUp(data);
@@ -1060,15 +1119,17 @@ class WebSocketService extends GetxService {
 
     // Package delivery completion (rider + driver should be routed to payment UI
     // when payment is still pending).
-    _listen('package:delivered', (data) {
-      print('[WS Rcvd] package:delivered -> $data');
-      if (data is Map<String, dynamic>) {
+    _listen('package:delivered', (incomingData) {
+      print('[WS Rcvd] package:delivered -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null) {
         try {
           if (Get.isRegistered<RideController>()) {
             Get.find<RideController>().handlePackageDelivered(data);
           }
         } catch (e) {
-          print("WS Error handling package:delivered for rider: $e");
+          print(
+              "WS Error handling package:delivered for rider: $e");
         }
 
         try {
@@ -1097,9 +1158,10 @@ class WebSocketService extends GetxService {
       }
     });
 
-    _listen('package:disputed', (data) {
-      print('[WS Rcvd] package:disputed -> $data');
-      if (data is Map<String, dynamic>) {
+    _listen('package:disputed', (incomingData) {
+      print('[WS Rcvd] package:disputed -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null) {
         if (Get.isRegistered<RideController>()) {
           Get.find<RideController>().handlePackageDisputed(data);
         }
@@ -1109,9 +1171,10 @@ class WebSocketService extends GetxService {
       }
     });
 
-    _listen('dispute:resolved', (data) {
-      print('[WS Rcvd] dispute:resolved -> $data');
-      if (data is Map<String, dynamic>) {
+    _listen('dispute:resolved', (incomingData) {
+      print('[WS Rcvd] dispute:resolved -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null) {
         if (Get.isRegistered<RideController>()) {
           Get.find<RideController>().handleDisputeResolved(data);
         }
@@ -1121,27 +1184,30 @@ class WebSocketService extends GetxService {
       }
     });
 
-    _listen('debt:paid', (data) {
-      print('[WS Rcvd] debt:paid -> $data');
-      if (data is Map<String, dynamic>) {
+    _listen('debt:paid', (incomingData) {
+      print('[WS Rcvd] debt:paid -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null) {
         if (Get.isRegistered<TripManagementController>()) {
           Get.find<TripManagementController>().handleDebtPaid(data);
         }
       }
     });
 
-    _listen('loyalty:reduction_applied', (data) {
-      print('[WS Rcvd] loyalty:reduction_applied -> $data');
-      if (data is Map<String, dynamic>) {
+    _listen('loyalty:reduction_applied', (incomingData) {
+      print('[WS Rcvd] loyalty:reduction_applied -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null) {
         if (Get.isRegistered<TripManagementController>()) {
           Get.find<TripManagementController>().handleLoyaltyReduction(data);
         }
       }
     });
 
-    _listen('transfer:completed', (data) {
-      print('[WS Rcvd] transfer:completed -> $data');
-      if (data is Map<String, dynamic>) {
+    _listen('transfer:completed', (incomingData) {
+      print('[WS Rcvd] transfer:completed -> $incomingData');
+      final data = _getMapData(incomingData);
+      if (data != null) {
         if (Get.isRegistered<RideController>()) {
           Get.find<RideController>().handleTransferCompleted(data);
         }
@@ -1185,6 +1251,18 @@ class WebSocketService extends GetxService {
           listener(data);
         } catch (e) {
           print("WS Error in payment:processed listener: $e");
+        }
+      }
+    });
+
+    // Event: driver:rating:updated
+    _listen('driver:rating:updated', (data) {
+      print('[WS Rcvd] driver:rating:updated -> $data');
+      for (var listener in List.from(_ratingUpdateListeners)) {
+        try {
+          listener(data);
+        } catch (e) {
+          print("WS Error in driver:rating:updated listener: $e");
         }
       }
     });

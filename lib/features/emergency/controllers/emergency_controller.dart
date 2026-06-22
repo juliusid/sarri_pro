@@ -56,20 +56,13 @@ class EmergencyController extends GetxController {
         tripId: tripId,
       );
 
-      if (result != null) {
-        activeEmergency.value = result;
-        messages.clear(); // Start fresh
-
-        // Join the socket room for this emergency
-        _socketService.joinEmergencyRoom(result['_id']);
+      if (result != null && result['_id'] != null) {
+        await loadEmergencyDetails(result['_id']);
 
         THelperFunctions.showSuccessSnackBar(
           'Alert Sent',
           'Emergency reported. Support has been notified.',
         );
-
-        // Navigate to Emergency Chat Screen (we will build this next)
-        // Get.to(() => const EmergencyChatScreen());
       } else {
         THelperFunctions.showErrorSnackBar(
           'Error',
