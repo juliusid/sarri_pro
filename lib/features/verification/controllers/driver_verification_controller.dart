@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:sarri_ride/features/authentication/models/auth_model.dart';
 import 'package:sarri_ride/features/authentication/services/auth_service.dart';
 import 'package:sarri_ride/features/driver/screens/driver_dashboard_screen.dart';
+import 'package:sarri_ride/features/driver/controllers/driver_dashboard_controller.dart';
 import 'package:sarri_ride/utils/formatters/formatter.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
@@ -23,6 +24,16 @@ class DriverVerificationController extends GetxController {
     currentStep.value = initialStep;
     pageController = PageController(initialPage: initialStep.index);
     isInitializedWizard = true;
+
+    // Pre-populate verified phone number from Dashboard Controller if available
+    if (Get.isRegistered<DriverDashboardController>()) {
+      final dashboardController = Get.find<DriverDashboardController>();
+      final existingPhone = dashboardController.currentDriver.value?.phoneNumber;
+      if (existingPhone != null && existingPhone.isNotEmpty) {
+        _verifiedPhoneNumber = existingPhone;
+        phoneNumberController.text = existingPhone;
+      }
+    }
   }
   final RxBool isLoading = false.obs;
   final RxBool privacyPolicy = false.obs;
@@ -149,22 +160,20 @@ class DriverVerificationController extends GetxController {
   Future<void> sendPhoneVerificationOtp() async {
     if (!phoneFormKey.currentState!.validate()) return;
 
-    // Dev bypass
-    final String phoneNumber = formattedPhoneNumber;
-    if (phoneNumber.startsWith('+234777')) {
-      THelperFunctions.showSuccessSnackBar(
-          'Dev Bypass', 'Test number — skipping OTP.');
-      _verifiedPhoneNumber = phoneNumber;
-      _goToDetails();
-      return;
-    }
+    if (!phoneFormKey.currentState!.validate()) return;
 
+    final String phoneNumber = formattedPhoneNumber;
     isLoading.value = true;
     try {
+      String userEmail = '';
+      if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
+        userEmail = Get.find<ClientData>(tag: 'currentUser').email;
+      }
+
       final result = await AuthService.instance.sendPhoneOtp(
         phoneNumber,
         'driver',
-        '', // We don't need email for authenticated phone verify
+        userEmail,
       );
 
       if (result.success) {
@@ -196,10 +205,15 @@ class DriverVerificationController extends GetxController {
   Future<void> resendPhoneOtp() async {
     isLoading.value = true;
     try {
+      String userEmail = '';
+      if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
+        userEmail = Get.find<ClientData>(tag: 'currentUser').email;
+      }
+
       final result = await AuthService.instance.resendPhoneOtp(
         formattedPhoneNumber,
         'driver',
-        '',
+        userEmail,
       );
       if (result.success) {
         THelperFunctions.showSuccessSnackBar('Resent', 'OTP sent again.');
@@ -224,11 +238,16 @@ class DriverVerificationController extends GetxController {
     isLoading.value = true;
 
     try {
+      String userEmail = '';
+      if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
+        userEmail = Get.find<ClientData>(tag: 'currentUser').email;
+      }
+
       final result = await AuthService.instance.verifyPhoneOtp(
         formattedPhoneNumber,
         otpCode,
         'driver',
-        '',
+        userEmail,
       );
       if (result.success) {
         THelperFunctions.showSuccessSnackBar(

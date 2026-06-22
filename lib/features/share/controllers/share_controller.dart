@@ -24,18 +24,14 @@ class ShareController extends GetxController {
 
     isSharing.value = true;
     try {
-      final token = await _service.createShareLink(
+      final shareUrl = await _service.createShareLink(
         _rideController.rideId.value,
       );
 
-      if (token != null) {
-        // Construct the full URL
-        final String shareUrl = "https://sarriride.app/share/$token";
-
+      if (shareUrl != null) {
         // Open the native iOS/Android share sheet
-        // 'subject' is used primarily for Email apps
         await Share.share(
-          'Follow my ride on Sarri: $shareUrl',
+          'Follow my live ride on SarriRide: $shareUrl',
           subject: 'Track my ride',
         );
       } else {

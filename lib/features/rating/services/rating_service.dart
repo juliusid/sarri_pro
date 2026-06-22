@@ -3,7 +3,8 @@ import 'package:sarri_ride/config/api_config.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
 
 class RatingService extends GetxService {
-  static RatingService get instance => Get.find();
+  static RatingService get instance =>
+      Get.isRegistered<RatingService>() ? Get.find() : Get.put(RatingService());
   final HttpService _httpService = HttpService.instance;
 
   // 1. Rate Driver (POST)

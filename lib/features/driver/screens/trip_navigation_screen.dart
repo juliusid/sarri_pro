@@ -447,7 +447,7 @@ class TripNavigationScreen extends StatelessWidget {
                   Expanded(
                     flex: 2,
                     child: ElevatedButton.icon(
-                      onPressed: () => controller.contactRider(),
+                      onPressed: () => controller.contactRider(context),
                       icon: const Icon(Iconsax.call, color: Colors.white),
                       label: const Text(
                         'Call',
@@ -537,7 +537,7 @@ class TripNavigationScreen extends StatelessWidget {
                   Expanded(
                     flex: 2,
                     child: ElevatedButton.icon(
-                      onPressed: () => controller.contactRider(),
+                      onPressed: () => controller.contactRider(context),
                       icon: const Icon(Iconsax.call, color: Colors.white),
                       label: const Text(
                         'Call',

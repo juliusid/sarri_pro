@@ -7,7 +7,7 @@ import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:iconsax/iconsax.dart';
-// Self import or keep clean
+import 'package:sarri_ride/features/emergency/widgets/swipe_to_sos_sheet.dart';
 import 'package:intl/intl.dart';
 
 class RideHistoryScreen extends StatelessWidget {
@@ -920,13 +920,35 @@ class RideDetailsSheet extends StatelessWidget {
 
           const SizedBox(height: TSizes.spaceBtwSections),
 
-          // Close Button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => Get.back(),
-              child: const Text('Close'),
-            ),
+          // Buttons Row
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Get.back(),
+                  child: const Text('Close'),
+                ),
+              ),
+              const SizedBox(width: TSizes.spaceBtwItems),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Get.back(); // close sheet
+                    Get.bottomSheet(
+                      SwipeToSOSBottomSheet(tripId: ride['_id']),
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                    );
+                  },
+                  icon: const Icon(Iconsax.shield_security),
+                  label: const Text('SOS'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: TColors.error,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: TSizes.spaceBtwItems),
         ],

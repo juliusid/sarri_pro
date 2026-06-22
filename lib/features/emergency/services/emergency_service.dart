@@ -38,7 +38,7 @@ class EmergencyService extends GetxService {
       return null;
     } catch (e) {
       print("EmergencyService Error (create): $e");
-      return null;
+      rethrow;
     }
   }
 
@@ -86,14 +86,18 @@ class EmergencyService extends GetxService {
   Future<List<dynamic>> getMyEmergencies({int page = 1}) async {
     try {
       final response = await _httpService.get(
-        '${ApiConfig.baseUrl}/emergencies/my',
+        '${ApiConfig.baseUrl}/emergency/my',
         queryParameters: {'page': page.toString()},
       );
 
       final responseData = _httpService.handleResponse(response);
 
       if (responseData['status'] == 'success') {
-        return responseData['data']['emergencies'] ?? [];
+        // Backend returns: { status: 'success', data: [...], pagination: {...} }
+        // 'data' is the list directly, not nested under 'emergencies'
+        final data = responseData['data'];
+        if (data is List) return data;
+        return [];
       }
       return [];
     } catch (e) {

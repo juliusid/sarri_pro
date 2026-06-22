@@ -216,7 +216,10 @@ class LocationService extends GetxController {
       );
     }
 
-    return Geolocator.getPositionStream(locationSettings: locationSettings);
+    return Geolocator.getPositionStream(locationSettings: locationSettings).map((position) {
+      _currentPosition.value = position;
+      return position;
+    });
   }
 
   /// --- 2. ENSURE LOCATION AVAILABLE ---

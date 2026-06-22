@@ -4,6 +4,7 @@ import 'package:sarri_ride/features/ride/controllers/ride_controller.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 
 class RideType {
   final String name;
@@ -243,12 +244,11 @@ class RideSelectionWidget extends StatelessWidget {
                               ),
 
                               // Price
-                              // Price
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Text(
-                                    '₦${rideType.price}',
+                                    '₦${NumberFormat('#,###').format(rideType.price)}',
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
@@ -257,7 +257,7 @@ class RideSelectionWidget extends StatelessWidget {
                                   ),
                                   if (rideType.originalPrice != null && rideType.originalPrice! > rideType.price)
                                     Text(
-                                      '₦${rideType.originalPrice}',
+                                      '₦${NumberFormat('#,###').format(rideType.originalPrice)}',
                                       style: TextStyle(
                                         fontWeight: FontWeight.w500,
                                         fontSize: 13,

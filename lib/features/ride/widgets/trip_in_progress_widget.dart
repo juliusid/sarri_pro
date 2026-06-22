@@ -9,6 +9,7 @@ import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/communication/screens/message_screen.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:sarri_ride/features/communication/widgets/call_selection_sheet.dart';
 
 class TripInProgressWidget extends StatelessWidget {
   final Driver driver;
@@ -21,90 +22,11 @@ class TripInProgressWidget extends StatelessWidget {
   });
 
   void _showCallOptionsDialog(BuildContext context) {
-    final dark = THelperFunctions.isDarkMode(context);
-
-    showDialog(
+    CallSelectionSheet.show(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: dark ? TColors.dark : Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Text(
-            'Contact ${driver.name}',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: dark ? TColors.white : TColors.black,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Choose a method to call',
-                style: TextStyle(
-                  color: dark ? TColors.lightGrey : TColors.darkGrey,
-                ),
-              ),
-              const SizedBox(height: 24),
-              _buildDialogButton(
-                icon: Iconsax.call,
-                label: 'Mobile Call',
-                color: TColors.success,
-                onTap: () {
-                  Navigator.pop(context);
-                  _makePhoneCall(driver.name);
-                },
-              ),
-              const SizedBox(height: 12),
-              _buildDialogButton(
-                icon: Iconsax.video,
-                label: 'In-App Call',
-                color: TColors.primary,
-                onTap: () {
-                  Navigator.pop(context);
-                  _makeInAppCall();
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildDialogButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color.withOpacity(0.1),
-          foregroundColor: color,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 20),
-            const SizedBox(width: 10),
-            Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-          ],
-        ),
-      ),
+      contactName: driver.name,
+      onMobileCall: () => _makePhoneCall(driver.name),
+      onInAppCall: () => _makeInAppCall(),
     );
   }
 
@@ -126,7 +48,8 @@ class TripInProgressWidget extends StatelessWidget {
   }
 
   void _makeInAppCall() {
-    CallController.instance.startCall(driver.id, driver.name, 'Driver');
+    final rideController = Get.find<RideController>();
+    CallController.instance.startCall(rideController.rideId.value, driver.name, 'Driver');
   }
 
   @override

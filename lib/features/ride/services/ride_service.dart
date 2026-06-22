@@ -42,6 +42,20 @@ class RideService extends GetxService {
     }
   }
 
+  /// Calls the activeTrip API to check for an existing trip
+  Future<Map<String, dynamic>?> getActiveTrip() async {
+    try {
+      final response = await _httpService.get(ApiConfig.getActiveTripEndpoint);
+      final responseData = _httpService.handleResponse(response);
+      if (responseData['status'] == 'success' && responseData['data'] != null) {
+        return responseData['data'];
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   /// Calculates the ride prices for different categories
   Future<CalculatePriceResponse> calculatePrice(
     LatLng pickup,

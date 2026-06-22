@@ -8,6 +8,7 @@ import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/ride/widgets/driver_info_card.dart';
 import 'package:sarri_ride/features/communication/screens/message_screen.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:sarri_ride/features/communication/widgets/call_selection_sheet.dart';
 
 class DriverAssignedWidget extends StatelessWidget {
   final Driver driver;
@@ -25,61 +26,11 @@ class DriverAssignedWidget extends StatelessWidget {
 
   // Function to show call type selection dialog
   void _showCallOptionsDialog(BuildContext context) {
-    final dark = THelperFunctions.isDarkMode(context);
-
-    showDialog(
+    CallSelectionSheet.show(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: dark ? TColors.dark : Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Text(
-            'Contact ${driver.name}',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: dark ? TColors.white : TColors.black,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'How would you like to connect?',
-                style: TextStyle(
-                  color: dark ? TColors.lightGrey : TColors.darkGrey,
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Normal Call Option
-              _buildDialogButton(
-                icon: Iconsax.call,
-                label: "Mobile Call",
-                color: TColors.success,
-                onTap: () {
-                  Navigator.pop(context);
-                  _makePhoneCall(driver.name);
-                },
-              ),
-
-              const SizedBox(height: 12),
-
-              // In-App Call Option
-              _buildDialogButton(
-                icon: Iconsax.video,
-                label: "App Call",
-                color: TColors.primary,
-                onTap: () {
-                  Navigator.pop(context);
-                  _makeInAppCall();
-                },
-              ),
-            ],
-          ),
-        );
-      },
+      contactName: driver.name,
+      onMobileCall: () => _makePhoneCall(driver.name),
+      onInAppCall: () => _makeInAppCall(),
     );
   }
 
@@ -133,7 +84,8 @@ class DriverAssignedWidget extends StatelessWidget {
   }
 
   void _makeInAppCall() {
-    CallController.instance.startCall(driver.id, driver.name, 'Driver');
+    final rideController = Get.find<RideController>();
+    CallController.instance.startCall(rideController.rideId.value, driver.name, 'Driver');
   }
 
   void _onMessagePressed() {

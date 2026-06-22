@@ -5,6 +5,21 @@ import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/payment/screens/paystack_webview_screen.dart';
 import 'package:get_storage/get_storage.dart';
 
+/// Outcome of a payment initiation attempt.
+enum PaymentResult {
+  /// Payment completed and confirmed.
+  success,
+
+  /// Cash or transfer — request sent, waiting for driver/backend to confirm.
+  awaitingConfirmation,
+
+  /// Payment definitively failed.
+  failed,
+
+  /// WebView closed without a clear intercept; polling/socket will resolve it.
+  unknown,
+}
+
 /// Model for a saved payment card
 class PaymentCardModel {
   final String cardId;
@@ -51,6 +66,8 @@ class PaymentController extends GetxController {
   final RxBool isAddingCard = false.obs;
   final RxBool isPaying = false.obs;
 
+  /// True while waiting for driver to confirm a cash/transfer payment.
+  final RxBool isAwaitingCashConfirmation = false.obs;
 
   /// Fetches the list of saved payment cards from the API
   Future<void> fetchSavedCards() async {
@@ -66,8 +83,6 @@ class PaymentController extends GetxController {
         savedCards.value = cardList
             .map((json) => PaymentCardModel.fromJson(json))
             .toList();
-
-        print("Fetched ${savedCards.length} saved cards.");
       } else {
         throw Exception(responseData['message'] ?? 'Failed to load cards');
       }
@@ -82,7 +97,7 @@ class PaymentController extends GetxController {
     }
   }
 
-  /// Initiates the "Add Card" flow
+  /// Initiates the "Add Card" flow via Paystack WebView.
   Future<void> addNewCard() async {
     isAddingCard.value = true;
     THelperFunctions.showSnackBar('Initializing secure payment...');
@@ -97,12 +112,9 @@ class PaymentController extends GetxController {
           responseData['authorization_url'] != null) {
         final String authUrl = responseData['authorization_url'];
 
-        print("PAYMENT CONTROLLER: Opening WebView. Waiting for result...");
         final result = await Get.to(
           () => PaystackWebViewScreen(authorizationUrl: authUrl),
         );
-
-        print("PAYMENT CONTROLLER: WebView closed. Received result: '$result'");
 
         if (result == 'success') {
           THelperFunctions.showSuccessSnackBar(
@@ -112,15 +124,16 @@ class PaymentController extends GetxController {
         } else if (result == 'cancelled') {
           THelperFunctions.showSnackBar('Card verification was cancelled.');
         } else {
-          // Card may still have been saved if the refund failed on the backend.
-          // Don't show error yet — silently refresh and let the list speak for itself.
           THelperFunctions.showSnackBar('Verifying card status...');
         }
-        
+
         await fetchSavedCards();
-        
+
         if (savedCards.isNotEmpty && result != 'success') {
-          THelperFunctions.showSuccessSnackBar('Success', 'Card verified and saved!');
+          THelperFunctions.showSuccessSnackBar(
+            'Success',
+            'Card verified and saved!',
+          );
         }
       } else {
         throw Exception(
@@ -138,13 +151,16 @@ class PaymentController extends GetxController {
     }
   }
 
-  /// Initiates a trip payment
-  Future<bool> initiateTripPayment(
+  /// Initiates a trip payment.
+  ///
+  /// Returns a [PaymentResult] so the UI can react appropriately to each
+  /// distinct outcome instead of guessing from a boolean.
+  Future<PaymentResult> initiateTripPayment(
     String tripId, {
     String? cardId,
     required String paymentMethod, // 'card', 'cash', 'transfer'
   }) async {
-    if (isPaying.value) return false;
+    if (isPaying.value) return PaymentResult.failed;
     isPaying.value = true;
 
     try {
@@ -152,19 +168,15 @@ class PaymentController extends GetxController {
       final bool isPackageDelivery =
           storage.read('active_ride_mode') == 'package_delivery';
 
-      // Construct body based on documentation
-      // req: { "tripId": "...", "paymentMethod": "card", "cardId": "..." }
       final Map<String, dynamic> requestBody = {
         "tripId": tripId,
         "paymentMethod": paymentMethod.toLowerCase(),
       };
 
-      // Add cardId only if method is card
       if (paymentMethod.toLowerCase() == "card" && cardId != null) {
         requestBody["cardId"] = cardId;
       }
 
-      // Use the correct endpoint based on ride type.
       final String endpoint = isPackageDelivery
           ? ApiConfig.packagePaymentInitEndpoint
           : ApiConfig.initiateTripPaymentEndpoint;
@@ -174,62 +186,56 @@ class PaymentController extends GetxController {
         body: requestBody,
       );
 
-      print(
-        "PAYMENT CONTROLLER: Response received from initiateTripPayment endpoint.",
-      );
-      print("PAYMENT CONTROLLER: Response body: $response");
-      print(requestBody);
-
       final responseData = _httpService.handleResponse(response);
 
       if (responseData['status'] == 'success') {
-        // 1. Handle Cash / Transfer (Driver Confirmation Required)
+        // --- Cash / Transfer: driver must confirm ---
         if (responseData['requiresDriverConfirmation'] == true) {
-          THelperFunctions.showSnackBar(
-            'Waiting for driver to confirm payment...',
-          );
-          return true; // Request sent successfully
+          isAwaitingCashConfirmation.value = true;
+          return PaymentResult.awaitingConfirmation;
         }
 
-        // 2. Handle Card charge_authorization (No UI form)
+        // --- Card: already charged via saved authorization ---
         if (responseData['charged'] == true) {
-          THelperFunctions.showSnackBar('Payment submitted. Confirming...');
-          return true;
-        } else if (responseData['requiresOtp'] == true) {
-          THelperFunctions.showSnackBar('Card requires OTP. Falling back to checkout...');
-          // Let the flow continue or handle OTP if needed.
-          // Typically we would show an OTP dialog here, but for now we'll just fail.
-          return false;
+          return PaymentResult.success;
         }
 
-        // 3. Handle Card (Authorization URL)
+        // --- Card OTP required (rare) ---
+        if (responseData['requiresOtp'] == true) {
+          THelperFunctions.showSnackBar(
+            'Your card requires OTP. Please use a different card or pay with cash.',
+          );
+          return PaymentResult.failed;
+        }
+
+        // --- Card: Paystack authorization URL (new card charge) ---
         if (responseData['authorization_url'] != null) {
           final String authUrl = responseData['authorization_url'];
+
+          // Close any stale dialogs before pushing the WebView
+          if (Get.isDialogOpen ?? false) Get.back();
+
           final result = await Get.to(
             () => PaystackWebViewScreen(authorizationUrl: authUrl),
           );
 
           if (result == 'success') {
-            THelperFunctions.showSuccessSnackBar(
-              'Success',
-              'Payment processing...',
-            );
-            return true;
+            return PaymentResult.success;
           } else if (result == 'cancelled') {
             THelperFunctions.showSnackBar('Payment was cancelled.');
-            return false;
+            return PaymentResult.failed;
           } else {
-            // WebView may have failed to intercept the redirect, but the payment 
-            // might still have gone through. Don't immediately show an error.
-            // The payment:confirmed socket event OR polling will resolve the UI.
-            THelperFunctions.showSnackBar('Payment submitted. Confirming status...');
-            return true;
+            // WebView closed without a clean redirect intercept.
+            // The payment may still have processed — socket/polling will confirm.
+            THelperFunctions.showSnackBar(
+              'Payment submitted. Confirming status automatically…',
+            );
+            return PaymentResult.unknown;
           }
         }
 
-        // 3. Fallback Success (e.g. Wallet auto-debit if supported)
-        THelperFunctions.showSuccessSnackBar('Success', 'Payment initiated!');
-        return true;
+        // Fallback: generic success (e.g. wallet auto-debit)
+        return PaymentResult.success;
       } else {
         throw Exception(
           responseData['message'] ?? 'Payment initialization failed',
@@ -238,9 +244,14 @@ class PaymentController extends GetxController {
     } catch (e) {
       String errorMsg = e is ApiException ? e.message : e.toString();
       THelperFunctions.showErrorSnackBar('Payment Failed', errorMsg);
-      return false;
+      return PaymentResult.failed;
     } finally {
       isPaying.value = false;
     }
+  }
+
+  /// Called when the backend confirms payment (via socket or polling).
+  void onPaymentConfirmedExternally() {
+    isAwaitingCashConfirmation.value = false;
   }
 }

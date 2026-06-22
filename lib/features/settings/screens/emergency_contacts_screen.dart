@@ -5,6 +5,8 @@ import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/utils/validators/validation.dart';
+import 'package:sarri_ride/core/services/http_service.dart';
+import 'package:sarri_ride/config/api_config.dart';
 
 class EmergencyContactsScreen extends StatefulWidget {
   const EmergencyContactsScreen({super.key});
@@ -14,22 +16,43 @@ class EmergencyContactsScreen extends StatefulWidget {
 }
 
 class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
-  final List<EmergencyContact> _emergencyContacts = [
-    EmergencyContact(
-      id: '1',
-      name: 'John Doe',
-      relationship: 'Father',
-      phoneNumber: '+234 801 123 4567',
-      isPrimary: true,
-    ),
-    EmergencyContact(
-      id: '2',
-      name: 'Jane Smith',
-      relationship: 'Sister',
-      phoneNumber: '+234 802 234 5678',
-      isPrimary: false,
-    ),
-  ];
+  List<EmergencyContact> _emergencyContacts = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchEmergencyContacts();
+  }
+
+  Future<void> _fetchEmergencyContacts() async {
+    try {
+      final response = await HttpService.instance.get(ApiConfig.publicSettingsEndpoint);
+      final data = HttpService.instance.handleResponse(response);
+      
+      if (data['status'] == 'success' && data['data'] != null) {
+        final List contacts = data['data']['emergencyContacts'] ?? [];
+        setState(() {
+          _emergencyContacts = contacts.asMap().entries.map((entry) {
+            final contact = entry.value;
+            return EmergencyContact(
+              id: contact['_id'] ?? entry.key.toString(),
+              name: contact['name'] ?? 'Emergency Contact',
+              relationship: 'Support',
+              phoneNumber: contact['phone'] ?? '',
+              isPrimary: entry.key == 0,
+            );
+          }).toList();
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print('Error fetching emergency contacts: $e');
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +80,9 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(TSizes.defaultSpace),
         child: Column(
           children: [

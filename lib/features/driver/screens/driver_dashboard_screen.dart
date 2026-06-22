@@ -64,15 +64,22 @@ class DriverDashboardScreen extends StatelessWidget {
             children: [
               // -- CONDITIONAL VERIFICATION BANNER --
               Obx(() {
-                //
-                final status = controller.driverOperationalStatus.value; //
-                print("Dashboard UI: Driver operational status = $status"); //
+                final status = controller.driverOperationalStatus.value;
+                final driver = controller.currentDriver.value;
+                final isVerified = driver?.driverProfile?.adminVerified ?? false;
 
-                if (status == 'unverified') {
-                  final driver = controller.currentDriver.value;
-                  final hasPhone = driver?.phoneNumber?.isNotEmpty ?? false;
-                  final hasVehicle = driver?.driverProfile?.vehicleDetails.make?.isNotEmpty ?? false;
+                print("Dashboard UI: Driver operational status = $status, adminVerified = $isVerified");
 
+                // If fully verified, hide the verification banner
+                if (isVerified) {
+                  return const SizedBox.shrink();
+                }
+
+                final hasPhone = driver?.phoneNumber?.isNotEmpty ?? false;
+                final hasVehicle = driver?.driverProfile?.vehicleDetails.make?.isNotEmpty ?? false;
+
+                // 1. If basic setup details (phone or vehicle) are missing, or status is unverified
+                if (!hasPhone || !hasVehicle || status == 'unverified') {
                   DriverVerificationStep startStep;
                   if (!hasPhone) {
                     startStep = DriverVerificationStep.phone;
@@ -96,50 +103,36 @@ class DriverDashboardScreen extends StatelessWidget {
                       ));
                     },
                   );
-                } else if (status == 'pending') {
-                  return VerificationBanner(
-                    //
-                    title: 'Verification Pending',
-                    message:
-                        'Your account is pending admin verification. You cannot receive trip requests yet.', // Message from API
-                    bannerColor: TColors.info, // Use Info color for pending
-                    iconData: Iconsax.clock, // Clock icon
-                    // No button needed for pending
-                  );
                 } else if (status == 'rejected') {
-                  //
                   return VerificationBanner(
-                    //
-                    title: 'Documents Rejected', //
+                    title: 'Documents Rejected',
                     message:
-                        'There was an issue with your documents. Please review and resubmit them.', //
-                    buttonText: 'Resubmit Documents', //
-                    bannerColor: TColors.error, //
-                    iconData: Iconsax.close_circle, //
+                        'There was an issue with your documents. Please review and resubmit them.',
+                    buttonText: 'Resubmit Documents',
+                    bannerColor: TColors.error,
+                    iconData: Iconsax.close_circle,
                     onButtonPressed: () =>
                         Get.to(() => const DriverVerificationWizardScreen(
                           initialStep: DriverVerificationStep.documents,
-                        )), //
+                        )),
                   );
                 } else if (status == 'in_progress') {
-                  //
                   return VerificationBanner(
-                    //
-                    title: 'Verification In Progress', //
+                    title: 'Verification In Progress',
                     message:
-                        'Your documents are currently under review. We will notify you once completed. Thank you for your patience.', //
-                    bannerColor: TColors.success, //
-                    iconData: Iconsax.clock, //
+                        'Your documents are currently under review. We will notify you once completed. Thank you for your patience.',
+                    bannerColor: TColors.success,
+                    iconData: Iconsax.clock,
                   );
-                } else if (status == 'unknown') {
-                  //
-                  return const SizedBox.shrink(); //
-                } else if (status == 'error') {
-                  //
-                  return const SizedBox.shrink(); //
                 } else {
-                  //
-                  return const SizedBox.shrink(); //
+                  // Fallback for pending, active (but not adminVerified), unknown, or other unverified statuses
+                  return VerificationBanner(
+                    title: 'Verification Pending',
+                    message:
+                        'Your account is pending admin verification. You cannot receive trip requests yet.',
+                    bannerColor: TColors.info,
+                    iconData: Iconsax.clock,
+                  );
                 }
               }),
 

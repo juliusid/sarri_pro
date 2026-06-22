@@ -11,18 +11,9 @@ class ShareService extends GetxService {
   Future<String?> createShareLink(String tripId) async {
     try {
       // Endpoint: POST /api/share/createSharelink
-      // We don't send specific recipients, we just want a generic link to share manually.
+      // Generic public link - no specific recipients needed.
       final body = {
         'tripId': tripId,
-        'recipients': [
-          {"name": "Mom", "phoneNumber": "+2348012345678"},
-          {"name": "Alex Smith", "email": "alex.smith@example.com"},
-          {
-            "name": "Work Colleague",
-            "phoneNumber": "+442079460001",
-            "email": "colleague@work.com",
-          },
-        ],
         'settings': {
           'showDriverDetails': true,
           'showClientDetails': true,
@@ -37,8 +28,8 @@ class ShareService extends GetxService {
       final responseData = _httpService.handleResponse(response);
 
       if (responseData['status'] == 'success' && responseData['data'] != null) {
-        // We just need the token to construct the URL
-        return responseData['data']['shareToken'];
+        // Return the universal Vercel link directly from the backend
+        return responseData['data']['shareUrl'] ?? 'https://sarri-r-ide.vercel.app/share/${responseData['data']['shareToken']}';
       }
       return null;
     } catch (e) {

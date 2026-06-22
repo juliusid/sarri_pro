@@ -939,6 +939,22 @@ class WebSocketService extends GetxService {
       }
     });
 
+    _listen('ride:failed', (data) {
+      print('[WS Rcvd] ride:failed -> $data');
+      if (data is Map<String, dynamic>) {
+        try {
+          final rideController = Get.find<RideController>();
+          String message =
+              data['message'] ?? 'No available drivers were found nearby.';
+          rideController.handleRideFailed(message);
+        } catch (e) {
+          print("WS Error handling ride:failed : $e");
+        }
+      } else {
+        print("WS: Invalid data format for ride:failed");
+      }
+    });
+
     _listen('ride:cancellationConfirmed', (data) {
       print('[WS Rcvd] ride:cancellationConfirmed -> $data');
       if (data is Map<String, dynamic>) {

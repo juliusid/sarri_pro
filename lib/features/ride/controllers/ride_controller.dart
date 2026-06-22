@@ -9,7 +9,7 @@ import 'package:sarri_ride/features/location/services/location_service.dart'; //
 import 'package:sarri_ride/utils/logging/app_logger.dart'; // Added
 import 'package:sarri_ride/features/location/services/places_service.dart'; // Moved up
 import 'package:sarri_ride/core/services/map_marker_service.dart';
-import 'package:sarri_ride/features/emergency/screens/emergency_reporting_screen.dart';
+import 'package:sarri_ride/features/emergency/widgets/swipe_to_sos_sheet.dart';
 import 'package:sarri_ride/features/ride/models/ride_model.dart';
 import 'package:sarri_ride/features/ride/services/ride_service.dart';
 import 'package:sarri_ride/features/ride/widgets/payment_selection_sheet.dart';
@@ -29,6 +29,7 @@ import 'package:sarri_ride/features/package_delivery/controllers/package_deliver
 import 'package:sarri_ride/features/package_delivery/services/package_delivery_service.dart';
 import 'package:sarri_ride/features/ride/controllers/drawer_controller.dart';
 import 'package:sarri_ride/features/authentication/screens/phone_verification/phone_number_screen.dart';
+import 'package:sarri_ride/features/payment/controllers/payment_controller.dart';
 
 // Enums
 enum BookingState {
@@ -145,6 +146,9 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
   final RxBool showDestinationSuggestions = false.obs;
   final Rx<DateTime?> actualTripStartTime = Rx<DateTime?>(null);
   final RxBool isPaymentCompleted = false.obs;
+
+  /// True while the rider is waiting for the driver to confirm a cash payment.
+  final RxBool isAwaitingCashConfirmation = false.obs;
   final RxList<RideType> rideTypes = <RideType>[].obs;
 
   final RxString rideId = ''.obs;
@@ -359,7 +363,18 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
       return;
     }
 
-    final storedRideId = _storage.read('active_ride_id');
+    String? storedRideId = _storage.read('active_ride_id');
+    
+    // Check backend for active trip if not found locally
+    if (storedRideId == null || storedRideId.toString().isEmpty) {
+      final activeTripData = await _rideService.getActiveTrip();
+      if (activeTripData != null && activeTripData['tripId'] != null) {
+        storedRideId = activeTripData['tripId'];
+        _storage.write('active_ride_id', storedRideId);
+        print("RideController: Found active trip from backend: $storedRideId");
+      }
+    }
+
     if (storedRideId != null && storedRideId.toString().isNotEmpty) {
       print(
         "RideController: Found active ride ID $storedRideId. Attempting reconnect...",
@@ -507,6 +522,10 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
     if (data is Map<String, dynamic> && data['tripId'] == rideId.value) {
       print("RIDE CONTROLLER: Received payment:confirmed event.");
       _stopPaymentPolling();
+      // Also reset the PaymentController's awaiting-confirmation flag.
+      if (Get.isRegistered<PaymentController>()) {
+        Get.find<PaymentController>().onPaymentConfirmedExternally();
+      }
       onPaymentSuccess();
     }
   }
@@ -1675,6 +1694,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
         );
         pickupName.value = finalPickupName;
         pickupController.text = finalPickupName;
+        currentState.value = BookingState.searchingDriver; // Enter searching state!
         THelperFunctions.showSnackBar('Finding your driver...');
       } else {
         if (response.message.toLowerCase().contains('no available drivers')) {
@@ -1958,6 +1978,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
     packageDeliveryController.clear();
     freightDeliveryController.clear();
     isPaymentCompleted.value = false;
+    isAwaitingCashConfirmation.value = false;
     activeRideChatId.value = '';
     rideId.value = '';
     _storage.remove('active_ride_id');
@@ -2007,6 +2028,10 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
   void onPaymentSuccess() {
     _stopPaymentPolling();
     isPaymentCompleted.value = true;
+    isAwaitingCashConfirmation.value = false;
+
+    // Close any stale confirmation dialogs that may still be open.
+    if (Get.isDialogOpen ?? false) Get.back();
 
     // Payment completed; stop forcing the payment-pending UI restoration.
     _storage.remove('rider_waiting_for_payment');
@@ -2139,7 +2164,11 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
 
   void handleEmergency() {
     final currentTripId = rideId.value.isNotEmpty ? rideId.value : null;
-    Get.to(() => EmergencyReportingScreen(tripId: currentTripId));
+    Get.bottomSheet(
+      SwipeToSOSBottomSheet(tripId: currentTripId),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+    );
   }
 
   void _ensureMapFitsRoute() {
@@ -2188,6 +2217,23 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
   void handleRideRejected(String message) {
     if (currentState.value == BookingState.searchingDriver) {
       THelperFunctions.showSnackBar(message);
+    }
+  }
+
+  void handleRideFailed(String message) {
+    if (currentState.value == BookingState.searchingDriver) {
+      Get.bottomSheet(
+        NoDriversAvailableWidget(
+          message: message,
+          onSearchAgain: () {
+            Get.back();
+            currentState.value = BookingState.selectRide;
+            if (!panelController.isPanelOpen) panelController.open();
+          },
+        ),
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+      );
     }
   }
 

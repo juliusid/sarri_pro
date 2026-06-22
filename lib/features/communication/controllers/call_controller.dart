@@ -9,6 +9,7 @@ import 'package:sarri_ride/features/communication/screens/incoming_call_screen.d
 import 'package:sarri_ride/features/communication/screens/call_screen.dart'; // Active call UI
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/core/services/http_service.dart'; // For ApiException
+import 'package:sarri_ride/features/communication/services/call_kit_service.dart';
 
 enum CallState { idle, dialing, ringing, active, ended }
 
@@ -113,7 +114,13 @@ class CallController extends GetxController {
     isCaller.value = false;
     callState.value = CallState.ringing;
 
-    // 1. Show Incoming Screen
+    // 1. Show Incoming Screen via CallKit
+    CallKitService.instance.showIncomingCall(
+      callId: data['callId'],
+      callerName: otherPartyName.value,
+      avatar: '',
+    );
+    // Also push the screen internally if the app is already in the foreground
     Get.to(() => const IncomingCallScreen());
 
     // 2. Init Peer with the ID the server assigned to us (receiverPeerId)
@@ -166,6 +173,7 @@ class CallController extends GetxController {
   }
 
   Future<void> hangUp() async {
+    CallKitService.instance.endCurrentCall();
     if (currentCallId.value.isNotEmpty) {
       await _callService.endCall(currentCallId.value);
     }
@@ -196,6 +204,7 @@ class CallController extends GetxController {
 
   void handleCallEnded(Map<String, dynamic> data) {
     if (data['callId'] == currentCallId.value) {
+      CallKitService.instance.endCurrentCall();
       THelperFunctions.showSnackBar("Call ended");
       _disposeCallResources();
       if (Get.currentRoute.contains('Call')) Get.back();

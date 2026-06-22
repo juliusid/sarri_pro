@@ -3,8 +3,8 @@ description: "A new Flutter project."
 
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
-# version: 1.0.3+20
-version: 1.0.5+4
+version: 1.0.3+22
+# version: 1.0.5+4
 
 environment:
   sdk: ^3.8.1
@@ -71,6 +71,8 @@ dependencies:
   firebase_core: ^4.6.0
   sign_in_with_apple: ^6.1.1
   mobile_scanner: ^7.2.0
+  flutter_callkit_incoming: ^3.1.2
+  app_links: ^6.4.1
 
 dependency_overrides:
   flutter_webrtc: ^0.12.9

@@ -148,7 +148,7 @@ class DriverDashboardController extends GetxController with WidgetsBindingObserv
       }
 
       // 2. Set Location
-      _updateInitialLocation();
+      await _updateInitialLocation();
 
       // 3. Check Status
       await checkDriverStatus();
@@ -306,7 +306,7 @@ class DriverDashboardController extends GetxController with WidgetsBindingObserv
     }
   }
 
-  void _updateInitialLocation() {
+  Future<void> _updateInitialLocation() async {
     final profileLocation =
         currentDriver.value?.driverProfile?.location.coordinates;
     final lastUpdate = currentDriver.value?.driverProfile?.lastLocationUpdate;
@@ -320,9 +320,17 @@ class DriverDashboardController extends GetxController with WidgetsBindingObserv
     }
 
     if (!useProfileLocation) {
-      _locationService.ensureLocationAvailable();
-      final position = _locationService.getLocationForMap();
-      currentLocation.value = LatLng(position.latitude, position.longitude);
+      final isReady = await _locationService.ensureLocationAvailable(isDriver: true);
+      if (isReady) {
+        final position = await _locationService.getCurrentLocation(isDriver: true);
+        if (position != null) {
+          currentLocation.value = LatLng(position.latitude, position.longitude);
+        }
+      }
+      if (currentLocation.value == null) {
+        final position = _locationService.getLocationForMap();
+        currentLocation.value = LatLng(position.latitude, position.longitude);
+      }
     }
 
     _tripController?.driverLocation.value = currentLocation.value;
@@ -533,8 +541,9 @@ class DriverDashboardController extends GetxController with WidgetsBindingObserv
   Future<void> toggleDriverStatus() async {
     if (isLoadingStatus.value) return;
 
-    if (driverOperationalStatus.value != 'active') {
-      _showOperationalStatusError();
+    if (_tripController?.hasActiveTrip ?? false) {
+      THelperFunctions.showSnackBar('Cannot change status while on a trip.');
+      await checkDriverStatus();
       return;
     }
     if (isOnBreak.value) {
@@ -543,20 +552,53 @@ class DriverDashboardController extends GetxController with WidgetsBindingObserv
       );
       return;
     }
-    if (_tripController?.hasActiveTrip ?? false) {
-      THelperFunctions.showSnackBar('Cannot change status while on a trip.');
-      await checkDriverStatus();
-      return;
-    }
 
     isLoadingStatus.value = true;
-    bool targetIsOnline = !isOnline.value;
-    THelperFunctions.showSnackBar(
-      targetIsOnline ? 'Going Online...' : 'Going Offline...',
-    );
     update();
 
+    bool targetIsOnline = !isOnline.value;
+
     if (targetIsOnline) {
+      // Refresh profile to verify latest verification status and category
+      final profileFetched = await _fetchDriverProfile();
+      if (!profileFetched) {
+        THelperFunctions.showSnackBar('Failed to refresh driver profile.');
+        isLoadingStatus.value = false;
+        update();
+        return;
+      }
+
+      final profile = currentDriver.value?.driverProfile;
+      if (profile == null) {
+        THelperFunctions.showSnackBar('Driver profile data not loaded.');
+        isLoadingStatus.value = false;
+        update();
+        return;
+      }
+
+      if (driverOperationalStatus.value != 'active') {
+        _showOperationalStatusError();
+        isLoadingStatus.value = false;
+        update();
+        return;
+      }
+
+      if (!profile.adminVerified) {
+        THelperFunctions.showSnackBar('Your account is not yet verified by the administrator.');
+        isLoadingStatus.value = false;
+        update();
+        return;
+      }
+
+      if (profile.category == null || profile.category!.trim().isEmpty) {
+        THelperFunctions.showSnackBar('No vehicle category has been assigned to your profile. Please contact support.');
+        isLoadingStatus.value = false;
+        update();
+        return;
+      }
+
+      THelperFunctions.showSnackBar('Going Online...');
+
       // --- THE CRITICAL CHANGE: Pass isDriver: true ---
       // This triggers the Prominent Disclosure Dialog from LocationService
       bool locationReady = await _locationService.ensureLocationAvailable(
@@ -573,6 +615,8 @@ class DriverDashboardController extends GetxController with WidgetsBindingObserv
       }
 
       await _tripController?.updateCurrentStateFromLocation();
+    } else {
+      THelperFunctions.showSnackBar('Going Offline...');
     }
 
     try {

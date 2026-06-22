@@ -58,6 +58,15 @@
                     android:host="payment-callback"
                     android:scheme="sarriride" />
             </intent-filter>
+            
+            <!-- App Links (Deep Links) for Ride Sharing -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <!-- Web URL -->
+                <data android:scheme="https" android:host="sarri-r-ide.vercel.app" android:pathPrefix="/share" />
+            </intent-filter>
         </activity>
         
         <meta-data

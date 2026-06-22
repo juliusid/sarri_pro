@@ -89,6 +89,7 @@ class ApiConfig {
       '$baseUrl/auth/user/verifyUserEmail';
   static String get verifyOtpEndpoint => '$baseUrl/auth/user/verify-otp';
   static String get reconnectEndpoint => '$baseUrl/reconnect/reconnectToTrip';
+  static String get getActiveTripEndpoint => '$baseUrl/reconnect/activeTrip';
   static String get sendPhoneOtpEndpoint =>
       '$baseUrl/phonenumber/send-OTP-phonenumber';
   static String get verifyPhoneOtpEndpoint =>
@@ -111,6 +112,7 @@ class ApiConfig {
   static String get createEmergency => '$baseUrl/emergency/create-emergency';
   static String getEmergencyDetailsEndpoint(String emergencyId) =>
       '$baseUrl/emergency/$emergencyId';
+  static String get publicSettingsEndpoint => '$baseUrl/super-setting/public';
 
   // --- REFRESH TOKEN ENDPOINTS (FROM USER) ---
   static String get clientRefreshEndpoint =>

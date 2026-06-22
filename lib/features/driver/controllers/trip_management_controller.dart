@@ -5,7 +5,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:url_launcher/url_launcher.dart' as url_launcher;
+import 'package:sarri_ride/features/communication/widgets/call_selection_sheet.dart';
+import 'package:sarri_ride/features/communication/controllers/call_controller.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
 import 'package:sarri_ride/core/services/websocket_service.dart';
 import 'package:sarri_ride/core/services/map_marker_service.dart';
@@ -13,10 +15,12 @@ import 'package:sarri_ride/features/driver/services/driver_trip_service.dart';
 import 'package:sarri_ride/features/driver/screens/waiting_for_payment_screen.dart'; // ADDED
 import 'package:sarri_ride/features/communication/screens/message_screen.dart';
 import 'package:sarri_ride/features/emergency/screens/emergency_reporting_screen.dart';
+import 'package:sarri_ride/features/emergency/widgets/swipe_to_sos_sheet.dart';
 import 'package:sarri_ride/features/ride/models/ride_model.dart';
 import 'package:sarri_ride/features/location/services/location_service.dart';
 import 'package:sarri_ride/features/location/services/route_service.dart';
 import 'package:sarri_ride/features/location/services/places_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:sarri_ride/utils/constants/enums.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
@@ -765,10 +769,11 @@ class TripManagementController extends GetxController {
         _storage.remove('driver_waiting_cash_amount');
 
         _showWaitingForPaymentScreenOnce();
-        
-        if (!isWaitingForCash.value) {
-          _startPaymentPolling(activeTrip.value!.id);
-        }
+
+        // Start polling for card/transfer only (cash is confirmed by the driver).
+        // Don't start polling for cash — the driver confirms it manually,
+        // and `cash_payment:pending` socket will switch isWaitingForCash to true.
+        _startPaymentPolling(activeTrip.value!.id);
       } else {
         throw Exception(responseData['message']);
       }
@@ -780,7 +785,7 @@ class TripManagementController extends GetxController {
   }
 
   Future<bool> confirmCashPayment() async {
-    if (activeTrip.value == null) return false;
+    if (activeTrip.value == null || isCompletingTrip.value) return false;
     isCompletingTrip.value = true;
     try {
       final isPackageDelivery =
@@ -797,8 +802,25 @@ class TripManagementController extends GetxController {
           'Success',
           'Cash payment confirmed!',
         );
+        // The WaitingForPaymentScreen listens to tripStatus; setting it to
+        // completed triggers _buildSuccessView() automatically.
+        // We also manually advance state here so the UI is never stuck
+        // if the socket `payment:confirmed` is delayed.
+        _stopPaymentPolling();
+        tripStatus.value = TripStatus.completed;
+        activeTrip.value = activeTrip.value?.copyWith(
+          status: TripStatus.completed,
+          endTime: DateTime.now(),
+        );
+        _dashboardController?.updateEarningsFromCompletedTrip(activeTrip.value);
+        Future.delayed(const Duration(seconds: 3), _resetTripState);
+        update();
         return true;
       }
+      THelperFunctions.showErrorSnackBar(
+        'Error',
+        responseData['message'] ?? 'Confirmation failed. Please try again.',
+      );
       return false;
     } catch (e) {
       THelperFunctions.showErrorSnackBar("Error", "Cash confirm failed: $e");
@@ -868,8 +890,12 @@ class TripManagementController extends GetxController {
   }
 
   void requestEmergencyAssistance() {
-    final tripId = activeTrip.value?.id;
-    Get.to(() => EmergencyReportingScreen(tripId: tripId));
+    final currentTripId = activeTrip.value?.id;
+    Get.bottomSheet(
+      SwipeToSOSBottomSheet(tripId: currentTripId),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+    );
   }
 
   void messageRider() {
@@ -892,14 +918,42 @@ class TripManagementController extends GetxController {
     );
   }
 
-  void contactRider() {
+  void contactRider([BuildContext? context]) {
     String? riderPhone =
         activeTrip.value?.riderPhone ?? currentTripRequest.value?.riderPhone;
     String? riderName =
         activeTrip.value?.riderName ?? currentTripRequest.value?.riderName;
 
     if (riderPhone != null && riderPhone.isNotEmpty && riderName != null) {
-      THelperFunctions.showSnackBar('Calling $riderName...');
+      final ctx = context ?? Get.context ?? Get.overlayContext;
+      if (ctx != null) {
+        CallSelectionSheet.show(
+          context: ctx,
+          contactName: riderName,
+          onMobileCall: () async {
+            final Uri phoneUri = Uri(scheme: 'tel', path: riderPhone);
+            try {
+              if (await url_launcher.canLaunchUrl(phoneUri)) {
+                await url_launcher.launchUrl(phoneUri);
+              } else {
+                THelperFunctions.showSnackBar('Could not launch phone app');
+              }
+            } catch (e) {
+              THelperFunctions.showSnackBar('Error making phone call: $e');
+            }
+          },
+          onInAppCall: () {
+            String tripId = activeTrip.value?.id ?? currentTripRequest.value?.id ?? '';
+            if (tripId.isNotEmpty) {
+              CallController.instance.startCall(tripId, riderName, 'Rider');
+            } else {
+              THelperFunctions.showSnackBar('Could not start in-app call.');
+            }
+          },
+        );
+      } else {
+        THelperFunctions.showSnackBar('Could not open call options.');
+      }
     } else {
       THelperFunctions.showSnackBar('Rider contact information not found.');
     }
@@ -908,8 +962,14 @@ class TripManagementController extends GetxController {
   // --- LOCATION UPDATE LOGIC ---
 
   void _initializeLocationTracking() async {
-    _locationService.ensureLocationAvailable();
-    final initialPosition = _locationService.getLocationForMap();
+    final hasPermission = await _locationService.ensureLocationAvailable(isDriver: true);
+    Position initialPosition;
+    if (hasPermission) {
+      final currentPos = await _locationService.getCurrentLocation(isDriver: true);
+      initialPosition = currentPos ?? _locationService.getLocationForMap();
+    } else {
+      initialPosition = _locationService.getLocationForMap();
+    }
     driverLocation.value = LatLng(
       initialPosition.latitude,
       initialPosition.longitude,
@@ -1025,7 +1085,7 @@ class TripManagementController extends GetxController {
       if (tripStatus.value == TripStatus.arrivedAtPickup) {
         nextInterval = const Duration(seconds: 30);
       } else {
-        nextInterval = const Duration(seconds: 4);
+        nextInterval = const Duration(seconds: 6);
       }
     } else {
       shouldSendUpdate = false;
@@ -1311,11 +1371,18 @@ class TripManagementController extends GetxController {
           (data['amount'] as num?)?.toDouble() ?? activeTrip.value!.fare;
       isWaitingForCash.value = true;
 
+      // Stop polling — driver confirms cash manually, no need to poll.
+      _stopPaymentPolling();
+
       // Persist cash-pending state so we can restore after restart.
       _storage.write('driver_waiting_for_payment', true);
       _storage.write('driver_waiting_trip_id', activeTrip.value!.id);
       _storage.write('driver_waiting_for_cash', true);
       _storage.write('driver_waiting_cash_amount', cashAmountToReceive.value);
+
+      // Open the waiting screen if it hasn't been opened yet
+      // (e.g., driver is still on TripNavigationScreen when socket fires).
+      _showWaitingForPaymentScreenOnce();
 
       update();
     }
@@ -1325,12 +1392,14 @@ class TripManagementController extends GetxController {
     if (data is Map<String, dynamic> &&
         data['tripId'] == activeTrip.value?.id) {
       _stopPaymentPolling();
+      isWaitingForCash.value = false;
       tripStatus.value = TripStatus.completed;
       activeTrip.value = activeTrip.value?.copyWith(
         status: TripStatus.completed,
         endTime: DateTime.now(),
       );
       _dashboardController?.updateEarningsFromCompletedTrip(activeTrip.value);
+      // Auto-reset after showing the success view on WaitingForPaymentScreen.
       Future.delayed(const Duration(seconds: 3), _resetTripState);
       update();
     }

@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:sarri_ride/core/services/http_service.dart';
 import 'package:sarri_ride/core/services/websocket_service.dart';
 import 'package:sarri_ride/features/emergency/services/emergency_service.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
@@ -75,8 +76,35 @@ class EmergencyController extends GetxController {
           'Failed to report emergency.',
         );
       }
+    } on ApiException catch (e) {
+      if (e.statusCode == 409) {
+        THelperFunctions.showSnackBar('Loading active emergency session...');
+        await loadExistingActiveEmergency();
+      } else {
+        THelperFunctions.showErrorSnackBar('Error', e.message);
+      }
+    } catch (e) {
+      THelperFunctions.showErrorSnackBar('Error', 'Failed to report emergency: $e');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  /// Finds and loads an active emergency from user's history
+  Future<void> loadExistingActiveEmergency() async {
+    try {
+      final list = await _service.getMyEmergencies();
+      final active = list.firstWhere(
+        (e) => e['status'] == 'open' || e['status'] == 'in_progress',
+        orElse: () => null,
+      );
+      if (active != null && active['_id'] != null) {
+        await loadEmergencyDetails(active['_id']);
+      } else {
+        THelperFunctions.showErrorSnackBar('Error', 'Could not locate active emergency.');
+      }
+    } catch (e) {
+      print("Error loading existing active emergency: $e");
     }
   }
 

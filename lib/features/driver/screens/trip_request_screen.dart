@@ -230,8 +230,7 @@ class TripRequestScreen extends StatelessWidget {
           ),
         ),
         IconButton(
-          onPressed: () =>
-              THelperFunctions.showSnackBar('Calling ${request.riderName}...'),
+          onPressed: () => Get.find<TripManagementController>().contactRider(context),
           icon: Container(
             padding: const EdgeInsets.all(TSizes.sm),
             decoration: BoxDecoration(
