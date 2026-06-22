@@ -791,17 +791,27 @@ class TripManagementController extends GetxController {
           'Success',
           'Cash payment confirmed!',
         );
-        // The WaitingForPaymentScreen listens to tripStatus; setting it to
-        // completed triggers _buildSuccessView() automatically.
-        // We also manually advance state here so the UI is never stuck
-        // if the socket `payment:confirmed` is delayed.
         _stopPaymentPolling();
-        tripStatus.value = TripStatus.completed;
-        activeTrip.value = activeTrip.value?.copyWith(
+
+        // --- CRITICAL: Clear storage AND null activeTrip IMMEDIATELY ---
+        // If we wait for the 3s _resetTripState delay, the server's
+        // `payment:confirmed` socket event fires in that window, finds
+        // activeTrip still set, calls _handlePaymentConfirmed → second
+        // delayed reset → _waitingForPaymentScreenOpened flips to false
+        // → WaitingForPaymentScreen opens again. Nulling activeTrip here
+        // breaks that guard.
+        _storage.remove('driver_waiting_for_payment');
+        _storage.remove('driver_waiting_for_cash');
+        _storage.remove('driver_waiting_trip_id');
+
+        final completedTrip = activeTrip.value?.copyWith(
           status: TripStatus.completed,
           endTime: DateTime.now(),
         );
-        _dashboardController?.updateEarningsFromCompletedTrip(activeTrip.value);
+        tripStatus.value = TripStatus.completed;
+        activeTrip.value = null; // Prevents _handlePaymentConfirmed re-firing
+
+        _dashboardController?.updateEarningsFromCompletedTrip(completedTrip);
         Future.delayed(const Duration(seconds: 3), _resetTripState);
         update();
         return true;
@@ -812,7 +822,7 @@ class TripManagementController extends GetxController {
       );
       return false;
     } catch (e) {
-      THelperFunctions.showErrorSnackBar("Error", "Cash confirm failed: $e");
+      THelperFunctions.showErrorSnackBar('Error', 'Cash confirm failed: $e');
       return false;
     } finally {
       isCompletingTrip.value = false;
@@ -1429,20 +1439,26 @@ class TripManagementController extends GetxController {
   }
 
   void _handlePaymentConfirmed(dynamic data) {
-    if (data is Map<String, dynamic> &&
-        data['tripId'] == activeTrip.value?.id) {
-      _stopPaymentPolling();
-      isWaitingForCash.value = false;
-      tripStatus.value = TripStatus.completed;
-      activeTrip.value = activeTrip.value?.copyWith(
-        status: TripStatus.completed,
-        endTime: DateTime.now(),
-      );
-      _dashboardController?.updateEarningsFromCompletedTrip(activeTrip.value);
-      // Auto-reset after showing the success view on WaitingForPaymentScreen.
-      Future.delayed(const Duration(seconds: 3), _resetTripState);
-      update();
-    }
+    // Guard: if activeTrip is null the driver already confirmed manually
+    // (confirmCashPayment nulls activeTrip immediately). Do nothing.
+    if (activeTrip.value == null) return;
+    if (data is! Map<String, dynamic>) return;
+    if (data['tripId'] != activeTrip.value?.id) return;
+    // Guard: already processed (e.g. cash was confirmed locally)
+    if (tripStatus.value == TripStatus.completed) return;
+
+    _stopPaymentPolling();
+    isWaitingForCash.value = false;
+    tripStatus.value = TripStatus.completed;
+    final completedTrip = activeTrip.value?.copyWith(
+      status: TripStatus.completed,
+      endTime: DateTime.now(),
+    );
+    activeTrip.value = null; // Prevent duplicate processing
+    _dashboardController?.updateEarningsFromCompletedTrip(completedTrip);
+    // Auto-reset after showing the success view on WaitingForPaymentScreen.
+    Future.delayed(const Duration(seconds: 3), _resetTripState);
+    update();
   }
 
   /// Backend emits `package:delivered` when a package delivery is confirmed.
@@ -1547,7 +1563,6 @@ class TripManagementController extends GetxController {
   void _resetTripState() {
     _storage.remove('active_ride_id');
     _storage.remove('active_ride_mode');
-    // Clear persisted coordinates
     _storage.remove('trip_pickup_lat');
     _storage.remove('trip_pickup_lng');
     _storage.remove('trip_dest_lat');
@@ -1556,6 +1571,8 @@ class TripManagementController extends GetxController {
     currentTripRequest.value = null;
     tripStatus.value = TripStatus.none;
     hasNewRequest.value = false;
+    isWaitingForCash.value = false;
+    cashAmountToReceive.value = 0.0;
     isNavigating.value = false;
     _requestTimer?.cancel();
     _stopPaymentPolling();
@@ -1565,10 +1582,9 @@ class TripManagementController extends GetxController {
     mapMarkers.removeWhere(
       (m) => m.markerId.value == 'pickup' || m.markerId.value == 'destination',
     );
-    _dashboardController?.checkDriverStatus();
     _waitingForPaymentScreenOpened = false;
 
-    // Clear persisted "waiting for payment" flags.
+    // Clear ALL persisted "waiting for payment" flags.
     _storage.remove('driver_waiting_for_payment');
     _storage.remove('driver_waiting_is_package');
     _storage.remove('driver_waiting_trip_id');
@@ -1580,6 +1596,15 @@ class TripManagementController extends GetxController {
     _storage.remove('driver_waiting_category');
     _storage.remove('driver_waiting_rider_id');
     _storage.remove('driver_waiting_rider_name');
+
+    // Restore driver to 'available' so they are ready for the next trip.
+    // checkDriverStatus() reads from server which may return 'unavailable'
+    // after a trip ends — we override that by explicitly going available.
+    _webSocketService.updateDriverAvailability('available');
+    _dashboardController?.driverTaskStatus.value = 'available';
+    _dashboardController?.isOnline.value = true;
+    _dashboardController?.checkDriverStatus();
+
     update();
   }
 

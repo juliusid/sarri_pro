@@ -15,48 +15,32 @@ class TripRequestScreen extends StatefulWidget {
 }
 
 class _TripRequestScreenState extends State<TripRequestScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _pulseController;
-  late AnimationController _slideController;
-  late Animation<double> _pulseAnimation;
-  late Animation<Offset> _slideAnimation;
-  late Animation<double> _fadeAnimation;
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
+  late Animation<double> _scaleAnim;
 
   @override
   void initState() {
     super.initState();
+    HapticFeedback.mediumImpact();
 
-    // Vibrate to alert the driver
-    HapticFeedback.vibrate();
-
-    _pulseController = AnimationController(
+    _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
-
-    _slideController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 400),
     )..forward();
 
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.08).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    _scaleAnim = CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOutBack,
     );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _slideController, curve: Curves.easeOut),
-    );
-
-    // Auto-dismiss when request is cleared
+    // Auto-dismiss when request is cleared by controller
     ever(
       Get.find<TripManagementController>().currentTripRequest,
       (request) {
-        if (request == null && mounted && Get.currentRoute == '/TripRequestScreen') {
+        if (request == null &&
+            mounted &&
+            Get.currentRoute == '/TripRequestScreen') {
           Get.back();
         }
       },
@@ -65,418 +49,392 @@ class _TripRequestScreenState extends State<TripRequestScreen>
 
   @override
   void dispose() {
-    _pulseController.dispose();
-    _slideController.dispose();
+    _animController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<TripManagementController>();
-    final size = MediaQuery.of(context).size;
+    final dark = THelperFunctions.isDarkMode(context);
+    final bg = dark ? const Color(0xFF1C1C1E) : Colors.white;
+    final surface = dark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F5);
+    final textPrimary = dark ? Colors.white : const Color(0xFF1A1A1A);
+    final textSecondary =
+        dark ? const Color(0xFF8E8E93) : const Color(0xFF6B6B6B);
 
     return PopScope(
-      canPop: false, // Prevent back-swipe — driver must explicitly decline
+      canPop: false,
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: bg,
         body: Obx(() {
           final request = controller.currentTripRequest.value;
-          if (request == null) {
-            return const SizedBox.shrink();
-          }
+          if (request == null) return const SizedBox.shrink();
 
           final totalSeconds = request.expiresAt
               .difference(request.requestTime)
               .inSeconds
               .clamp(1, 120);
           final timeLeft = controller.requestTimeLeft.value;
-          final progress = timeLeft / totalSeconds;
+          final progress = (timeLeft / totalSeconds).clamp(0.0, 1.0);
           final isUrgent = timeLeft <= 5;
 
-          return Stack(
-            children: [
-              // --- Background: blurred dark gradient ---
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF0D0D1A),
-                      Color(0xFF1A0A2E),
-                      Color(0xFF0D0D1A),
-                    ],
+          return ScaleTransition(
+            scale: _scaleAnim,
+            child: SafeArea(
+              child: Column(
+                children: [
+                  // ── Top bar: countdown ring + "New Trip Request"
+                  _TopBar(
+                    progress: progress,
+                    timeLeft: timeLeft,
+                    isUrgent: isUrgent,
+                    bg: bg,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
                   ),
-                ),
-              ),
 
-              // Decorative glow behind the ring
-              Positioned(
-                top: size.height * 0.08,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: AnimatedBuilder(
-                    animation: _pulseAnimation,
-                    builder: (_, __) => Transform.scale(
-                      scale: _pulseAnimation.value,
-                      child: Container(
-                        width: 220,
-                        height: 220,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: isUrgent
-                                  ? Colors.redAccent.withOpacity(0.35)
-                                  : TColors.primary.withOpacity(0.30),
-                              blurRadius: 80,
-                              spreadRadius: 30,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // --- Scrollable content ---
-              FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: SafeArea(
+                  Expanded(
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 8),
 
-                            // ── NEW TRIP banner
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: TColors.primary.withOpacity(0.18),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                    color: TColors.primary.withOpacity(0.4),
-                                    width: 1),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: isUrgent
-                                          ? Colors.redAccent
-                                          : TColors.primary,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    isUrgent
-                                        ? 'EXPIRING SOON'
-                                        : 'NEW TRIP REQUEST',
-                                    style: TextStyle(
-                                      color: isUrgent
-                                          ? Colors.redAccent
-                                          : TColors.primary,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 1.4,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            // ── Rider row
+                            _RiderRow(
+                              request: request,
+                              surface: surface,
+                              textPrimary: textPrimary,
+                              textSecondary: textSecondary,
                             ),
 
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 20),
 
-                            // ── Countdown ring + rider avatar
-                            SizedBox(
-                              width: 180,
-                              height: 180,
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // Ring
-                                  CustomPaint(
-                                    size: const Size(180, 180),
-                                    painter: _CountdownRingPainter(
-                                      progress: progress,
-                                      isUrgent: isUrgent,
-                                      primaryColor: TColors.primary,
-                                    ),
-                                  ),
-                                  // Avatar + seconds
-                                  Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: 64,
-                                        height: 64,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          gradient: LinearGradient(
-                                            colors: [
-                                              TColors.primary,
-                                              TColors.primary.withOpacity(0.6),
-                                            ],
-                                          ),
-                                        ),
-                                        child: const Icon(
-                                          Iconsax.user,
-                                          color: Colors.white,
-                                          size: 30,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Obx(() => Text(
-                                            '${controller.requestTimeLeft.value}s',
-                                            style: TextStyle(
-                                              color: controller.requestTimeLeft
-                                                          .value <=
-                                                      5
-                                                  ? Colors.redAccent
-                                                  : Colors.white,
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.w800,
-                                            ),
-                                          )),
-                                    ],
-                                  ),
-                                ],
-                              ),
+                            // ── Fare + distance + duration
+                            _TripStats(
+                              request: request,
+                              surface: surface,
+                              textPrimary: textPrimary,
+                              textSecondary: textSecondary,
                             ),
 
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 20),
 
-                            // ── Rider name & rating
-                            Text(
-                              request.riderName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.star_rounded,
-                                    color: Color(0xFFFFD700), size: 18),
-                                const SizedBox(width: 4),
-                                Text(
-                                  request.riderRating.toStringAsFixed(1),
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: TColors.primary.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                        color:
-                                            TColors.primary.withOpacity(0.4)),
-                                  ),
-                                  child: Text(
-                                    request.rideType.toUpperCase(),
-                                    style: TextStyle(
-                                      color: TColors.primary,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.8,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 24),
-
-                            // ── Fare hero card
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 20, horizontal: 24),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    TColors.primary,
-                                    TColors.primary.withOpacity(0.75),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: TColors.primary.withOpacity(0.35),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 8),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Iconsax.wallet_3,
-                                      color: Colors.white, size: 28),
-                                  const SizedBox(width: 14),
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Estimated Fare',
-                                        style: TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 12),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '₦${_formatFare(request.estimatedFare)}',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 28,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const Spacer(),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        '${request.estimatedDistance.toStringAsFixed(1)} km',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      if (request.estimatedDuration > 0)
-                                        Text(
-                                          '${request.estimatedDuration} min',
-                                          style: const TextStyle(
-                                              color: Colors.white70,
-                                              fontSize: 12),
-                                        ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            // ── Route card (glassmorphism)
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(18),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.06),
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(
-                                    color: Colors.white.withOpacity(0.10)),
-                              ),
-                              child: Column(
-                                children: [
-                                  _RouteRow(
-                                    dot: const Color(0xFF4ADE80),
-                                    label: 'PICKUP',
-                                    address: request.pickupAddress,
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.only(
-                                        left: 10, top: 4, bottom: 4),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 2,
-                                          height: 24,
-                                          margin: const EdgeInsets.only(
-                                              right: 18),
-                                          decoration: BoxDecoration(
-                                            color:
-                                                Colors.white.withOpacity(0.2),
-                                            borderRadius:
-                                                BorderRadius.circular(1),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  _RouteRow(
-                                    dot: Colors.redAccent,
-                                    label: 'DROP OFF',
-                                    address: request.destinationAddress,
-                                  ),
-                                ],
-                              ),
+                            // ── Route
+                            _RouteCard(
+                              request: request,
+                              surface: surface,
+                              textPrimary: textPrimary,
+                              textSecondary: textSecondary,
+                              dark: dark,
                             ),
 
                             const SizedBox(height: 28),
-
-                            // ── Action buttons
-                            Row(
-                              children: [
-                                // Decline
-                                _ActionButton(
-                                  onTap: () {
-                                    HapticFeedback.lightImpact();
-                                    controller.declineTripRequest();
-                                  },
-                                  icon: Icons.close_rounded,
-                                  label: 'Decline',
-                                  color: Colors.redAccent,
-                                  filled: false,
-                                ),
-                                const SizedBox(width: 12),
-                                // Accept — larger, filled
-                                Expanded(
-                                  flex: 2,
-                                  child: _AcceptButton(
-                                    controller: controller,
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 32),
                           ],
                         ),
                       ),
                     ),
                   ),
-                ),
+
+                  // ── Sticky action bar at bottom
+                  _ActionBar(controller: controller, bg: bg),
+                ],
               ),
-            ],
+            ),
           );
         }),
       ),
     );
   }
+}
 
-  String _formatFare(double fare) {
+// ──────────────────────────────────────────────
+// Top bar with ring countdown
+// ──────────────────────────────────────────────
+class _TopBar extends StatelessWidget {
+  final double progress;
+  final int timeLeft;
+  final bool isUrgent;
+  final Color bg;
+  final Color textPrimary;
+  final Color textSecondary;
+
+  const _TopBar({
+    required this.progress,
+    required this.timeLeft,
+    required this.isUrgent,
+    required this.bg,
+    required this.textPrimary,
+    required this.textSecondary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ringColor =
+        isUrgent ? const Color(0xFFFF3B30) : TColors.primary;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      decoration: BoxDecoration(
+        color: bg,
+        border: Border(
+          bottom: BorderSide(color: Colors.grey.withOpacity(0.15), width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Countdown ring
+          SizedBox(
+            width: 52,
+            height: 52,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CustomPaint(
+                  size: const Size(52, 52),
+                  painter: _RingPainter(
+                    progress: progress,
+                    color: ringColor,
+                  ),
+                ),
+                Obx(() {
+                  final t = Get.find<TripManagementController>()
+                      .requestTimeLeft
+                      .value;
+                  final urgent = t <= 5;
+                  return Text(
+                    '${t}s',
+                    style: TextStyle(
+                      color: urgent
+                          ? const Color(0xFFFF3B30)
+                          : TColors.primary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 14),
+
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'New Trip Request',
+                style: TextStyle(
+                  color: textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                isUrgent
+                    ? 'Expiring soon — respond now'
+                    : 'Tap Accept to confirm',
+                style: TextStyle(
+                  color: isUrgent
+                      ? const Color(0xFFFF3B30)
+                      : textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────
+// Rider name, rating, ride type
+// ──────────────────────────────────────────────
+class _RiderRow extends StatelessWidget {
+  final TripRequest request;
+  final Color surface;
+  final Color textPrimary;
+  final Color textSecondary;
+
+  const _RiderRow({
+    required this.request,
+    required this.surface,
+    required this.textPrimary,
+    required this.textSecondary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // Avatar
+        Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            color: TColors.primary.withOpacity(0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Iconsax.user, color: TColors.primary, size: 26),
+        ),
+        const SizedBox(width: 14),
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                request.riderName,
+                style: TextStyle(
+                  color: textPrimary,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Icon(Icons.star_rounded,
+                      color: Color(0xFFFFB800), size: 16),
+                  const SizedBox(width: 3),
+                  Text(
+                    request.riderRating.toStringAsFixed(1),
+                    style: TextStyle(
+                      color: textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: TColors.primary.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      request.rideType.toUpperCase(),
+                      style: TextStyle(
+                        color: TColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // Seats badge
+        if (request.seats > 1)
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Iconsax.people, color: textSecondary, size: 15),
+                const SizedBox(width: 4),
+                Text(
+                  '${request.seats}',
+                  style: TextStyle(
+                    color: textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ──────────────────────────────────────────────
+// Fare + distance + duration stat row
+// ──────────────────────────────────────────────
+class _TripStats extends StatelessWidget {
+  final TripRequest request;
+  final Color surface;
+  final Color textPrimary;
+  final Color textSecondary;
+
+  const _TripStats({
+    required this.request,
+    required this.surface,
+    required this.textPrimary,
+    required this.textSecondary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          // Fare
+          Expanded(
+            child: _Stat(
+              value: '₦${_fmt(request.estimatedFare)}',
+              label: 'Fare',
+              textPrimary: textPrimary,
+              textSecondary: textSecondary,
+              large: true,
+            ),
+          ),
+          _Divider(),
+          // Distance
+          Expanded(
+            child: _Stat(
+              value:
+                  '${request.estimatedDistance.toStringAsFixed(1)} km',
+              label: 'Distance',
+              textPrimary: textPrimary,
+              textSecondary: textSecondary,
+            ),
+          ),
+          if (request.estimatedDuration > 0) ...[
+            _Divider(),
+            Expanded(
+              child: _Stat(
+                value: '${request.estimatedDuration} min',
+                label: 'Duration',
+                textPrimary: textPrimary,
+                textSecondary: textSecondary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _fmt(double fare) {
     if (fare >= 1000) {
-      return fare.toStringAsFixed(0).replaceAllMapped(
+      return fare
+          .toStringAsFixed(0)
+          .replaceAllMapped(
             RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
             (m) => '${m[1]},',
           );
@@ -485,13 +443,131 @@ class _TripRequestScreenState extends State<TripRequestScreen>
   }
 }
 
-// ── Route row widget
-class _RouteRow extends StatelessWidget {
-  final Color dot;
+class _Stat extends StatelessWidget {
+  final String value;
+  final String label;
+  final Color textPrimary;
+  final Color textSecondary;
+  final bool large;
+  const _Stat({
+    required this.value,
+    required this.label,
+    required this.textPrimary,
+    required this.textSecondary,
+    this.large = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            color: textPrimary,
+            fontSize: large ? 20 : 16,
+            fontWeight: FontWeight.w800,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 3),
+        Text(label,
+            style: TextStyle(color: textSecondary, fontSize: 12)),
+      ],
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 36,
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      color: Colors.grey.withOpacity(0.25),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────
+// Route card
+// ──────────────────────────────────────────────
+class _RouteCard extends StatelessWidget {
+  final TripRequest request;
+  final Color surface;
+  final Color textPrimary;
+  final Color textSecondary;
+  final bool dark;
+
+  const _RouteCard({
+    required this.request,
+    required this.surface,
+    required this.textPrimary,
+    required this.textSecondary,
+    required this.dark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          _RouteStop(
+            dotColor: const Color(0xFF34C759),
+            label: 'Pickup',
+            address: request.pickupAddress,
+            textPrimary: textPrimary,
+            textSecondary: textSecondary,
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 5, top: 5, bottom: 5),
+            child: Row(
+              children: [
+                Container(
+                  width: 1.5,
+                  height: 22,
+                  margin:
+                      const EdgeInsets.only(right: 22, left: 4.5),
+                  color: Colors.grey.withOpacity(0.35),
+                ),
+              ],
+            ),
+          ),
+          _RouteStop(
+            dotColor: const Color(0xFFFF3B30),
+            label: 'Drop-off',
+            address: request.destinationAddress,
+            textPrimary: textPrimary,
+            textSecondary: textSecondary,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RouteStop extends StatelessWidget {
+  final Color dotColor;
   final String label;
   final String address;
-  const _RouteRow(
-      {required this.dot, required this.label, required this.address});
+  final Color textPrimary;
+  final Color textSecondary;
+
+  const _RouteStop({
+    required this.dotColor,
+    required this.label,
+    required this.address,
+    required this.textPrimary,
+    required this.textSecondary,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -499,12 +575,12 @@ class _RouteRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(top: 3),
+          padding: const EdgeInsets.only(top: 4, right: 16),
           child: Container(
-            width: 12,
-            height: 12,
-            margin: const EdgeInsets.only(right: 14),
-            decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+            width: 10,
+            height: 10,
+            decoration:
+                BoxDecoration(color: dotColor, shape: BoxShape.circle),
           ),
         ),
         Expanded(
@@ -513,15 +589,15 @@ class _RouteRow extends StatelessWidget {
             children: [
               Text(label,
                   style: TextStyle(
-                      color: dot.withOpacity(0.85),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1)),
+                      color: textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3)),
               const SizedBox(height: 2),
               Text(
                 address,
-                style: const TextStyle(
-                    color: Colors.white,
+                style: TextStyle(
+                    color: textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w500),
                 maxLines: 2,
@@ -535,167 +611,147 @@ class _RouteRow extends StatelessWidget {
   }
 }
 
-// ── Decline/small action button
-class _ActionButton extends StatelessWidget {
-  final VoidCallback onTap;
-  final IconData icon;
-  final String label;
-  final Color color;
-  final bool filled;
+// ──────────────────────────────────────────────
+// Sticky bottom action bar
+// ──────────────────────────────────────────────
+class _ActionBar extends StatelessWidget {
+  final TripManagementController controller;
+  final Color bg;
 
-  const _ActionButton({
-    required this.onTap,
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.filled,
-  });
+  const _ActionBar({required this.controller, required this.bg});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        decoration: BoxDecoration(
-          color: filled ? color : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.7), width: 1.5),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      decoration: BoxDecoration(
+        color: bg,
+        border: Border(
+          top: BorderSide(color: Colors.grey.withOpacity(0.15), width: 1),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 26),
-            const SizedBox(height: 4),
-            Text(label,
-                style: TextStyle(
-                    color: color,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700)),
-          ],
-        ),
+      ),
+      child: Row(
+        children: [
+          // Decline
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              controller.declineTripRequest();
+            },
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF3B30).withOpacity(0.10),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.close_rounded,
+                  color: Color(0xFFFF3B30), size: 26),
+            ),
+          ),
+
+          const SizedBox(width: 14),
+
+          // Accept
+          Expanded(
+            child: Obx(() {
+              final loading = controller.isAccepting.value;
+              return GestureDetector(
+                onTap: loading
+                    ? null
+                    : () {
+                        HapticFeedback.mediumImpact();
+                        controller.acceptTripRequest();
+                      },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: loading
+                        ? const Color(0xFF34C759).withOpacity(0.7)
+                        : const Color(0xFF34C759),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: loading
+                        ? []
+                        : [
+                            BoxShadow(
+                              color: const Color(0xFF34C759)
+                                  .withOpacity(0.35),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                  ),
+                  child: Center(
+                    child: loading
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            'Accept',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ── Accept button with loading state
-class _AcceptButton extends StatelessWidget {
-  final TripManagementController controller;
-  const _AcceptButton({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return Obx(() {
-      final isLoading = controller.isAccepting.value;
-      return GestureDetector(
-        onTap: isLoading ? null : () {
-          HapticFeedback.mediumImpact();
-          controller.acceptTripRequest();
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                const Color(0xFF4ADE80),
-                const Color(0xFF22C55E),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF4ADE80).withOpacity(0.4),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: isLoading
-              ? const Center(
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  ),
-                )
-              : const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.check_rounded, color: Colors.white, size: 28),
-                    SizedBox(height: 4),
-                    Text(
-                      'Accept',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
-                ),
-        ),
-      );
-    });
-  }
-}
-
-// ── Countdown ring painter
-class _CountdownRingPainter extends CustomPainter {
+// ──────────────────────────────────────────────
+// Thin countdown ring painter
+// ──────────────────────────────────────────────
+class _RingPainter extends CustomPainter {
   final double progress;
-  final bool isUrgent;
-  final Color primaryColor;
+  final Color color;
 
-  _CountdownRingPainter({
-    required this.progress,
-    required this.isUrgent,
-    required this.primaryColor,
-  });
+  _RingPainter({required this.progress, required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - 16) / 2;
-    const strokeWidth = 6.0;
+    final radius = (size.shortestSide - 5) / 2;
 
     // Track
-    final trackPaint = Paint()
-      ..color = Colors.white.withOpacity(0.08)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-    canvas.drawCircle(center, radius, trackPaint);
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = color.withOpacity(0.15)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4,
+    );
 
-    // Progress arc
-    final progressPaint = Paint()
-      ..shader = SweepGradient(
-        startAngle: -math.pi / 2,
-        endAngle: -math.pi / 2 + 2 * math.pi,
-        colors: isUrgent
-            ? [Colors.redAccent, Colors.orangeAccent]
-            : [primaryColor, primaryColor.withOpacity(0.5)],
-        tileMode: TileMode.clamp,
-      ).createShader(Rect.fromCircle(center: center, radius: radius))
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
+    // Arc
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       -math.pi / 2,
-      2 * math.pi * progress.clamp(0.0, 1.0),
+      2 * math.pi * progress,
       false,
-      progressPaint,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round,
     );
   }
 
   @override
-  bool shouldRepaint(_CountdownRingPainter old) =>
-      old.progress != progress || old.isUrgent != isUrgent;
+  bool shouldRepaint(_RingPainter old) =>
+      old.progress != progress || old.color != color;
 }
