@@ -269,6 +269,8 @@ class RideDriverDetails {
   final String firstName;
   final String lastName;
   final String? phoneNumber;
+  final double rating;
+  final String? profileImage;
   final RideVehicleDetails vehicleDetails;
 
   RideDriverDetails({
@@ -276,15 +278,31 @@ class RideDriverDetails {
     required this.firstName,
     required this.lastName,
     required this.phoneNumber,
+    required this.rating,
+    this.profileImage,
     required this.vehicleDetails,
   });
 
   factory RideDriverDetails.fromJson(Map<String, dynamic> json) {
+    String parsedFirstName = json['FirstName'] ?? json['firstName'] ?? json['name'] ?? 'Driver';
+    String parsedLastName = json['LastName'] ?? json['lastName'] ?? '';
+    
+    // Sometimes the backend sends full name in `name`
+    if (json['name'] != null && json['FirstName'] == null && json['firstName'] == null) {
+       final parts = json['name'].toString().split(' ');
+       parsedFirstName = parts.first;
+       if (parts.length > 1) {
+         parsedLastName = parts.sublist(1).join(' ');
+       }
+    }
+
     return RideDriverDetails(
-      id: json['_id'] ?? '',
-      firstName: json['FirstName'] ?? 'Driver',
-      lastName: json['LastName'] ?? '',
-      phoneNumber: json['PhoneNumber'],
+      id: json['_id'] ?? json['id'] ?? '',
+      firstName: parsedFirstName,
+      lastName: parsedLastName,
+      phoneNumber: json['PhoneNumber'] ?? json['phone'] ?? json['phoneNumber'],
+      rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
+      profileImage: json['picture'] ?? json['profileImage'],
       vehicleDetails: RideVehicleDetails.fromJson(json['vehicleDetails'] ?? {}),
     );
   }
@@ -350,10 +368,12 @@ class DriverReconnectData {
   final int seats;
   final String riderId;
   final String riderName;
-  // Optional fields returned by the reconnect API (used to restore payment UI correctly).
+  final String riderPhone;
+  final double riderRating;
+  final String? riderPicture;
   final String? paymentStatus; // e.g. "pending" | "completed"
   final String? paymentMethod; // e.g. "cash" | "card" | "transfer"
-  final double? cashAmount; // When payment is pending via cash (if provided)
+  final double? cashAmount; // Store expected cash amount
 
   DriverReconnectData({
     required this.tripId,
@@ -367,6 +387,9 @@ class DriverReconnectData {
     required this.seats,
     required this.riderId,
     required this.riderName,
+    required this.riderPhone,
+    required this.riderRating,
+    this.riderPicture,
     this.paymentStatus,
     this.paymentMethod,
     this.cashAmount,
@@ -391,8 +414,11 @@ class DriverReconnectData {
       distance: (json['distance'] as num?)?.toDouble() ?? 0.0,
       price: parsedPrice,
       seats: (json['seats'] as num?)?.toInt() ?? 4,
-      riderId: json['rider']?['_id'] ?? '',
-      riderName: json['rider']?['name'] ?? 'Rider',
+      riderId: json['rider']?['_id'] ?? json['rider']?['id'] ?? '',
+      riderName: json['rider']?['name'] ?? json['rider']?['firstName'] ?? json['rider']?['FirstName'] ?? 'Rider',
+      riderPhone: json['rider']?['phoneNumber'] ?? json['rider']?['phone'] ?? '',
+      riderRating: (json['rider']?['rating'] as num?)?.toDouble() ?? 0.0,
+      riderPicture: json['rider']?['picture'] ?? json['rider']?['profileImage'],
       paymentStatus: json['paymentStatus'] as String?,
       paymentMethod: json['paymentMethod'] as String?,
       cashAmount: (json['cashAmount'] as num?)?.toDouble() ??

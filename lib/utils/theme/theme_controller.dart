@@ -24,6 +24,7 @@ class ThemeController extends GetxController {
 
   void setThemeMode(ThemeMode mode) {
     _themeMode.value = mode;
+    Get.changeThemeMode(mode);
     GetStorage().write(_storageKey, mode.index);
   }
 } 

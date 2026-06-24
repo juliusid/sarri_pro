@@ -1811,13 +1811,14 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
       final d = rideData.driver!;
       assignedDriver.value = Driver(
         id: d.id,
-        name: d.firstName,
-        rating: 4.9,
+        name: d.lastName.isNotEmpty ? '${d.firstName} ${d.lastName}'.trim() : d.firstName,
+        rating: d.rating,
         carModel: '${d.vehicleDetails.make} ${d.vehicleDetails.model}',
         plateNumber: d.vehicleDetails.licensePlate,
         phoneNumber: d.phoneNumber ?? '',
         eta: '...',
         location: pickupLocation.value ?? const LatLng(0, 0),
+        profileImage: d.profileImage,
       );
       addDriverMarker();
     }

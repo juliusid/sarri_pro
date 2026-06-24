@@ -34,7 +34,7 @@ class PublicLiveTrackingScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: TSizes.spaceBtwItems),
                 ElevatedButton(
-                  onPressed: () => Get.offAllNamed('/'),
+                  onPressed: () => Get.back(),
                   child: const Text('Go Home'),
                 ),
               ],
@@ -76,7 +76,7 @@ class PublicLiveTrackingScreen extends StatelessWidget {
                 ),
                 child: IconButton(
                   icon: const Icon(Icons.close),
-                  onPressed: () => Get.offAllNamed('/'),
+                  onPressed: () => Get.back(),
                 ),
               ),
             ),
@@ -129,7 +129,7 @@ class PublicLiveTrackingScreen extends StatelessWidget {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              controller.tripData.value!['destinationName'] ?? 'Unknown Destination',
+                              'Heading to: ${controller.tripData.value!['destinationName'] ?? 'Unknown Destination'}',
                               style: Theme.of(context).textTheme.bodyMedium,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,

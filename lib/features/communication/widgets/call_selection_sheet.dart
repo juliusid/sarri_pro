@@ -86,7 +86,7 @@ class CallSelectionSheet {
                 color: TColors.primary,
                 onTap: () {
                   Navigator.pop(context);
-                  onInAppCall();
+                  THelperFunctions.showSnackBar('In-App Calling is coming soon! Please use Mobile Call.');
                 },
                 dark: dark,
               ),

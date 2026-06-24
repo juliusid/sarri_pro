@@ -832,7 +832,7 @@ class WebSocketService extends GetxService {
             id: data['rideId'],
             riderId: riderId,
             riderName: riderName,
-            riderPhone: data['riderPhone'] ?? '',
+            riderPhone: data['clientPhone'] ?? data['riderPhone'] ?? '',
             riderRating: riderRating,
             pickupLocation: pickupLoc,
             destinationLocation: destLoc,
@@ -920,7 +920,7 @@ class WebSocketService extends GetxService {
           final String driverName =
               driverData['name'] ?? data['driverName'] ?? 'Driver';
           final String driverPhone =
-              driverData['phoneNumber'] ?? data['driverPhone'] ?? '';
+              driverData['phoneNumber'] ?? driverData['phone'] ?? data['driverPhone'] ?? '';
           final String carModel = vehicleData['make'] ?? 'Vehicle';
           final String plateNumber = vehicleData['licensePlate'] ?? 'N/A';
           final String eta = data['eta'] ?? '...';

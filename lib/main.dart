@@ -22,13 +22,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print("Background Notification received: ${message.data['type']}");
 
   if (message.data['type'] == 'call:incoming' || message.data['action'] == 'call:incoming') {
-    CallKitService.instance.showIncomingCall(
-      callId: message.data['callId'] ?? '',
-      callerName: message.data['callerName'] ?? 'Incoming Call',
-      avatar: '',
-    );
+    // CallKitService.instance.showIncomingCall(
+    //   callId: message.data['callId'] ?? '',
+    //   callerName: message.data['callerName'] ?? 'Incoming Call',
+    //   avatar: '',
+    // );
   } else if (message.data['type'] == 'call:ended' || message.data['type'] == 'call:rejected') {
-    CallKitService.instance.endCurrentCall();
+    // CallKitService.instance.endCurrentCall();
   }
 }
 
@@ -48,7 +48,7 @@ void main() async {
   await Get.putAsync(() => HttpService().init());
   
   // Initialize CallKit
-  await CallKitService.instance.init();
+  // await CallKitService.instance.init();
 
   // --- REGISTER NOTIFICATION SERVICE ---
   // We put it here so it's available everywhere

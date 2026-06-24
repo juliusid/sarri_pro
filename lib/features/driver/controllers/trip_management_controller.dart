@@ -301,10 +301,9 @@ class TripManagementController extends GetxController {
     activeTrip.value ??= ActiveTrip(
       id: tripId,
       riderId: _storage.read('driver_waiting_rider_id')?.toString() ?? '',
-      riderName: _storage.read('driver_waiting_rider_name')?.toString() ??
-          'Rider',
-      riderPhone: '',
-      riderRating: 0.0,
+      riderName: _storage.read('driver_waiting_rider_name')?.toString() ?? 'Rider',
+      riderPhone: _storage.read('driver_waiting_rider_phone')?.toString() ?? '',
+      riderRating: (_storage.read('driver_waiting_rider_rating') as num?)?.toDouble() ?? 0.0,
       pickupLocation: fallbackLoc,
       destinationLocation: fallbackLoc,
       pickupAddress: '',
@@ -750,6 +749,8 @@ class TripManagementController extends GetxController {
         _storage.write('driver_waiting_category', activeTrip.value!.rideType);
         _storage.write('driver_waiting_rider_id', activeTrip.value!.riderId);
         _storage.write('driver_waiting_rider_name', activeTrip.value!.riderName);
+        _storage.write('driver_waiting_rider_phone', activeTrip.value!.riderPhone);
+        _storage.write('driver_waiting_rider_rating', activeTrip.value!.riderRating);
 
         // Default until we receive a `cash_payment:pending` socket event.
         isWaitingForCash.value = false;
@@ -1676,8 +1677,8 @@ class TripManagementController extends GetxController {
       id: data.tripId,
       riderId: data.riderId,
       riderName: data.riderName,
-      riderPhone: '',
-      riderRating: 0.0,
+      riderPhone: data.riderPhone,
+      riderRating: data.riderRating,
       pickupLocation: pickupLoc ?? driverLocation.value!,
       destinationLocation: destLoc ?? driverLocation.value!,
       pickupAddress: data.pickup,

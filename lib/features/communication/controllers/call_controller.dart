@@ -115,11 +115,11 @@ class CallController extends GetxController {
     callState.value = CallState.ringing;
 
     // 1. Show Incoming Screen via CallKit
-    CallKitService.instance.showIncomingCall(
-      callId: data['callId'],
-      callerName: otherPartyName.value,
-      avatar: '',
-    );
+    // CallKitService.instance.showIncomingCall(
+    //   callId: data['callId'],
+    //   callerName: otherPartyName.value,
+    //   avatar: '',
+    // );
     // Also push the screen internally if the app is already in the foreground
     Get.to(() => const IncomingCallScreen());
 
@@ -173,7 +173,7 @@ class CallController extends GetxController {
   }
 
   Future<void> hangUp() async {
-    CallKitService.instance.endCurrentCall();
+    // CallKitService.instance.endCurrentCall();
     if (currentCallId.value.isNotEmpty) {
       await _callService.endCall(currentCallId.value);
     }

@@ -299,6 +299,17 @@ class _RiderRow extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              if (request.riderPhone.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  request.riderPhone,
+                  style: TextStyle(
+                    color: textSecondary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
               const SizedBox(height: 4),
               Row(
                 children: [

@@ -61,7 +61,9 @@ class _MyAppState extends State<App> {
         final shareToken = uri.pathSegments[1];
         // Wait a small delay to ensure GetMaterialApp is ready
         Future.delayed(const Duration(milliseconds: 500), () {
-          Get.toNamed('/share/$shareToken');
+          if (Get.currentRoute != '/share/$shareToken') {
+            Get.toNamed('/share/$shareToken');
+          }
         });
       }
     }
@@ -77,33 +79,31 @@ class _MyAppState extends State<App> {
   Widget build(BuildContext context) {
     // ... No changes to build method ...
     final themeController = Get.find<ThemeController>();
-    return Obx(
-      () => GetMaterialApp(
-        themeMode: themeController.themeMode.value,
-        theme: TAppTheme.lightTheme,
-        darkTheme: TAppTheme.darkTheme,
-        home: const SplashScreen(),
-        builder: (context, child) {
-          return UpgradeAlert(
-            upgrader: Upgrader(),
-            // This ensures the update prompt isn't forcefully blocking the user
-            showIgnore: true,
-            showLater: true,
-            child: child ?? const SizedBox.shrink(),
-          );
-        },
-        getPages: [
-          GetPage(name: '/', page: () => const SplashScreen()),
-          GetPage(name: '/signup', page: () => const UserTypeSelectionScreen()),
-          GetPage(
-            name: '/share/:token',
-            page: () => PublicLiveTrackingScreen(
-              shareToken: Get.parameters['token'] ?? '',
-            ),
+    return GetMaterialApp(
+      themeMode: themeController.themeMode.value,
+      theme: TAppTheme.lightTheme,
+      darkTheme: TAppTheme.darkTheme,
+      home: const SplashScreen(),
+      builder: (context, child) {
+        return UpgradeAlert(
+          upgrader: Upgrader(),
+          // This ensures the update prompt isn't forcefully blocking the user
+          showIgnore: true,
+          showLater: true,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+      getPages: [
+        GetPage(name: '/', page: () => const SplashScreen()),
+        GetPage(name: '/signup', page: () => const UserTypeSelectionScreen()),
+        GetPage(
+          name: '/share/:token',
+          page: () => PublicLiveTrackingScreen(
+            shareToken: Get.parameters['token'] ?? '',
           ),
-        ],
-        debugShowCheckedModeBanner: false,
-      ),
+        ),
+      ],
+      debugShowCheckedModeBanner: false,
     );
   }
 }

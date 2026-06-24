@@ -398,14 +398,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_callkit_incoming:
-    dependency: "direct main"
-    description:
-      name: flutter_callkit_incoming
-      sha256: "5e49358e4e49b7bfa60c97470873fe68d824e7885dc7c380572e46e524cae373"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.1.2"
   flutter_dotenv:
     dependency: "direct main"
     description:

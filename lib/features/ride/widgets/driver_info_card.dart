@@ -138,6 +138,18 @@ class DriverInfoCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (driver.phoneNumber.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        driver.phoneNumber,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: subtitleColor,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Row(
                       children: [
