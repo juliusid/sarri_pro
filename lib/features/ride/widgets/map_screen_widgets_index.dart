@@ -13,6 +13,7 @@ export 'package:sarri_ride/features/ride/widgets/trip_completed_widget.dart'; //
 export 'package:sarri_ride/features/ride/widgets/package_booking_widget.dart'; // Package delivery booking
 export 'package:sarri_ride/features/ride/widgets/freight_booking_widget.dart'; // Freight transport booking
 export 'package:sarri_ride/features/ride/widgets/warehouse_booking_widget.dart'; // Warehouse booking
+export 'package:sarri_ride/features/car_rental/widgets/car_rental_booking_widget.dart'; // Car rental booking
 
 // UI COMPONENTS (Reusable smaller widgets)
 export 'package:sarri_ride/features/ride/widgets/ride_type_card.dart'; // Individual ride type card

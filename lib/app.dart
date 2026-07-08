@@ -7,6 +7,9 @@ import 'package:sarri_ride/core/services/notification_service.dart'; // <--- IMP
 import 'package:sarri_ride/features/splash/screen/splash_screen.dart';
 import 'package:sarri_ride/features/authentication/screens/user_type_selection/user_type_selection_screen.dart';
 import 'package:sarri_ride/features/share/screens/public_live_tracking_screen.dart';
+import 'package:sarri_ride/features/car_rental/screens/car_rental_detail_screen.dart';
+import 'package:sarri_ride/features/car_rental/screens/car_rental_confirm_screen.dart';
+import 'package:sarri_ride/features/car_rental/screens/car_rental_history_screen.dart';
 import 'package:sarri_ride/utils/theme/theme.dart';
 import 'package:sarri_ride/utils/theme/theme_controller.dart';
 import 'package:upgrader/upgrader.dart';
@@ -102,6 +105,9 @@ class _MyAppState extends State<App> {
             shareToken: Get.parameters['token'] ?? '',
           ),
         ),
+        GetPage(name: '/car-rental/detail', page: () => const CarRentalDetailScreen()),
+        GetPage(name: '/car-rental/confirm', page: () => const CarRentalConfirmScreen()),
+        GetPage(name: '/car-rental/history', page: () => const CarRentalHistoryScreen()),
       ],
       debugShowCheckedModeBanner: false,
     );

@@ -221,28 +221,62 @@ class WalletScreen extends StatelessWidget {
                     ),
                   ),
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: balance > 500
-                    ? () => _showWithdrawModal(context, controller, balance)
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: TColors.primary,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            if (balance < 0) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () => _showPayDebtModal(context, controller, balance.abs()),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Pay Outstanding Debt',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
-                child: const Text(
-                  'Withdraw Funds',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ] else ...[
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: balance > 500
+                      ? () => _showWithdrawModal(context, controller, balance)
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: TColors.primary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Withdraw Funds',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
                 ),
               ),
-            ),
-            if (balance <= 500)
+            ],
+            if (balance < 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  "Outstanding commission debt: ₦${balance.abs().toStringAsFixed(2)}",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              )
+            else if (balance <= 500)
               Padding(
                 padding: const EdgeInsets.only(top: 8.0),
                 child: Text(
@@ -509,6 +543,198 @@ class WalletScreen extends StatelessWidget {
                         'Success',
                         'Withdrawal initiated successfully',
                       );
+                    }
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPayDebtModal(
+    BuildContext context,
+    DriverWalletController controller,
+    double debtAmount,
+  ) {
+    final amountController = TextEditingController(text: debtAmount.toStringAsFixed(2));
+    final dark = THelperFunctions.isDarkMode(context);
+    final RxString selectedMethod = 'card'.obs; // 'card' or 'transfer'
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: dark ? TColors.dark : TColors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          left: 24,
+          right: 24,
+          top: 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Pay Outstanding Debt',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Outstanding Commission Debt: ₦${debtAmount.toStringAsFixed(2)}',
+              style: const TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Amount Input
+            TextField(
+              controller: amountController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              style: TextStyle(color: dark ? TColors.white : TColors.black),
+              decoration: InputDecoration(
+                labelText: 'Amount to Pay',
+                prefixText: '₦ ',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                suffixIcon: TextButton(
+                  onPressed: () => amountController.text = debtAmount.toStringAsFixed(2),
+                  child: const Text('MAX'),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Payment Method Selector
+            Text(
+              'Payment Method',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Obx(
+              () => Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => selectedMethod.value = 'card',
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: selectedMethod.value == 'card'
+                            ? TColors.primary.withOpacity(0.1)
+                            : Colors.transparent,
+                        side: BorderSide(
+                          color: selectedMethod.value == 'card'
+                              ? TColors.primary
+                              : Colors.grey,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.credit_card,
+                            color: selectedMethod.value == 'card'
+                                ? TColors.primary
+                                : Colors.grey,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Card',
+                            style: TextStyle(
+                              color: selectedMethod.value == 'card'
+                                  ? TColors.primary
+                                  : (dark ? Colors.white : Colors.black),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => selectedMethod.value = 'transfer',
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: selectedMethod.value == 'transfer'
+                            ? TColors.primary.withOpacity(0.1)
+                            : Colors.transparent,
+                        side: BorderSide(
+                          color: selectedMethod.value == 'transfer'
+                              ? TColors.primary
+                              : Colors.grey,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.account_balance,
+                            color: selectedMethod.value == 'transfer'
+                                ? TColors.primary
+                                : Colors.grey,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Transfer',
+                            style: TextStyle(
+                              color: selectedMethod.value == 'transfer'
+                                  ? TColors.primary
+                                  : (dark ? Colors.white : Colors.black),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Confirm Button
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: Obx(
+                () => LoadingElevatedButton(
+                  isLoading: controller.isPayingDebt.value,
+                  text: 'Proceed to Pay',
+                  onPressed: () async {
+                    final amount = double.tryParse(amountController.text) ?? 0.0;
+
+                    if (amount <= 0) {
+                      THelperFunctions.showSnackBar('Please enter a valid amount');
+                      return;
+                    }
+                    if (amount > debtAmount) {
+                      THelperFunctions.showSnackBar(
+                        'Amount cannot exceed outstanding debt of ₦${debtAmount.toStringAsFixed(2)}',
+                      );
+                      return;
+                    }
+
+                    final success = await controller.initiateDebtRepayment(
+                      amount,
+                      selectedMethod.value,
+                    );
+                    if (success && context.mounted) {
+                      Navigator.pop(context);
                     }
                   },
                 ),

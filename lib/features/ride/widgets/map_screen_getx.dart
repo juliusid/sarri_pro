@@ -116,7 +116,11 @@ class MapScreenGetX extends StatelessWidget {
     }
   ]''';
 
-  double _getMinPanelHeight(BuildContext context) {
+  double _getMinPanelHeight(BuildContext context, BookingState state) {
+    // On initial state, open the panel tall enough to show all service cards
+    if (state == BookingState.initial) {
+      return MediaQuery.of(context).size.height * 0.75;
+    }
     return MediaQuery.of(context).size.height * 0.5;
   }
 
@@ -126,7 +130,6 @@ class MapScreenGetX extends StatelessWidget {
     final rideController = Get.put(RideController());
     final notificationController = Get.find<NotificationController>();
     final dark = THelperFunctions.isDarkMode(context);
-    final panelMinHeight = _getMinPanelHeight(context);
 
     // Open panel after frame renders if state is active
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -145,14 +148,17 @@ class MapScreenGetX extends StatelessWidget {
           },
         ),
         // Everything is now contained within the SlidingUpPanel's body
-        body: SlidingUpPanel(
-        controller: rideController.panelController,
-        minHeight: panelMinHeight,
-        maxHeight: MediaQuery.of(context).size.height * 0.9,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        parallaxEnabled: true,
-        parallaxOffset: 0.5,
-        body: Stack(
+        body: Obx(() {
+          final state = rideController.currentState.value;
+          final panelMinHeight = _getMinPanelHeight(context, state);
+          return SlidingUpPanel(
+          controller: rideController.panelController,
+          minHeight: panelMinHeight,
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          parallaxEnabled: true,
+          parallaxOffset: 0.5,
+          body: Stack(
           children: [
             // Google Map
             Obx(
@@ -281,7 +287,8 @@ class MapScreenGetX extends StatelessWidget {
         onPanelSlide: (double pos) {
           // Optional: Add paralax or fade effects here if needed
         },
-      ),
+        );
+        }),
     ));
   }
 
@@ -295,6 +302,7 @@ class MapScreenGetX extends StatelessWidget {
             onPackageTap: controller.goToPackageBooking,
             onFreightTap: controller.goToFreightBooking,
             onWarehouseTap: controller.goToWarehouseBooking,
+            onCarRentalTap: controller.goToCarRentalBooking,
             recentDestinations: controller.recentDestinations,
             onRecentDestinationTap: controller.selectDestinationFromRecent,
           );
@@ -397,6 +405,11 @@ class MapScreenGetX extends StatelessWidget {
               final warehouseController = Get.find<WarehouseBookingController>();
               warehouseController.createOrder();
             }
+          );
+
+        case BookingState.carRentalBooking:
+          return CarRentalBookingWidget(
+            onBackPressed: controller.onBackPressed,
           );
       }
     });

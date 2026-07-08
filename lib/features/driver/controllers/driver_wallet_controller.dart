@@ -1,3 +1,4 @@
+import 'package:url_launcher/url_launcher.dart';
 import 'package:get/get.dart';
 import 'package:sarri_ride/config/api_config.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
@@ -299,6 +300,48 @@ class DriverWalletController extends GetxController {
       return false;
     } finally {
       isWithdrawing.value = false;
+    }
+  }
+
+  // --- Debt Repayment Flow ---
+  final RxBool isPayingDebt = false.obs;
+
+  Future<bool> initiateDebtRepayment(double amount, String paymentMethod) async {
+    isPayingDebt.value = true;
+    try {
+      final response = await _httpService.post(
+        ApiConfig.driverPayDebtEndpoint,
+        body: {
+          'amount': amount,
+          'paymentMethod': paymentMethod, // 'card' or 'transfer'
+        },
+      );
+
+      final responseData = _httpService.handleResponse(response);
+
+      if (responseData['status'] == 'success' && responseData['authorization_url'] != null) {
+        final String authUrl = responseData['authorization_url'];
+        final Uri uri = Uri.parse(authUrl);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          return true;
+        } else {
+          THelperFunctions.showErrorSnackBar('Error', 'Could not launch payment page');
+          return false;
+        }
+      } else {
+        THelperFunctions.showErrorSnackBar(
+          'Payment Failed',
+          responseData['message'] ?? 'Failed to initialize payment',
+        );
+        return false;
+      }
+    } catch (e) {
+      String msg = e is ApiException ? e.message : e.toString();
+      THelperFunctions.showErrorSnackBar('Payment Error', msg);
+      return false;
+    } finally {
+      isPayingDebt.value = false;
     }
   }
 }

@@ -44,6 +44,7 @@ enum BookingState {
   packageBooking,
   freightBooking,
   warehouseBooking,
+  carRentalBooking,
 }
 
 class RideController extends GetxController with GetTickerProviderStateMixin, WidgetsBindingObserver {
@@ -1332,6 +1333,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
       case BookingState.packageBooking:
       case BookingState.freightBooking:
       case BookingState.warehouseBooking:
+      case BookingState.carRentalBooking:
         currentState.value = BookingState.initial;
         showDestinationSuggestions.value = false;
         destinationSuggestions.clear();
@@ -2077,6 +2079,11 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
 
   void goToWarehouseBooking() {
     currentState.value = BookingState.warehouseBooking;
+    animatePanelTo80Percent();
+  }
+
+  void goToCarRentalBooking() {
+    currentState.value = BookingState.carRentalBooking;
     animatePanelTo80Percent();
   }
 
