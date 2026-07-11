@@ -275,7 +275,7 @@ class BookingInitialWidget extends StatelessWidget {
                 _ServiceCard(
                   icon: Icons.vpn_key_outlined,
                   title: 'Car Rental',
-                  subtitle: 'Pick up the keys, ride on your terms.',
+                  subtitle: 'Rent a luxury vehicle, move executive',
                   onTap: onCarRentalTap,
                   cardColor: cardColor,
                   dark: dark,

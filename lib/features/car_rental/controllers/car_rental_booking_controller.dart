@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
+import 'package:sarri_ride/features/payment/screens/paystack_webview_screen.dart';
 
 class CarRentalBookingController extends GetxController {
   static CarRentalBookingController get instance => Get.find();
@@ -137,7 +138,7 @@ class CarRentalBookingController extends GetxController {
     Get.toNamed('/car-rental/confirm');
   }
 
-  Future<void> submitBooking(String paymentMethod) async {
+  Future<void> submitBooking(String cardId) async {
     if (selectedVehicle.value == null) return;
     
     isSubmitting.value = true;
@@ -147,20 +148,53 @@ class CarRentalBookingController extends GetxController {
     final ret = DateTime(returnDate.value!.year, returnDate.value!.month, returnDate.value!.day, returnTime.value!.hour, returnTime.value!.minute);
 
     try {
-      final response = await _httpService.post('/api/car-rental/bookings', body: {
+      // Step 1: Create the booking
+      final createResponse = await _httpService.post('/api/car-rental/bookings', body: {
         'vehicleId': selectedVehicle.value!['_id'],
         'pickupDateTime': pickup.toIso8601String(),
         'returnDateTime': ret.toIso8601String(),
         'rentalMode': rentalMode.value,
-        'paymentMethod': paymentMethod, // 'wallet' or 'card'
-        'paymentAmount': estimatedPrice.value, // Used for checking, backend recalculates
+        'paymentMethod': 'card', // Always card for now
+        'paymentAmount': estimatedPrice.value,
       });
       
-      final data = _httpService.handleResponse(response);
-      if (data['status'] == 'success') {
-        Get.offAllNamed('/car-rental/success');
+      final createData = _httpService.handleResponse(createResponse);
+      if (createData['status'] != 'success') {
+        error.value = createData['message'] ?? 'Booking failed';
+        isSubmitting.value = false;
+        return;
+      }
+
+      final bookingId = createData['data']['_id'];
+
+      // Step 2: Initialize payment
+      final payResponse = await _httpService.post('/api/car-rental/bookings/$bookingId/pay', body: {
+        'cardId': cardId.isNotEmpty ? cardId : null,
+      });
+
+      final payData = _httpService.handleResponse(payResponse);
+      if (payData['status'] == 'success') {
+        if (payData['charged'] == true) {
+          // Charged successfully via saved card
+          Get.offAllNamed('/car-rental/success');
+        } else if (payData['requiresOtp'] == true || payData['authorization_url'] != null) {
+          // Route to WebView for 3DS or new card payment link
+          final url = payData['authorization_url'] ?? payData['url'] ?? ''; 
+          if (url.isNotEmpty) {
+             final result = await Get.to(() => PaystackWebViewScreen(authorizationUrl: url));
+             if (result == 'success') {
+               Get.offAllNamed('/car-rental/success');
+             } else {
+               error.value = 'Payment was not completed';
+             }
+          } else {
+            error.value = 'Payment authorization failed: URL missing';
+          }
+        } else {
+           Get.offAllNamed('/car-rental/success');
+        }
       } else {
-        error.value = data['message'] ?? 'Booking failed';
+        error.value = payData['message'] ?? 'Payment failed';
       }
     } catch (e) {
       print('Booking error: $e');

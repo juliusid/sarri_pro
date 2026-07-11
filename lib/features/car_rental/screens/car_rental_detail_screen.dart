@@ -45,7 +45,7 @@ class CarRentalDetailScreen extends StatelessWidget {
         int savePercent = 0;
         if (hasDiscount) {
           final orig = double.parse(price);
-          final disc = double.parse(discountedRaw!);
+          final disc = double.parse(discountedRaw);
           savePercent = (((orig - disc) / orig) * 100).round();
         }
 
