@@ -325,6 +325,94 @@ class RideSelectionWidget extends StatelessWidget {
                   ),
                 ),
 
+                const SizedBox(height: 12),
+
+                // Promo Code
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: dark ? TColors.darkerGrey : Colors.grey[100],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Obx(() {
+                    final hasApplied = controller.hasValidPromoCode;
+                    if (hasApplied) {
+                      return Row(
+                        children: [
+                          const Icon(Iconsax.discount_shape, color: Colors.green, size: 22),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  controller.appliedPromoCode.value,
+                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: textColor),
+                                ),
+                                Text(
+                                  'You save ₦${NumberFormat('#,###').format(controller.promoDiscountAmount.value)}',
+                                  style: const TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w500),
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: controller.clearPromoCode,
+                            child: const Text('Remove'),
+                          ),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Iconsax.discount_shape, color: subtitleColor, size: 22),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TextField(
+                                controller: controller.promoCodeController,
+                                textCapitalization: TextCapitalization.characters,
+                                enabled: selectedRideType != null && !controller.isCheckingPromoCode.value,
+                                style: TextStyle(fontSize: 14, color: textColor),
+                                decoration: InputDecoration(
+                                  hintText: 'Have a promo code?',
+                                  hintStyle: TextStyle(fontSize: 14, color: subtitleColor),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                                onSubmitted: (_) => controller.applyPromoCode(),
+                              ),
+                              if (controller.promoCodeError.value.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    controller.promoCodeError.value,
+                                    style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        controller.isCheckingPromoCode.value
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : TextButton(
+                                onPressed: selectedRideType != null ? controller.applyPromoCode : null,
+                                child: const Text('Apply'),
+                              ),
+                      ],
+                    );
+                  }),
+                ),
+
                 const SizedBox(height: 16),
 
                 // Confirm Button

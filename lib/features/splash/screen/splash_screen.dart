@@ -124,16 +124,33 @@ class _SplashScreenState extends State<SplashScreen>
         }
 
         // 2. Check for Active Ride
-        if (activeRideId != null &&
-            activeRideId.isNotEmpty &&
+        // Local storage (`active_ride_id`) is wiped if the app is deleted and
+        // reinstalled. If it's missing, ask the backend directly whether this
+        // authenticated user has an active trip, so a reinstall doesn't strand
+        // an in-progress ride for either the rider or the driver.
+        String? effectiveActiveRideId = activeRideId;
+        final rideService = RideService.instance;
+        if ((effectiveActiveRideId == null || effectiveActiveRideId.isEmpty) &&
+            userRole != null) {
+          final activeTripData = await rideService.getActiveTrip();
+          final serverTripId = activeTripData?['tripId']?.toString();
+          if (serverTripId != null && serverTripId.isNotEmpty) {
+            print(
+              "SplashScreen: No local active_ride_id, but server reports active trip $serverTripId. Reconnecting...",
+            );
+            effectiveActiveRideId = serverTripId;
+          }
+        }
+
+        if (effectiveActiveRideId != null &&
+            effectiveActiveRideId.isNotEmpty &&
             userRole != null) {
           print(
-            "SplashScreen: Found active_ride_id $activeRideId for $userRole. Attempting to reconnect...",
+            "SplashScreen: Found active_ride_id $effectiveActiveRideId for $userRole. Attempting to reconnect...",
           );
 
-          final rideService = RideService.instance;
           final reconnectResponse = await rideService.reconnectToTrip(
-            activeRideId,
+            effectiveActiveRideId,
             userRole,
           );
 

@@ -187,6 +187,8 @@ class ApiConfig {
   static String get cancelRideEndpoint => '$baseUrl/clientRide/cancel-ride';
   static String get checkRideStatusEndpoint =>
       '$baseUrl/clientRide/checkRideStatus';
+  static String get validatePromoCodeEndpoint =>
+      '$baseUrl/clientRide/promo/validate';
 
   // Client endpoints
   static String get clientProfileEndpoint => '$baseUrl/auth/client/profile';

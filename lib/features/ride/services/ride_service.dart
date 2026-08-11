@@ -88,6 +88,31 @@ class RideService extends GetxService {
     }
   }
 
+  /// Validates a promo code against a category/price before booking, without
+  /// consuming a usage slot — used for the live "you save ₦X" preview.
+  Future<ValidatePromoCodeResponse> validatePromoCode({
+    required String code,
+    required String category,
+    required double price,
+  }) async {
+    try {
+      final response = await _httpService.post(
+        ApiConfig.validatePromoCodeEndpoint,
+        body: {
+          "code": code,
+          "category": category.toLowerCase(),
+          "price": price,
+        },
+      );
+      final responseData = _httpService.handleResponse(response);
+      return ValidatePromoCodeResponse.fromJson(responseData);
+    } catch (e) {
+      String errorMessage = 'Invalid promo code';
+      if (e is ApiException) errorMessage = e.message;
+      return ValidatePromoCodeResponse(valid: false, message: errorMessage);
+    }
+  }
+
   /// Books a ride for the client
   Future<BookRideResponse> bookRide({
     required String pickupName,
@@ -96,6 +121,7 @@ class RideService extends GetxService {
     required LatLng destinationCoords,
     required String category,
     required String state,
+    String? promoCode,
   }) async {
     try {
       final request = BookRideRequest(
@@ -105,6 +131,7 @@ class RideService extends GetxService {
         destination: destinationCoords,
         category: category,
         state: state,
+        promoCode: promoCode,
       );
       final response = await _httpService.post(
         ApiConfig.bookRideEndpoint,

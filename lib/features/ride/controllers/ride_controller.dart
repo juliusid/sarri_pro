@@ -155,6 +155,52 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
   final RxString rideId = ''.obs;
   final RxString activeRideChatId = ''.obs;
 
+  // --- Promo Code ---
+  final TextEditingController promoCodeController = TextEditingController();
+  final RxString appliedPromoCode = ''.obs;
+  final RxDouble promoDiscountAmount = 0.0.obs;
+  final RxBool isCheckingPromoCode = false.obs;
+  final RxString promoCodeError = ''.obs;
+
+  bool get hasValidPromoCode =>
+      appliedPromoCode.value.isNotEmpty && promoCodeError.value.isEmpty;
+
+  /// Validates the entered promo code against the currently selected ride
+  /// type's price, without consuming a usage slot — just a live preview.
+  Future<void> applyPromoCode() async {
+    final code = promoCodeController.text.trim();
+    if (code.isEmpty || selectedRideType.value == null) return;
+
+    isCheckingPromoCode.value = true;
+    promoCodeError.value = '';
+    try {
+      final result = await _rideService.validatePromoCode(
+        code: code,
+        category: selectedRideType.value!.name,
+        price: selectedRideType.value!.price.toDouble(),
+      );
+
+      if (result.valid) {
+        appliedPromoCode.value = result.code ?? code;
+        promoDiscountAmount.value = result.discountAmount;
+        promoCodeError.value = '';
+      } else {
+        appliedPromoCode.value = '';
+        promoDiscountAmount.value = 0;
+        promoCodeError.value = result.message;
+      }
+    } finally {
+      isCheckingPromoCode.value = false;
+    }
+  }
+
+  void clearPromoCode() {
+    promoCodeController.clear();
+    appliedPromoCode.value = '';
+    promoDiscountAmount.value = 0;
+    promoCodeError.value = '';
+  }
+
   // --- Animation State ---
   LatLng? _animStartLocation;
   LatLng? _animEndLocation;
@@ -461,6 +507,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
     pickupController.dispose();
     packageDeliveryController.dispose();
     freightDeliveryController.dispose();
+    promoCodeController.dispose();
     _webSocketService.unregisterPaymentConfirmedListener(
       _handlePaymentConfirmed,
     );
@@ -1513,6 +1560,12 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
   final RxBool isBooking = false.obs;
 
   void selectRideType(RideType rideType) {
+    // A previously-applied promo code was validated against the old
+    // category/price — clear it so a stale discount can't silently carry
+    // over to a ride type it was never checked against.
+    if (selectedRideType.value?.name != rideType.name) {
+      clearPromoCode();
+    }
     selectedRideType.value = rideType;
     update();
   }
@@ -1671,6 +1724,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
         destinationCoords: destinationLocation.value!,
         category: selectedRideType.value!.name,
         state: pickupState.value,
+        promoCode: hasValidPromoCode ? appliedPromoCode.value : null,
       );
 
       print("==== DEBUG RIDER RIDE RESPONSE ====");
@@ -1686,6 +1740,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
       if (response.status == 'success' && response.data != null) {
         rideId.value = response.data!.rideId;
         _storage.write('active_ride_id', rideId.value);
+        clearPromoCode();
 
         selectedRideType.value = RideType(
           name: selectedRideType.value!.name,

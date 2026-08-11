@@ -101,6 +101,7 @@ class BookRideRequest {
   final LatLng destination;
   final String category;
   final String state; // --- ADDED ---
+  final String? promoCode;
 
   BookRideRequest({
     required this.currentLocationName,
@@ -109,6 +110,7 @@ class BookRideRequest {
     required this.destination,
     required this.category,
     required this.state, // --- ADDED ---
+    this.promoCode,
   });
 
   Map<String, dynamic> toJson() => {
@@ -124,6 +126,7 @@ class BookRideRequest {
     },
     "category": category.toLowerCase(),
     "state": state, // --- ADDED ---
+    if (promoCode != null && promoCode!.isNotEmpty) "promoCode": promoCode,
   };
 }
 
@@ -147,11 +150,15 @@ class BookRideData {
   final String rideId;
   final int price; // Kept as int, as "16183" is an integer
   final double distanceKm;
+  final String? promoCode;
+  final int? promoDiscountAmount;
 
   BookRideData({
     required this.rideId,
     required this.price,
     required this.distanceKm,
+    this.promoCode,
+    this.promoDiscountAmount,
   });
 
   factory BookRideData.fromJson(Map<String, dynamic> json) {
@@ -169,10 +176,55 @@ class BookRideData {
     }
     // --- END MODIFICATION ---
 
+    int? parsedPromoDiscount;
+    final rawPromoDiscount = json['promoDiscountAmount'];
+    if (rawPromoDiscount != null &&
+        rawPromoDiscount is Map &&
+        rawPromoDiscount['\$numberDecimal'] != null) {
+      parsedPromoDiscount =
+          int.tryParse(rawPromoDiscount['\$numberDecimal'].toString());
+    } else if (rawPromoDiscount is num) {
+      parsedPromoDiscount = rawPromoDiscount.toInt();
+    }
+
     return BookRideData(
       rideId: json['tripId'] ?? '',
       price: parsedPrice, // Use the parsed price
       distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0.0,
+      promoCode: json['promoCode'],
+      promoDiscountAmount: parsedPromoDiscount,
+    );
+  }
+}
+
+// --- PROMO CODE ---
+
+class ValidatePromoCodeResponse {
+  final bool valid;
+  final String message;
+  final String? code;
+  final double discountAmount;
+  final double finalPrice;
+
+  ValidatePromoCodeResponse({
+    required this.valid,
+    required this.message,
+    this.code,
+    this.discountAmount = 0,
+    this.finalPrice = 0,
+  });
+
+  factory ValidatePromoCodeResponse.fromJson(Map<String, dynamic> json) {
+    final isSuccess = json['status'] == 'success';
+    final data = json['data'] as Map<String, dynamic>?;
+    return ValidatePromoCodeResponse(
+      valid: isSuccess,
+      message: isSuccess
+          ? 'Promo code applied'
+          : (json['message'] ?? 'Invalid promo code'),
+      code: data?['code'],
+      discountAmount: (data?['discountAmount'] as num?)?.toDouble() ?? 0,
+      finalPrice: (data?['finalPrice'] as num?)?.toDouble() ?? 0,
     );
   }
 }
