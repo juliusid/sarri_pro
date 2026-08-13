@@ -7,6 +7,7 @@ import 'package:sarri_ride/features/ride/widgets/location_status_indicator.dart'
 import 'package:sarri_ride/features/ride/controllers/drawer_controller.dart';
 import 'package:sarri_ride/features/ride/controllers/ride_controller.dart';
 import 'package:sarri_ride/features/ride/models/nearby_event_model.dart';
+import 'package:sarri_ride/features/ride/widgets/event_preview_sheet.dart';
 
 class BookingInitialWidget extends StatelessWidget {
   final VoidCallback onDestinationTap;
@@ -159,16 +160,23 @@ class BookingInitialWidget extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    SizedBox(
-                      height: 220,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: events.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 12),
-                        itemBuilder: (context, index) => _NearbyEventCard(
-                          event: events[index],
-                          dark: dark,
-                          onBookRide: () => rideController.selectEventDestination(events[index]),
+                    ...events.map(
+                      (event) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        // Tapping the card opens a full flyer preview; the CTA
+                        // inside it books directly, skipping the preview.
+                        child: GestureDetector(
+                          onTap: () => EventPreviewSheet.show(
+                            context,
+                            event: event,
+                            onBookRide: () => rideController.selectEventDestination(event),
+                          ),
+                          child: _NearbyEventCard(
+                            event: event,
+                            dark: dark,
+                            cardColor: cardColor,
+                            onBookRide: () => rideController.selectEventDestination(event),
+                          ),
                         ),
                       ),
                     ),
@@ -358,137 +366,153 @@ class BookingInitialWidget extends StatelessWidget {
 class _NearbyEventCard extends StatelessWidget {
   final NearbyEvent event;
   final bool dark;
+  final Color cardColor;
   final VoidCallback onBookRide;
 
   const _NearbyEventCard({
     required this.event,
     required this.dark,
+    required this.cardColor,
     required this.onBookRide,
   });
 
   @override
   Widget build(BuildContext context) {
-    final cardColor = dark ? const Color(0xFF242424) : Colors.white;
-
     return Container(
-      width: 260,
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
-        border: Border.all(color: TColors.primary.withOpacity(0.4)),
+        border: Border.all(color: TColors.primary.withOpacity(0.35)),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
-            children: [
-              SizedBox(
-                height: 110,
-                width: double.infinity,
-                child: Image.network(
-                  event.imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: dark ? const Color(0xFF2E2E2E) : const Color(0xFFF0F0F0),
-                    child: Icon(Icons.event, color: Colors.grey[500], size: 32),
-                  ),
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) return child;
-                    return Container(
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Thumbnail — fades into the card background at its right edge
+            // so it reads as one continuous card, not an image + a box.
+            SizedBox(
+              width: 110,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    event.imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
                       color: dark ? const Color(0xFF2E2E2E) : const Color(0xFFF0F0F0),
-                    );
-                  },
-                ),
-              ),
-              if (event.badgeLabel.isNotEmpty)
-                Positioned(
-                  top: 10,
-                  left: 10,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      child: Icon(Icons.event, color: Colors.grey[500], size: 28),
+                    ),
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return Container(
+                        color: dark ? const Color(0xFF2E2E2E) : const Color(0xFFF0F0F0),
+                      );
+                    },
+                  ),
+                  DecoratedBox(
                     decoration: BoxDecoration(
-                      color: TColors.primary.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(20),
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [cardColor.withOpacity(0), cardColor],
+                        stops: const [0.55, 1.0],
+                      ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          event.badgeLabel,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  event.title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: dark ? Colors.white : TColors.textPrimary,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (event.subtitle.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    event.subtitle,
-                    style: TextStyle(fontSize: 12, color: dark ? Colors.grey[400] : Colors.grey[600]),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
-                const SizedBox(height: 10),
-                GestureDetector(
-                  onTap: onBookRide,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: TColors.primary,
-                      borderRadius: BorderRadius.circular(TSizes.buttonRadius),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          event.ctaLabel,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Icon(Icons.arrow_forward, color: Colors.white, size: 14),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 14, 16, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (event.badgeLabel.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: TColors.primary.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 5,
+                              height: 5,
+                              decoration: BoxDecoration(color: TColors.primary, shape: BoxShape.circle),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              event.badgeLabel,
+                              style: TextStyle(
+                                color: dark ? const Color(0xFFC896FA) : TColors.primary,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    Text(
+                      event.title,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                        height: 1.25,
+                        color: dark ? Colors.white : TColors.textPrimary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (event.subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        event.subtitle,
+                        style: TextStyle(fontSize: 11, color: dark ? Colors.grey[400] : Colors.grey[600]),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    GestureDetector(
+                      onTap: onBookRide,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: TColors.primary,
+                          borderRadius: BorderRadius.circular(TSizes.buttonRadius),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              event.ctaLabel,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            const Icon(Icons.arrow_forward, color: Colors.white, size: 13),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
