@@ -124,6 +124,28 @@ class MapScreenGetX extends StatelessWidget {
     return MediaQuery.of(context).size.height * 0.5;
   }
 
+  /// The 'Choose a ride' panel's height depends on how many ride categories
+  /// are on offer — with one category (the common case) a fixed 50%/90%
+  /// panel left a large empty gap below the single card. Sizing it to
+  /// content (clamped to a sensible range) removes that gap, and min==max
+  /// so the panel opens directly to its content height instead of a
+  /// draggable range it doesn't need.
+  ({double min, double max}) _getSelectRidePanelHeight(
+    BuildContext context,
+    int rideTypeCount,
+  ) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    const double chromeHeight = 340; // header + trip settings card + confirm button + paddings
+    const double itemHeight = 88; // ride card row + spacing
+    final contentHeight =
+        chromeHeight + (rideTypeCount.clamp(1, 4) * itemHeight);
+    final height = contentHeight.clamp(
+      screenHeight * 0.35,
+      screenHeight * 0.75,
+    );
+    return (min: height, max: height);
+  }
+
   @override
   Widget build(BuildContext context) {
     // Initialize the RideController
@@ -140,6 +162,17 @@ class MapScreenGetX extends StatelessWidget {
     });
 
     return DoubleBackToCloseWidget(
+      onWillPop: () {
+        // Step back through the booking flow (matches the in-app back
+        // arrow's controller.onBackPressed) before falling through to the
+        // double-tap-to-exit behavior — otherwise the system back button
+        // always tried to close the app from any screen.
+        if (rideController.currentState.value != BookingState.initial) {
+          rideController.onBackPressed();
+          return true;
+        }
+        return false;
+      },
       child: Scaffold(
         drawer: MapDrawerWidget(
           onRefreshLocation: rideController.refreshCurrentLocation,
@@ -150,11 +183,26 @@ class MapScreenGetX extends StatelessWidget {
         // Everything is now contained within the SlidingUpPanel's body
         body: Obx(() {
           final state = rideController.currentState.value;
-          final panelMinHeight = _getMinPanelHeight(context, state);
+          final rideTypeCount = rideController.rideTypes.length; // reactive read so the panel resizes once prices load
+          final isSelectRide = state == BookingState.selectRide;
+          final selectRideHeights = isSelectRide
+              ? _getSelectRidePanelHeight(context, rideTypeCount)
+              : null;
+          // 'Plan your ride' (destinationSearch) should start from the
+          // vertical center of the screen rather than ballooning to 90% —
+          // panelController.open() always snaps to maxHeight, so it must
+          // match the intended (50%) minHeight for this state too.
+          final isFixedHalfHeight = state == BookingState.destinationSearch;
+          final panelMinHeight =
+              selectRideHeights?.min ?? _getMinPanelHeight(context, state);
+          final panelMaxHeight = selectRideHeights?.max ??
+              (isFixedHalfHeight
+                  ? panelMinHeight
+                  : MediaQuery.of(context).size.height * 0.9);
           return SlidingUpPanel(
           controller: rideController.panelController,
           minHeight: panelMinHeight,
-          maxHeight: MediaQuery.of(context).size.height * 0.9,
+          maxHeight: panelMaxHeight,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           parallaxEnabled: true,
           parallaxOffset: 0.5,
@@ -334,7 +382,10 @@ class MapScreenGetX extends StatelessWidget {
           );
 
         case BookingState.searchingDriver:
-          return SearchingDriverWidget(onCancel: controller.cancelRide);
+          // Reuses onBackPressed rather than cancelRide directly — for
+          // BookingState.searchingDriver that already shows the "Cancel
+          // Ride?" confirmation dialog instead of cancelling immediately.
+          return SearchingDriverWidget(onCancel: controller.onBackPressed);
 
         case BookingState.driverAssigned:
           return DriverAssignedWidget(

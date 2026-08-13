@@ -3,7 +3,14 @@ import 'package:flutter/services.dart';
 
 class DoubleBackToCloseWidget extends StatefulWidget {
   final Widget child;
-  const DoubleBackToCloseWidget({super.key, required this.child});
+
+  /// Called first on every system back press. Return true if it handled the
+  /// back navigation internally (e.g. stepped back one screen in a booking
+  /// flow) so the double-tap-to-exit logic below is skipped entirely.
+  /// Return false (or pass null) to fall through to the exit behavior.
+  final bool Function()? onWillPop;
+
+  const DoubleBackToCloseWidget({super.key, required this.child, this.onWillPop});
 
   @override
   State<DoubleBackToCloseWidget> createState() => _DoubleBackToCloseWidgetState();
@@ -18,6 +25,10 @@ class _DoubleBackToCloseWidgetState extends State<DoubleBackToCloseWidget> {
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) async {
         if (didPop) {
+          return;
+        }
+
+        if (widget.onWillPop?.call() ?? false) {
           return;
         }
 

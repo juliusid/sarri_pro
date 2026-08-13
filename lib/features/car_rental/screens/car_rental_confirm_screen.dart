@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
+import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/car_rental/controllers/car_rental_booking_controller.dart';
 import 'package:sarri_ride/features/payment/controllers/payment_controller.dart';
@@ -398,7 +399,7 @@ class _CarRentalConfirmScreenState extends State<CarRentalConfirmScreen> {
                   color: controller.isSubmitting.value
                       ? (dark ? const Color(0xFF2E2E2E) : Colors.grey[300])
                       : TColors.primary,
-                  borderRadius: BorderRadius.circular(28),
+                  borderRadius: BorderRadius.circular(TSizes.buttonRadius),
                 ),
                 child: Center(
                   child: controller.isSubmitting.value

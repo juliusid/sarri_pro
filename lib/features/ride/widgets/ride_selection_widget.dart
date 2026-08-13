@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/features/ride/controllers/ride_controller.dart';
+import 'package:sarri_ride/features/ride/widgets/promo_code_sheet.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
+import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -78,7 +80,12 @@ class RideSelectionWidget extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
+      child: SingleChildScrollView(
+        // Safety net: the panel height is estimated from item count in
+        // map_screen_getx's _getSelectRidePanelHeight — if that estimate
+        // ever runs a little short, this scrolls instead of overflowing.
+        physics: const ClampingScrollPhysics(),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Drag Handle
@@ -115,21 +122,21 @@ class RideSelectionWidget extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Ride List
-          Expanded(
-            child: Column(
-              children: [
-                Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    itemCount: rideTypes.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final rideType = rideTypes[index];
-                      final isSelected = selectedRideType == rideType;
+          // Ride List — shrink-wrapped to content so the sheet is only as
+          // tall as it needs to be (1 category shouldn't reserve the same
+          // space as 4), matched by a dynamic panel height in map_screen_getx.
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 16),
+            itemCount: rideTypes.length,
+            separatorBuilder: (context, index) =>
+                const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final rideType = rideTypes[index];
+              final isSelected = selectedRideType == rideType;
 
-                      return GestureDetector(
+              return GestureDetector(
                         onTap: rideType.isActive ? () => onRideTypeSelected(rideType) : null,
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
@@ -270,37 +277,47 @@ class RideSelectionWidget extends StatelessWidget {
                             ],
                           ),
                         ),
-                      );
-                    },
-                  ),
-                ),
+                );
+              },
+            ),
 
-                // Payment Method
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: dark ? TColors.darkerGrey : Colors.grey[100],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: InkWell(
-                    onTap: () => controller.showPaymentMethodPicker(context),
+          const SizedBox(height: 4),
+          Text(
+            'TRIP SETTINGS',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+              color: subtitleColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Trip Settings — payment method + promo code grouped in one card,
+          // matching the design reference (no gaps between rows).
+          Container(
+            decoration: BoxDecoration(
+              color: dark ? TColors.darkerGrey : Colors.grey[100],
+              borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
+            ),
+            child: Column(
+              children: [
+                InkWell(
+                  onTap: () => controller.showPaymentMethodPicker(context),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(TSizes.cardRadiusMd)),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     child: Row(
                       children: [
-                        Icon(Iconsax.money, color: TColors.primary, size: 24),
+                        Icon(Iconsax.money, color: TColors.primary, size: 22),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Payment Method',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: subtitleColor,
-                                ),
+                                'Payment method',
+                                style: TextStyle(fontSize: 12, color: subtitleColor),
                               ),
                               Obx(
                                 () => Text(
@@ -315,134 +332,87 @@ class RideSelectionWidget extends StatelessWidget {
                             ],
                           ),
                         ),
-                        Icon(
-                          Icons.arrow_forward_ios,
-                          size: 14,
-                          color: subtitleColor,
-                        ),
+                        Icon(Icons.arrow_forward_ios, size: 14, color: subtitleColor),
                       ],
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 12),
+                Divider(height: 1, color: dark ? TColors.dark : Colors.grey[300]),
 
-                // Promo Code
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: dark ? TColors.darkerGrey : Colors.grey[100],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Obx(() {
-                    final hasApplied = controller.hasValidPromoCode;
-                    if (hasApplied) {
+                InkWell(
+                  onTap: () => PromoCodeSheet.show(context),
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(TSizes.cardRadiusMd)),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    child: Obx(() {
+                      final hasApplied = controller.hasValidPromoCode;
                       return Row(
                         children: [
-                          const Icon(Iconsax.discount_shape, color: Colors.green, size: 22),
+                          Icon(
+                            Iconsax.ticket_discount,
+                            color: hasApplied ? Colors.green : subtitleColor,
+                            size: 22,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  controller.appliedPromoCode.value,
-                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: textColor),
-                                ),
-                                Text(
-                                  'You save ₦${NumberFormat('#,###').format(controller.promoDiscountAmount.value)}',
-                                  style: const TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w500),
-                                ),
-                              ],
-                            ),
+                            child: hasApplied
+                                ? Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        controller.appliedPromoCode.value,
+                                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: textColor),
+                                      ),
+                                      Text(
+                                        'You save ₦${NumberFormat('#,###').format(controller.promoDiscountAmount.value)}',
+                                        style: const TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w500),
+                                      ),
+                                    ],
+                                  )
+                                : Text(
+                                    'Add promo code',
+                                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: textColor),
+                                  ),
                           ),
-                          TextButton(
-                            onPressed: controller.clearPromoCode,
-                            child: const Text('Remove'),
-                          ),
+                          Icon(Icons.arrow_forward_ios, size: 14, color: subtitleColor),
                         ],
                       );
-                    }
-
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Iconsax.discount_shape, color: subtitleColor, size: 22),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              TextField(
-                                controller: controller.promoCodeController,
-                                textCapitalization: TextCapitalization.characters,
-                                enabled: selectedRideType != null && !controller.isCheckingPromoCode.value,
-                                style: TextStyle(fontSize: 14, color: textColor),
-                                decoration: InputDecoration(
-                                  hintText: 'Have a promo code?',
-                                  hintStyle: TextStyle(fontSize: 14, color: subtitleColor),
-                                  border: InputBorder.none,
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                                onSubmitted: (_) => controller.applyPromoCode(),
-                              ),
-                              if (controller.promoCodeError.value.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Text(
-                                    controller.promoCodeError.value,
-                                    style: const TextStyle(color: Colors.redAccent, fontSize: 12),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        controller.isCheckingPromoCode.value
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : TextButton(
-                                onPressed: selectedRideType != null ? controller.applyPromoCode : null,
-                                child: const Text('Apply'),
-                              ),
-                      ],
-                    );
-                  }),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Confirm Button
-                if (selectedRideType != null)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: onConfirmRide,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: TColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        'Select ${selectedRideType!.displayName}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
+                    }),
                   ),
+                ),
               ],
             ),
           ),
+
+          const SizedBox(height: 16),
+
+          // Confirm Button
+          if (selectedRideType != null)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: onConfirmRide,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: TColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(TSizes.buttonRadius),
+                  ),
+                  elevation: 0,
+                ),
+                child: Text(
+                  'Select ${selectedRideType!.displayName}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
         ],
+        ),
       ),
     );
   }

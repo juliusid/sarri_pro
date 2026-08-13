@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
+import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 import 'package:sarri_ride/features/ride/widgets/location_status_indicator.dart';
 import 'package:sarri_ride/features/ride/controllers/drawer_controller.dart';
+import 'package:sarri_ride/features/ride/controllers/ride_controller.dart';
+import 'package:sarri_ride/features/ride/models/nearby_event_model.dart';
 
 class BookingInitialWidget extends StatelessWidget {
   final VoidCallback onDestinationTap;
@@ -40,6 +43,7 @@ class BookingInitialWidget extends StatelessWidget {
     final backgroundColor = dark ? const Color(0xFF1A1A1A) : Colors.grey[100];
     final cardColor = dark ? const Color(0xFF242424) : Colors.white;
     final drawerController = Get.find<MapDrawerController>();
+    final rideController = Get.find<RideController>();
 
     return Container(
       width: double.infinity,
@@ -109,8 +113,8 @@ class BookingInitialWidget extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                 decoration: BoxDecoration(
-                  color: dark ? const Color(0xFF2C2C2C) : Colors.white,
-                  borderRadius: BorderRadius.circular(30),
+                  color: dark ? TColors.darkerGrey : Colors.white,
+                  borderRadius: BorderRadius.circular(TSizes.inputFieldRadius),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.06),
@@ -135,6 +139,43 @@ class BookingInitialWidget extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
+
+            // ── Happening Nearby (partner events) ──
+            Obx(() {
+              final events = rideController.nearbyEvents;
+              if (events.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'HAPPENING NEARBY',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.4,
+                        color: dark ? Colors.grey[500] : Colors.grey[500],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 220,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: events.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 12),
+                        itemBuilder: (context, index) => _NearbyEventCard(
+                          event: events[index],
+                          dark: dark,
+                          onBookRide: () => rideController.selectEventDestination(events[index]),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
 
             // ── GET STARTED label ──
             Text(
@@ -192,7 +233,7 @@ class BookingInitialWidget extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                             decoration: BoxDecoration(
                               color: TColors.primary,
-                              borderRadius: BorderRadius.circular(24),
+                              borderRadius: BorderRadius.circular(TSizes.buttonRadius),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -309,6 +350,145 @@ class BookingInitialWidget extends StatelessWidget {
             const SizedBox(height: 8),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _NearbyEventCard extends StatelessWidget {
+  final NearbyEvent event;
+  final bool dark;
+  final VoidCallback onBookRide;
+
+  const _NearbyEventCard({
+    required this.event,
+    required this.dark,
+    required this.onBookRide,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cardColor = dark ? const Color(0xFF242424) : Colors.white;
+
+    return Container(
+      width: 260,
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
+        border: Border.all(color: TColors.primary.withOpacity(0.4)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Stack(
+            children: [
+              SizedBox(
+                height: 110,
+                width: double.infinity,
+                child: Image.network(
+                  event.imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: dark ? const Color(0xFF2E2E2E) : const Color(0xFFF0F0F0),
+                    child: Icon(Icons.event, color: Colors.grey[500], size: 32),
+                  ),
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return Container(
+                      color: dark ? const Color(0xFF2E2E2E) : const Color(0xFFF0F0F0),
+                    );
+                  },
+                ),
+              ),
+              if (event.badgeLabel.isNotEmpty)
+                Positioned(
+                  top: 10,
+                  left: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: TColors.primary.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          event.badgeLabel,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  event.title,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: dark ? Colors.white : TColors.textPrimary,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (event.subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    event.subtitle,
+                    style: TextStyle(fontSize: 12, color: dark ? Colors.grey[400] : Colors.grey[600]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                const SizedBox(height: 10),
+                GestureDetector(
+                  onTap: onBookRide,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: TColors.primary,
+                      borderRadius: BorderRadius.circular(TSizes.buttonRadius),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          event.ctaLabel,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.arrow_forward, color: Colors.white, size: 14),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

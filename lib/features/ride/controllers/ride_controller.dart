@@ -11,6 +11,7 @@ import 'package:sarri_ride/features/location/services/places_service.dart'; // M
 import 'package:sarri_ride/core/services/map_marker_service.dart';
 import 'package:sarri_ride/features/emergency/widgets/swipe_to_sos_sheet.dart';
 import 'package:sarri_ride/features/ride/models/ride_model.dart';
+import 'package:sarri_ride/features/ride/models/nearby_event_model.dart';
 import 'package:sarri_ride/features/ride/services/ride_service.dart';
 import 'package:sarri_ride/features/ride/widgets/payment_selection_sheet.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
@@ -151,6 +152,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
   /// True while the rider is waiting for the driver to confirm a cash payment.
   final RxBool isAwaitingCashConfirmation = false.obs;
   final RxList<RideType> rideTypes = <RideType>[].obs;
+  final RxList<NearbyEvent> nearbyEvents = <NearbyEvent>[].obs;
 
   final RxString rideId = ''.obs;
   final RxString activeRideChatId = ''.obs;
@@ -342,6 +344,7 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
     _checkCurrentRideStatus();
     _webSocketService.registerPaymentConfirmedListener(_handlePaymentConfirmed);
     fetchRecentDestinations();
+    loadNearbyEvents();
   }
 
   Future<void> fetchRecentDestinations() async {
@@ -1372,6 +1375,21 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
       _ensureMapFitsRoute();
       animatePanelTo80Percent();
     }
+  }
+
+  Future<void> loadNearbyEvents() async {
+    nearbyEvents.assignAll(await _rideService.fetchActiveEvents());
+  }
+
+  /// Pre-fills the booking destination from a "Happening Nearby" event card
+  /// and jumps straight into ride selection, skipping manual destination
+  /// search — reuses the same flow as picking a recent destination.
+  Future<void> selectEventDestination(NearbyEvent event) async {
+    await selectDestinationFromRecent({
+      'location': event.destination,
+      'name': event.destinationName,
+      'address': event.subtitle,
+    });
   }
 
   void onBackPressed() {

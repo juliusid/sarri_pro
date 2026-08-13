@@ -134,7 +134,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen> {
                     elevation: 3,
                     disabledBackgroundColor: Colors.grey.shade400,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                      borderRadius: BorderRadius.circular(TSizes.buttonRadius),
                     ),
                   ),
                   child: _isProcessing

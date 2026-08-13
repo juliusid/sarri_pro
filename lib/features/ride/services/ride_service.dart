@@ -5,6 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sarri_ride/config/api_config.dart';
 import 'package:sarri_ride/core/services/http_service.dart';
 import 'package:sarri_ride/features/ride/models/ride_model.dart';
+import 'package:sarri_ride/features/ride/models/nearby_event_model.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
 
 class RideService extends GetxService {
@@ -53,6 +54,23 @@ class RideService extends GetxService {
       return null;
     } catch (e) {
       return null;
+    }
+  }
+
+  /// Fetches the currently active "Happening Nearby" partner event cards.
+  Future<List<NearbyEvent>> fetchActiveEvents() async {
+    try {
+      final response = await _httpService.get(ApiConfig.activeEventsEndpoint);
+      final responseData = _httpService.handleResponse(response);
+      if (responseData['status'] == 'success' && responseData['data'] != null) {
+        return (responseData['data'] as List)
+            .map((e) => NearbyEvent.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      // Non-critical — the home screen works fine with no event cards.
+      return [];
     }
   }
 
