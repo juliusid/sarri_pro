@@ -341,7 +341,13 @@ class RideSelectionWidget extends StatelessWidget {
                 Divider(height: 1, color: dark ? TColors.dark : Colors.grey[300]),
 
                 InkWell(
-                  onTap: () => PromoCodeSheet.show(context),
+                  onTap: () {
+                    if (selectedRideType == null) {
+                      THelperFunctions.showSnackBar('Select a ride type first');
+                      return;
+                    }
+                    PromoCodeSheet.show(context);
+                  },
                   borderRadius: const BorderRadius.vertical(bottom: Radius.circular(TSizes.cardRadiusMd)),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

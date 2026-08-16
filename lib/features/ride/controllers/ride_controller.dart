@@ -171,7 +171,14 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
   /// type's price, without consuming a usage slot — just a live preview.
   Future<void> applyPromoCode() async {
     final code = promoCodeController.text.trim();
-    if (code.isEmpty || selectedRideType.value == null) return;
+    if (code.isEmpty) {
+      promoCodeError.value = 'Enter a promo code first';
+      return;
+    }
+    if (selectedRideType.value == null) {
+      promoCodeError.value = 'Select a ride type first';
+      return;
+    }
 
     isCheckingPromoCode.value = true;
     promoCodeError.value = '';
@@ -1338,6 +1345,17 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
         }
 
         rideTypes.assignAll(newRideTypes);
+
+        // When only one category is actually bookable, pick it for the
+        // rider automatically instead of making them tap it — there's
+        // nothing to compare, so the extra tap is just friction (and it
+        // was silently blocking promo code entry, which requires a
+        // selected ride type).
+        final activeTypes = newRideTypes.where((rt) => rt.isActive).toList();
+        if (activeTypes.length == 1) {
+          selectedRideType.value = activeTypes.first;
+        }
+
         return true;
       } else {
         rideTypes.assignAll(_defaultRideTypes);
