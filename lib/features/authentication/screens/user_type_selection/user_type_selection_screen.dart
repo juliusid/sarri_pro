@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/features/authentication/screens/login/login_screen_getx.dart';
 import 'package:sarri_ride/features/authentication/screens/signup/driver_signup_screen.dart';
 import 'package:sarri_ride/features/authentication/screens/signup/rider_signup_screen.dart';
@@ -16,159 +15,133 @@ class UserTypeSelectionScreen extends StatelessWidget {
     final dark = THelperFunctions.isDarkMode(context);
 
     return Scaffold(
-      // Use an AppBar to put the Login button right at the top
-      appBar: AppBar(
-        automaticallyImplyLeading: false, // No back button needed here usually
-        actions: [
-          TextButton(
-            onPressed: () => Get.to(() => const LoginScreenGetX()),
-            child: Text(
-              'Log In',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: TColors.primary,
-                fontWeight: FontWeight.bold,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: TSizes.defaultSpace),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: TSizes.spaceBtwItems),
+
+              // Top row: intentionally empty on the left, Log in on the right.
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const SizedBox(width: 40, height: 40),
+                  TextButton(
+                    onPressed: () => Get.to(() => const LoginScreenGetX()),
+                    child: Text(
+                      'Log in',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: TColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
+
+              const SizedBox(height: TSizes.spaceBtwSections * 1.5),
+
+              // Header
+              Text(
+                'How will you\nride today?',
+                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  height: 1.15,
+                ),
+              ),
+              const SizedBox(height: TSizes.sm),
+              Text(
+                'Pick one to continue.',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: dark ? TColors.lightGrey : TColors.darkGrey,
+                ),
+              ),
+
+              const SizedBox(height: TSizes.spaceBtwSections * 1.5),
+
+              // Flat selectable rows, separated by a hairline divider.
+              _buildSelectionRow(
+                context: context,
+                dark: dark,
+                title: 'Rider',
+                subtitle: 'Book instantly',
+                onTap: () => Get.to(() => const RiderSignupScreen()),
+              ),
+              Divider(
+                height: 1,
+                color: dark ? TColors.darkGrey.withOpacity(0.4) : TColors.grey.withOpacity(0.4),
+              ),
+              _buildSelectionRow(
+                context: context,
+                dark: dark,
+                title: 'Driver',
+                subtitle: 'Start earning',
+                onTap: () => Get.to(() => const DriverSignupScreen()),
+              ),
+
+              const Spacer(),
+
+              // Footer Text
+              Padding(
+                padding: const EdgeInsets.only(bottom: TSizes.spaceBtwItems),
+                child: Text.rich(
+                  TextSpan(
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: dark ? TColors.lightGrey : TColors.darkGrey,
+                    ),
+                    children: const [
+                      TextSpan(text: 'By continuing you agree to our '),
+                      TextSpan(
+                        text: 'terms',
+                        style: TextStyle(decoration: TextDecoration.underline),
+                      ),
+                      TextSpan(text: ' and '),
+                      TextSpan(
+                        text: 'privacy policy',
+                        style: TextStyle(decoration: TextDecoration.underline),
+                      ),
+                      TextSpan(text: '.'),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: TSizes.defaultSpace / 2),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(TSizes.defaultSpace),
-        child: Column(
-          mainAxisAlignment:
-              MainAxisAlignment.center, // Center content vertically
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Header
-            Text(
-              'Welcome to Sarri Ride',
-              style: Theme.of(
-                context,
-              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: TSizes.sm),
-            Text(
-              'Choose how you want to continue',
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-
-            const SizedBox(height: TSizes.spaceBtwSections * 1.5),
-
-            // RIDER CARD (Simplified)
-            _buildSelectionCard(
-              context: context,
-              dark: dark,
-              title: "I am a Rider",
-              subtitle: "Book rides instantly",
-              icon: Iconsax.car,
-              color: TColors.primary,
-              onTap: () => Get.to(() => const RiderSignupScreen()),
-            ),
-
-            const SizedBox(height: TSizes.spaceBtwItems),
-
-            // DRIVER CARD (Simplified)
-            _buildSelectionCard(
-              context: context,
-              dark: dark,
-              title: "I am a Driver",
-              subtitle: "Earn money driving",
-              icon: Iconsax.driver,
-              color: const Color(0xFF4b68ff), // Or TColors.secondary
-              onTap: () => Get.to(() => const DriverSignupScreen()),
-            ),
-
-            const Spacer(), // Pushes content up slightly if needed
-            // Footer Text
-            Center(
-              child: Text(
-                'By continuing, you agree to our Terms & Privacy Policy',
-                style: Theme.of(
-                  context,
-                ).textTheme.labelSmall?.copyWith(color: Colors.grey),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: TSizes.sm),
-          ],
         ),
       ),
     );
   }
 
-  Widget _buildSelectionCard({
+  Widget _buildSelectionRow({
     required BuildContext context,
     required bool dark,
     required String title,
     required String subtitle,
-    required IconData icon,
-    required Color color,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(TSizes.md),
-        decoration: BoxDecoration(
-          // FIX: Use a hardcoded dark grey for dark mode to ensure it's visible
-          color: dark ? const Color(0xFF1F1F1F) : Colors.white,
-          borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
-          border: Border.all(
-            // Make the border slightly visible in dark mode
-            color: dark ? Colors.grey.withOpacity(0.2) : color.withOpacity(0.3),
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: TSizes.spaceBtwSections),
         child: Row(
           children: [
-            // Icon Box
-            Container(
-              height: 60,
-              width: 60,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
-              ),
-              child: Icon(icon, color: color, size: 30),
-            ),
-            const SizedBox(width: TSizes.spaceBtwItems),
-
-            // Text Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      // Ensure text is white in dark mode
-                      color: dark ? Colors.white : Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
-                  ),
-                ],
+            Text(
+              title,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
             ),
-
-            // Arrow Icon
-            Icon(Iconsax.arrow_right_3, color: color),
+            const Spacer(),
+            Text(
+              subtitle,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: dark ? TColors.lightGrey : TColors.darkGrey,
+              ),
+            ),
+            const SizedBox(width: TSizes.sm),
+            const Icon(Icons.arrow_forward, color: TColors.primary, size: TSizes.iconMd),
           ],
         ),
       ),

@@ -81,6 +81,7 @@ class ApiConfig {
   static String get googleAuthEndpoint =>
       '$baseUrl/client/google'; // Assuming correct path
   static String get appleAuthEndpoint => '$baseUrl/auth/client/apple';
+  static String get socialLoginEndpoint => '$baseUrl/auth/social/login';
   static String get logoutEndpoint =>
       '$baseUrl/auth/logout'; // Assuming correct path
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart'; //
+import 'package:sarri_ride/features/authentication/widgets/sign_in_update_notice.dart';
 import 'package:sarri_ride/common/widgets/loading_button.dart';
 // --- Local Imports ---
 import 'package:sarri_ride/features/driver/controllers/driver_dashboard_controller.dart'; //
@@ -27,6 +28,10 @@ class DriverDashboardScreen extends StatelessWidget {
     final controller = Get.put(DriverDashboardController()); //
     final tripController = Get.put(TripManagementController()); //
     final dark = THelperFunctions.isDarkMode(context); //
+
+    // One-time heads-up for drivers still signed in from before passwords
+    // were replaced by Google, so an expiring session isn't a surprise.
+    SignInUpdateNotice.maybeShow(SignInNoticeSurface.home);
 
     return DoubleBackToCloseWidget(
       child: Scaffold(

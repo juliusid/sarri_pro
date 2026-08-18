@@ -38,6 +38,10 @@ class LoginController extends GetxController {
   final RxBool isAppleLoading = false.obs;
   final selectedRole = UserType.rider.obs;
 
+  /// Name/email Apple returns only on a first-ever sign-in. Kept so a
+  /// new-account signup can use it instead of falling back to placeholders.
+  Map<String, dynamic>? _pendingAppleUserPayload;
+
   // @override
   // void onClose() {
   //   emailController.dispose();
@@ -219,20 +223,21 @@ class LoginController extends GetxController {
     }
   }
 
-  // Handle social login (Google) — for both riders and drivers
+  // Unified Google login — backend detects Client vs Driver from the
+  // Google account, so the app no longer needs to pick a role up front.
   Future<void> handleGoogleLogin() async {
     isGoogleLoading.value = true;
 
-    try {
-      final googleSignIn = GoogleSignIn(
-        clientId: Platform.isIOS
-            ? '566802818676-af50fhe86j05gsf22vcrpu5o25re8g0h.apps.googleusercontent.com'
-            : null,
-        serverClientId:
-            '566802818676-kuc13au4v6ifp3oe6qimcdp78s84fnnd.apps.googleusercontent.com',
-        scopes: ['email', 'profile'],
-      );
+    final googleSignIn = GoogleSignIn(
+      clientId: Platform.isIOS
+          ? '566802818676-af50fhe86j05gsf22vcrpu5o25re8g0h.apps.googleusercontent.com'
+          : null,
+      serverClientId:
+          '566802818676-kuc13au4v6ifp3oe6qimcdp78s84fnnd.apps.googleusercontent.com',
+      scopes: ['email', 'profile'],
+    );
 
+    try {
       await googleSignIn.signOut();
       final googleUser = await googleSignIn.signIn();
 
@@ -251,70 +256,238 @@ class LoginController extends GetxController {
         return;
       }
 
-      final isDriverLogin = selectedRole.value == UserType.driver;
-
-      if (isDriverLogin) {
-        // ── Driver Google Login ──────────────────────────────────────────
-        print('LOGIN_CONTROLLER: Driver Google Sign-In...');
-        final loginResult =
-            await AuthService.instance.loginDriverWithGoogle(googleToken);
-
-        if (loginResult.success && loginResult.client != null) {
-          if (loginResult.isNewDriver) {
-            THelperFunctions.showSuccessSnackBar(
-              'Account Created',
-              'Welcome! Please complete your driver profile setup.',
-            );
-          } else {
-            THelperFunctions.showSuccessSnackBar(
-                'Welcome back!', 'Signed in as driver.');
-          }
-
-          if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
-            Get.delete<ClientData>(tag: 'currentUser', force: true);
-          }
-          Get.put<ClientData>(loginResult.client!,
-              tag: 'currentUser', permanent: true);
-
-          final storage = GetStorage();
-          storage.write('user_role', loginResult.client!.role);
-          storage.write('current_user_data', loginResult.client!.toJson());
-
-          WebSocketService.instance.connect();
-          await NotificationService.instance.updateTokenOnBackend();
-
-          Get.offAll(() => const DriverDashboardScreen());
-        } else {
-          THelperFunctions.showErrorSnackBar(
-              'Login Failed', loginResult.error ?? 'Server rejected the login.');
+      final result = await AuthService.instance.socialLogin(googleToken, 'google');
+      await _handleSocialLoginResult(
+        result,
+        provider: 'google',
+        token: googleToken,
+        onNoAccountOrFailure: () async {
           try {
             await googleSignIn.signOut();
           } catch (_) {}
+        },
+      );
+    } catch (e) {
+      THelperFunctions.showErrorSnackBar(
+          'Error', 'Google login failed: ${e.toString()}');
+      print('Google Sign-In Error: $e');
+    } finally {
+      if (!isClosed) {
+        isGoogleLoading.value = false;
+      }
+    }
+  }
+
+  // Shared handling for the unified /auth/social/login response — routes to
+  // the right dashboard by the role the backend detected, prompts Signup on
+  // a genuine "no account" result, and lets the person pick a role when the
+  // same provider account is linked to both a rider and a driver profile.
+  Future<void> _handleSocialLoginResult(
+    SocialLoginResult result, {
+    required String provider,
+    required String token,
+    required Future<void> Function() onNoAccountOrFailure,
+  }) async {
+    if (result.success && result.client != null) {
+      if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
+        Get.delete<ClientData>(tag: 'currentUser', force: true);
+      }
+      Get.put<ClientData>(result.client!, tag: 'currentUser', permanent: true);
+
+      final storage = GetStorage();
+      storage.write('user_role', result.role);
+      storage.write('current_user_data', result.client!.toJson());
+
+      WebSocketService.instance.connect();
+      await NotificationService.instance.updateTokenOnBackend();
+
+      if (result.role == 'driver') {
+        Get.offAll(() => const DriverDashboardScreen());
+        THelperFunctions.showSuccessSnackBar('Welcome back!', 'Signed in as driver.');
+        return;
+      }
+
+      // Client/rider
+      final drawerController = Get.find<MapDrawerController>();
+      await drawerController.refreshUserData();
+      final profile = drawerController.fullProfile.value;
+      if (profile != null && profile.phoneNumberVerified == false) {
+        Get.offAll(() => const PhoneNumberScreen());
+      } else {
+        Get.offAll(() => const MapScreenGetX());
+        THelperFunctions.showSuccessSnackBar('Success', 'Welcome!');
+      }
+      return;
+    }
+
+    if (result.multipleAccounts) {
+      await onNoAccountOrFailure();
+      _promptRoleChoiceForMultipleAccounts(result.accounts!, provider, token);
+      return;
+    }
+
+    if (result.noAccountFound) {
+      // Genuinely new person. Don't dead-end them into "please sign up first"
+      // and a second Google prompt — the only thing we still need is whether
+      // they're a rider or a driver, so ask that one question and finish the
+      // signup with the token already in hand.
+      if (provider == 'apple') {
+        // Drivers have no Apple backend yet, so Apple can only mean rider.
+        await _completeNewAppleRiderSignup(token);
+      } else {
+        _promptRoleChoiceForNewAccount(token);
+      }
+      return;
+    }
+
+    await onNoAccountOrFailure();
+    THelperFunctions.showErrorSnackBar(
+      'Login Failed',
+      result.error ?? 'Server rejected the login.',
+    );
+  }
+
+  // New Google account: ask the one thing a Google token can't tell us —
+  // rider or driver — then create the account straight away. Guessing instead
+  // of asking would be worse than a dead end: silently making a rider account
+  // for someone who meant to drive leaves their email permanently unusable
+  // for a driver signup.
+  void _promptRoleChoiceForNewAccount(String token) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('How will you be using Sarri Ride?'),
+        content: const Text(
+          "Looks like you're new here. Pick how you'd like to get started.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Get.back();
+              _completeRoleSpecificGoogleLogin('client', token);
+            },
+            child: const Text('As a Rider'),
+          ),
+          TextButton(
+            onPressed: () {
+              Get.back();
+              _completeRoleSpecificGoogleLogin('driver', token);
+            },
+            child: const Text('As a Driver'),
+          ),
+        ],
+      ),
+      barrierDismissible: true,
+    );
+  }
+
+  // New Apple account — rider only, so no role question to ask.
+  Future<void> _completeNewAppleRiderSignup(String identityToken) async {
+    isAppleLoading.value = true;
+    try {
+      final result = await AuthService.instance.loginWithApple(
+        identityToken,
+        user: _pendingAppleUserPayload,
+      );
+
+      if (result.success && result.client != null) {
+        if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
+          Get.delete<ClientData>(tag: 'currentUser', force: true);
+        }
+        Get.put<ClientData>(result.client!, tag: 'currentUser', permanent: true);
+
+        final storage = GetStorage();
+        storage.write('user_role', result.client!.role);
+        storage.write('current_user_data', result.client!.toJson());
+
+        WebSocketService.instance.connect();
+        await NotificationService.instance.updateTokenOnBackend();
+
+        final drawerController = Get.find<MapDrawerController>();
+        await drawerController.refreshUserData();
+        final profile = drawerController.fullProfile.value;
+        if (profile != null && profile.phoneNumberVerified == false) {
+          Get.offAll(() => const PhoneNumberScreen());
+        } else {
+          Get.offAll(() => const MapScreenGetX());
+          THelperFunctions.showSuccessSnackBar('Welcome!', 'Your account is ready.');
         }
       } else {
-        // ── Rider Google Login (unchanged) ───────────────────────────────
-        print('LOGIN_CONTROLLER: Rider Google Sign-In...');
-        final loginResult = await AuthService.instance.loginWithGoogle(googleToken);
+        THelperFunctions.showErrorSnackBar(
+          'Sign Up Failed',
+          result.error ?? 'Could not create your account. Please try again.',
+        );
+      }
+    } finally {
+      if (!isClosed) {
+        isAppleLoading.value = false;
+      }
+    }
+  }
 
+  // One Google account linked to both a rider and a driver profile — let the
+  // person choose, then complete sign-in through the existing per-role
+  // Google endpoints (Apple never reaches here: Driver has no Apple auth).
+  void _promptRoleChoiceForMultipleAccounts(
+    List<Map<String, dynamic>> accounts,
+    String provider,
+    String token,
+  ) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Choose an account'),
+        content: const Text(
+          'This sign-in is linked to both a rider and a driver account. Which one would you like to continue with?',
+        ),
+        actions: accounts.map((account) {
+          final role = account['role'] as String;
+          return TextButton(
+            onPressed: () async {
+              Get.back();
+              await _completeRoleSpecificGoogleLogin(role, token);
+            },
+            child: Text(role == 'driver' ? 'Continue as Driver' : 'Continue as Rider'),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Future<void> _completeRoleSpecificGoogleLogin(String role, String googleToken) async {
+    isGoogleLoading.value = true;
+    try {
+      if (role == 'driver') {
+        final loginResult = await AuthService.instance.loginDriverWithGoogle(googleToken);
         if (loginResult.success && loginResult.client != null) {
-          print('LOGIN_CONTROLLER: Backend accepted the login!');
-
           if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
             Get.delete<ClientData>(tag: 'currentUser', force: true);
           }
-          Get.put<ClientData>(loginResult.client!,
-              tag: 'currentUser', permanent: true);
-
+          Get.put<ClientData>(loginResult.client!, tag: 'currentUser', permanent: true);
           final storage = GetStorage();
           storage.write('user_role', loginResult.client!.role);
           storage.write('current_user_data', loginResult.client!.toJson());
-
+          WebSocketService.instance.connect();
+          await NotificationService.instance.updateTokenOnBackend();
+          Get.offAll(() => const DriverDashboardScreen());
+          THelperFunctions.showSuccessSnackBar('Welcome back!', 'Signed in as driver.');
+        } else {
+          THelperFunctions.showErrorSnackBar(
+              'Login Failed', loginResult.error ?? 'Server rejected the login.');
+        }
+      } else {
+        final loginResult = await AuthService.instance.loginWithGoogle(googleToken);
+        if (loginResult.success && loginResult.client != null) {
+          if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
+            Get.delete<ClientData>(tag: 'currentUser', force: true);
+          }
+          Get.put<ClientData>(loginResult.client!, tag: 'currentUser', permanent: true);
+          final storage = GetStorage();
+          storage.write('user_role', loginResult.client!.role);
+          storage.write('current_user_data', loginResult.client!.toJson());
           WebSocketService.instance.connect();
           await NotificationService.instance.updateTokenOnBackend();
 
           final drawerController = Get.find<MapDrawerController>();
           await drawerController.refreshUserData();
-
           final profile = drawerController.fullProfile.value;
           if (profile != null && profile.phoneNumberVerified == false) {
             Get.offAll(() => const PhoneNumberScreen());
@@ -325,30 +498,19 @@ class LoginController extends GetxController {
         } else {
           THelperFunctions.showErrorSnackBar(
               'Login Failed', loginResult.error ?? 'Server rejected the login.');
-          try {
-            await googleSignIn.signOut();
-          } catch (_) {}
         }
       }
-    } catch (e) {
-      THelperFunctions.showErrorSnackBar(
-          'Error', 'Google login failed: ${e.toString()}');
-      print('Google Sign-In Error: $e');
     } finally {
-      isGoogleLoading.value = false;
+      if (!isClosed) {
+        isGoogleLoading.value = false;
+      }
     }
   }
 
-  // Handle Sign in with Apple (iOS only)
+  // Unified Sign in with Apple (iOS only). Apple has no Driver-side backend
+  // support today, so a driver's Apple sign-in correctly resolves to
+  // "no account found" and prompts Signup rather than erroring.
   Future<void> handleAppleSignIn() async {
-    if (selectedRole.value != UserType.rider) {
-      THelperFunctions.showErrorSnackBar(
-        'Error',
-        'Apple Sign-In is currently only available for Riders.',
-      );
-      return;
-    }
-
     isAppleLoading.value = true;
     try {
       // Check if Sign in with Apple is available on this device/build
@@ -372,83 +534,39 @@ class LoginController extends GetxController {
       final identityToken = credential.identityToken;
 
       if (identityToken != null) {
-        // Prepare optional user object if provided
-        final givenName = credential.givenName;
-        final familyName = credential.familyName;
-        final email = credential.email;
-
         debugPrint(
           'APPLE SIGN-IN: identityToken received: ${identityToken.substring(0, 20)}...',
         );
-        debugPrint(
-          'APPLE SIGN-IN: givenName: $givenName, familyName: $familyName, email: $email',
-        );
 
-        // Only send user object if we have actual data (Apple only provides name/email on first sign-in)
-        Map<String, dynamic>? userPayload;
-        if (givenName != null || familyName != null || email != null) {
-          userPayload = {
+        // Apple only hands over name/email on the very first sign-in. Hold on
+        // to it here — if this turns out to be a new account, it's the only
+        // chance we get to save a real name instead of "Apple User".
+        final givenName = credential.givenName;
+        final familyName = credential.familyName;
+        final appleEmail = credential.email;
+        if (givenName != null || familyName != null || appleEmail != null) {
+          _pendingAppleUserPayload = {
             'name': {
               'firstName': givenName ?? '',
               'lastName': familyName ?? '',
             },
-            'email': email ?? '',
+            'email': appleEmail ?? '',
           };
         }
 
-        print("LOGIN_CONTROLLER: Calling AuthService.loginWithApple...");
-        final loginResult = await AuthService.instance.loginWithApple(
-          identityToken,
-          user: userPayload,
-        );
+        print("LOGIN_CONTROLLER: Calling unified AuthService.socialLogin (apple)...");
+        final result = await AuthService.instance.socialLogin(identityToken, 'apple');
 
         print(
-          "LOGIN_CONTROLLER: loginWithApple returned - Success: ${loginResult.success}, Error: ${loginResult.error}",
+          "LOGIN_CONTROLLER: socialLogin(apple) returned - Success: ${result.success}, noAccount: ${result.noAccountFound}, error: ${result.error}",
         );
 
-        if (loginResult.success && loginResult.client != null) {
-          print(
-            "LOGIN_CONTROLLER: Apple login successful - User email: ${loginResult.client!.email}",
-          );
-
-          if (Get.isRegistered<ClientData>(tag: 'currentUser')) {
-            Get.delete<ClientData>(tag: 'currentUser', force: true);
-          }
-
-          Get.put<ClientData>(
-            loginResult.client!,
-            tag: 'currentUser',
-            permanent: true,
-          );
-
-          final storage = GetStorage();
-          storage.write('user_role', loginResult.client!.role);
-          storage.write('current_user_data', loginResult.client!.toJson());
-
-          WebSocketService.instance.connect();
-          await NotificationService.instance.updateTokenOnBackend();
-
-          final drawerController = Get.find<MapDrawerController>();
-          await drawerController.refreshUserData();
-
-          final profile = drawerController.fullProfile.value;
-          if (profile != null && profile.phoneNumberVerified == false) {
-            Get.offAll(() => const PhoneNumberScreen());
-          } else {
-            Get.offAll(() => const MapScreenGetX());
-            THelperFunctions.showSuccessSnackBar('Success', 'Welcome!');
-          }
-        } else {
-          print(
-            "LOGIN_CONTROLLER: Apple login failed - Error: ${loginResult.error}",
-          );
-          final errorMessage =
-              loginResult.error ?? 'Apple Sign-In failed. Please try again.';
-
-          // Ensure error is visible
-          print("LOGIN_CONTROLLER: Showing error snackbar: $errorMessage");
-          THelperFunctions.showErrorSnackBar('Login Failed', errorMessage);
-        }
+        await _handleSocialLoginResult(
+          result,
+          provider: 'apple',
+          token: identityToken,
+          onNoAccountOrFailure: () async {},
+        );
       } else {
         print("LOGIN_CONTROLLER: No identity token returned from Apple");
         THelperFunctions.showErrorSnackBar(

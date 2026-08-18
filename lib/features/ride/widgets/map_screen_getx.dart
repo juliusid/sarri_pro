@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:sarri_ride/features/authentication/widgets/sign_in_update_notice.dart';
 import 'package:sarri_ride/features/notifications/controllers/notification_controller.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 
@@ -152,6 +153,10 @@ class MapScreenGetX extends StatelessWidget {
     final rideController = Get.put(RideController());
     final notificationController = Get.find<NotificationController>();
     final dark = THelperFunctions.isDarkMode(context);
+
+    // One-time heads-up for users still signed in from before passwords
+    // were replaced by Google/Apple, so an expiring session isn't a surprise.
+    SignInUpdateNotice.maybeShow(SignInNoticeSurface.home);
 
     // Open panel after frame renders if state is active
     WidgetsBinding.instance.addPostFrameCallback((_) {

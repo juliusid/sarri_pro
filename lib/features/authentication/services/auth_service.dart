@@ -394,6 +394,56 @@ class AuthService extends GetxService {
     }
   }
 
+  // Unified Google/Apple login — backend detects Client vs Driver by
+  // provider account ID, so the app no longer picks a role up front.
+  // A 404/NO_ACCOUNT_FOUND means "no account yet, go to Signup"; it is not
+  // an error to surface as a generic failure.
+  Future<SocialLoginResult> socialLogin(String idToken, String provider) async {
+    try {
+      final response = await _httpService.post(
+        ApiConfig.socialLoginEndpoint,
+        body: {'idToken': idToken, 'provider': provider},
+      );
+      final responseData = _httpService.handleResponse(response);
+      final data = responseData['data'] as Map<String, dynamic>?;
+
+      if (data?['multipleAccounts'] == true) {
+        final accounts = (data!['accounts'] as List)
+            .map((a) => a as Map<String, dynamic>)
+            .toList();
+        return SocialLoginResult.multipleAccounts(accounts);
+      }
+
+      final loginResponse = LoginResponse.fromJson(responseData);
+      if (loginResponse.status == 'success' &&
+          loginResponse.accessToken != null &&
+          loginResponse.client != null) {
+        await _httpService.storeTokens(
+          loginResponse.accessToken!,
+          loginResponse.refreshToken,
+        );
+        final role = data?['role'] ?? loginResponse.client!.role;
+        return SocialLoginResult.success(
+          client: loginResponse.client!,
+          role: role,
+        );
+      }
+      return SocialLoginResult.error(
+        loginResponse.message.isNotEmpty
+            ? loginResponse.message
+            : 'Sign-in failed. Please try again.',
+      );
+    } catch (e) {
+      if (e is ApiException) {
+        if (e.statusCode == 404 && e.data['code'] == 'NO_ACCOUNT_FOUND') {
+          return SocialLoginResult.noAccount();
+        }
+        return SocialLoginResult.error(e.message);
+      }
+      return SocialLoginResult.error('An unknown error occurred: ${e.toString()}');
+    }
+  }
+
   // ---------- VERIFY OTP ----------
   Future<AuthResult> verifyEmail(String email, String otp, String role) async {
     try {
@@ -784,6 +834,52 @@ class AuthResult {
 
   factory AuthResult.error(String error) {
     return AuthResult._(success: false, error: error);
+  }
+}
+
+// ---------- UNIFIED SOCIAL LOGIN RESULT ----------
+class SocialLoginResult {
+  final bool success;
+  final bool noAccountFound;
+  final bool multipleAccounts;
+  final ClientData? client;
+  final String? role;
+  final List<Map<String, dynamic>>? accounts;
+  final String? error;
+
+  SocialLoginResult._({
+    required this.success,
+    this.noAccountFound = false,
+    this.multipleAccounts = false,
+    this.client,
+    this.role,
+    this.accounts,
+    this.error,
+  });
+
+  factory SocialLoginResult.success({
+    required ClientData client,
+    required String role,
+  }) {
+    return SocialLoginResult._(success: true, client: client, role: role);
+  }
+
+  factory SocialLoginResult.noAccount() {
+    return SocialLoginResult._(success: false, noAccountFound: true);
+  }
+
+  factory SocialLoginResult.multipleAccounts(
+    List<Map<String, dynamic>> accounts,
+  ) {
+    return SocialLoginResult._(
+      success: false,
+      multipleAccounts: true,
+      accounts: accounts,
+    );
+  }
+
+  factory SocialLoginResult.error(String error) {
+    return SocialLoginResult._(success: false, error: error);
   }
 }
 

@@ -6,6 +6,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:sarri_ride/common/widgets/loading_button.dart';
 import 'package:sarri_ride/features/authentication/controllers/driver_signup_controller.dart';
 import 'package:sarri_ride/features/authentication/widgets/google_button.dart';
+import 'package:sarri_ride/features/authentication/widgets/auth_illustration.dart';
 import 'package:sarri_ride/utils/constants/colors.dart';
 import 'package:sarri_ride/utils/constants/sizes.dart';
 import 'package:sarri_ride/utils/helpers/helper_functions.dart';
@@ -30,87 +31,54 @@ class _DriverAuthMethodStepState extends State<DriverAuthMethodStep> {
   Widget build(BuildContext context) {
     final dark = THelperFunctions.isDarkMode(context);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(TSizes.defaultSpace),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: TSizes.spaceBtwItems),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(TSizes.defaultSpace),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const AuthIllustration(
+                    variant: AuthIllustrationVariant.radar,
+                  ),
+                  const SizedBox(height: TSizes.spaceBtwSections),
 
-          // ── Header ─────────────────────────────────────────────────────
-          Text(
-            'Join as a Driver',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
-          const SizedBox(height: TSizes.xs),
-          Text(
-            'Start earning in minutes. No long forms.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: dark ? TColors.lightGrey : TColors.darkGrey,
-                ),
-          ),
+                  // ── Header ─────────────────────────────────────────────
+                  Text(
+                    'Join as a Driver',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: TSizes.xs),
+                  Text(
+                    'Start earning in minutes. No long forms.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: dark ? TColors.lightGrey : TColors.darkGrey,
+                        ),
+                  ),
 
-          const SizedBox(height: TSizes.spaceBtwSections),
+                  const SizedBox(height: TSizes.spaceBtwSections * 1.5),
 
-          // ── Google Sign-In (Primary) ───────────────────────────────────
-          Obx(() => GoogleSignInButton(
-                isLoading: c.isLoading.value && !_showOtpField.value,
-                onPressed: c.signInWithGoogle,
-              )),
-
-          const SizedBox(height: TSizes.spaceBtwItems),
-
-          // ── Divider ───────────────────────────────────────────────────
-          Row(
-            children: [
-              Expanded(
-                child: Divider(
-                  color: dark ? TColors.darkGrey : TColors.grey,
-                  thickness: .5,
-                ),
+                  // ── Google Sign-In ─────────────────────────────────────
+                  // Email/password sign-up is suspended for now — Google only.
+                  SizedBox(
+                    width: double.infinity,
+                    child: Obx(() => GoogleSignInButton(
+                          isLoading: c.isLoading.value && !_showOtpField.value,
+                          onPressed: c.signInWithGoogle,
+                        )),
+                  ),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  'or sign up with email',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: dark ? TColors.lightGrey : TColors.darkGrey,
-                      ),
-                ),
-              ),
-              Expanded(
-                child: Divider(
-                  color: dark ? TColors.darkGrey : TColors.grey,
-                  thickness: .5,
-                ),
-              ),
-            ],
+            ),
           ),
-
-          const SizedBox(height: TSizes.spaceBtwItems),
-
-          // ── Form Area ────────────────────────────────────────────────
-          Obx(() {
-            if (c.isOtpVerified.value) {
-              return _ProfileSection(controller: c, dark: dark);
-            } else if (_showOtpField.value) {
-              return _OtpSection(
-                controller: c,
-                showOtpField: _showOtpField,
-                dark: dark,
-              );
-            } else {
-              return _EmailSection(
-                controller: c,
-                showOtpField: _showOtpField,
-                dark: dark,
-              );
-            }
-          }),
-        ],
-      ),
+        );
+      },
     );
   }
 }
