@@ -45,8 +45,8 @@ class _TripCompletedWidgetState extends State<TripCompletedWidget>
 
   // ---- Payment UI state ----
   /// Which method the user has chosen to pay with this session.
-  String? _selectedMethod; // 'cash', 'card:<cardId>', null = not chosen
-  bool _hasPaidCash = false; // user tapped "I've Paid Cash"
+  String? _selectedMethod; // 'transfer', 'card:<cardId>', null = not chosen
+  bool _hasPaidCash = false; // awaiting driver/webhook confirmation banner
 
   // ---- Rating state ----
   int _selectedRating = 0;
@@ -136,24 +136,21 @@ class _TripCompletedWidgetState extends State<TripCompletedWidget>
   // Payment actions
   // ---------------------------------------------------------------------------
 
-  Future<void> _payCash() async {
+  Future<void> _payWithTransfer() async {
     final result = await _paymentController.initiateTripPayment(
       widget.tripId,
-      paymentMethod: 'cash',
+      paymentMethod: 'transfer',
     );
 
     if (!mounted) return;
 
-    if (result == PaymentResult.awaitingConfirmation) {
-      setState(() => _hasPaidCash = true);
-      // The widget now shows the "Waiting for driver to confirm" banner.
-      // isPaymentCompleted socket/polling will auto-advance the phase.
-    } else if (result == PaymentResult.success) {
+    if (result == PaymentResult.success) {
       _advanceToConfirmed();
-    } else if (result == PaymentResult.failed) {
-      // Error snackbar already shown by controller.
+    } else if (result == PaymentResult.unknown) {
+      // Webview closed without a clean redirect — the webhook will confirm.
+      setState(() => _hasPaidCash = true); // Reuse the "waiting" banner.
     }
-    // PaymentResult.unknown is not expected for cash.
+    // failed: snackbar already shown by controller.
   }
 
   Future<void> _payWithCard(String cardId) async {
@@ -477,19 +474,19 @@ class _TripCompletedWidgetState extends State<TripCompletedWidget>
           opacity: isPaying ? 0.6 : 1.0,
           child: Column(
             children: [
-              // ---- Cash option ----
+              // ---- Bank transfer option ----
               _buildOptionTile(
                 dark: dark,
-                icon: Iconsax.money,
+                icon: Iconsax.bank,
                 color: TColors.success,
-                title: 'Cash',
-                subtitle: 'Pay ₦$price directly to driver',
-                trailing: isPaying && _selectedMethod == 'cash'
+                title: 'Bank Transfer',
+                subtitle: 'Pay ₦$price via bank transfer',
+                trailing: isPaying && _selectedMethod == 'transfer'
                     ? const _SmallSpinner(color: TColors.success)
                     : null,
                 onTap: () {
-                  setState(() => _selectedMethod = 'cash');
-                  _payCash();
+                  setState(() => _selectedMethod = 'transfer');
+                  _payWithTransfer();
                 },
               ),
 

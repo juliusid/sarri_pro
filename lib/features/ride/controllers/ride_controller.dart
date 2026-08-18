@@ -107,10 +107,11 @@ class RideController extends GetxController with GetTickerProviderStateMixin, Wi
   final RxString searchingStatusText = "Finding your driver...".obs;
   final RxString potentialDriverInfo = "".obs;
 
-  /// Stores the currently selected payment method. Defaults to 'Cash'.
-  final RxString selectedPaymentMethod = 'Cash'.obs;
+  /// Stores the currently selected payment method. Defaults to 'Transfer'
+  /// now that cash is suspended.
+  final RxString selectedPaymentMethod = 'Transfer'.obs;
 
-  /// Stores the ID of the selected card (if not 'Cash').
+  /// Stores the ID of the selected card (if not 'Transfer').
   final RxString selectedCardId = ''.obs;
 
   // Reactive state variables

@@ -74,7 +74,7 @@ class PaymentSelectionSheet extends StatelessWidget {
 
           // --- 4. MODIFIED PAYMENT LIST ---
 
-          // Cash Option
+          // Bank Transfer Option
           Obx(
             () => ListTile(
               leading: Container(
@@ -86,15 +86,14 @@ class PaymentSelectionSheet extends StatelessWidget {
                       : TColors.lightGrey.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(TSizes.borderRadiusSm),
                 ),
-                child: const Icon(Iconsax.money, color: TColors.success),
+                child: const Icon(Iconsax.bank, color: TColors.success),
               ),
-              title: Text('Cash', style: Theme.of(context).textTheme.bodyLarge),
+              title: Text('Bank Transfer', style: Theme.of(context).textTheme.bodyLarge),
               onTap: () {
-                // Set method to 'Cash' and cardId to null
-                rideController.selectPaymentMethod('Cash', cardId: null);
+                rideController.selectPaymentMethod('Transfer', cardId: null);
                 Get.back();
               },
-              trailing: rideController.selectedPaymentMethod.value == 'Cash'
+              trailing: rideController.selectedPaymentMethod.value == 'Transfer'
                   ? const Icon(Iconsax.tick_circle, color: TColors.primary)
                   : null,
             ),
