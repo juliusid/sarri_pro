@@ -5,17 +5,14 @@ class ApiConfig {
   static String get apiKey =>
       dotenv.env['API_KEY'] ?? "the_sarriride_2025@development_Backend";
   static String get _devBaseUrl =>
-      // 'https://sarriride.onrender.com'; // Replace with your dev API URL
       dotenv.env['DEV_BASE_URL'] ??
-      'https://oyster-app-kfpml.ondigitalocean.app';
+      (throw StateError('DEV_BASE_URL is not set in .env'));
   static String get _stagingBaseUrl =>
-      // 'https://sarriride.onrender.com'; // Replace with your staging API URL
       dotenv.env['STAGING_BASE_URL'] ??
-      'https://oyster-app-kfpml.ondigitalocean.app';
+      (throw StateError('STAGING_BASE_URL is not set in .env'));
   static String get _prodBaseUrl =>
-      // 'https://sarriride.onrender.com'; // Replace with your production API URL
       dotenv.env['PROD_BASE_URL'] ??
-      'https://oyster-app-kfpml.ondigitalocean.app';
+      (throw StateError('PROD_BASE_URL is not set in .env'));
 
   // Timeouts
   static const Duration _connectionTimeout = Duration(seconds: 30);
@@ -46,7 +43,7 @@ class ApiConfig {
   }
 
   static String get isProductionUrl {
-    if (baseUrl == 'https://oyster-app-kfpml.ondigitalocean.app') {
+    if (baseUrl == 'http://143.198.181.152') {
       print(
         "___________________________________________ PRODUCTION __________________________________________________________",
       );
